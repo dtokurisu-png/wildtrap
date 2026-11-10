@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WILDTRAP · Expedición procedural</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#e8f6f1;background:#101d1b}*{box-sizing:border-box}
+body{margin:0;overflow:hidden}#game{position:fixed;inset:0;width:100%;height:100%;display:block}
+#hud{position:fixed;z-index:2;top:12px;left:12px;width:min(335px,calc(100% - 24px));padding:13px 15px;background:#0e201cdd;border:1px solid #5c8d7c99;border-radius:12px;backdrop-filter:blur(7px);font-size:13px;line-height:1.5}
+h1{font-size:20px;margin:0;color:#9df5d7}h2{font-size:13px;margin:10px 0 2px}ol{margin:4px 0;padding-left:20px}li.done{text-decoration:line-through;color:#87b7a2}.minor{color:#abc9bc}
+#controls{position:fixed;z-index:2;bottom:12px;left:12px;padding:8px 12px;background:#102822e8;border-radius:8px;font-size:12px;max-width:calc(100% - 24px)}
+#message{position:fixed;top:13%;left:50%;transform:translateX(-50%);z-index:5;background:#174236f5;padding:11px 16px;border-radius:10px;max-width:85vw;text-align:center;opacity:0;pointer-events:none}
+#map{position:fixed;right:12px;top:12px;border:1px solid #83b9a6;border-radius:10px;background:#0c241cdd;z-index:2}
+#actions{position:fixed;right:12px;bottom:12px;display:flex;gap:6px;flex-direction:column;z-index:3}
+button,input,.fileLabel{background:#165044;color:#e5fff6;border:1px solid #7dc5a9;border-radius:8px;padding:9px;font:inherit;font-size:12px;cursor:pointer}
+button:hover,.fileLabel:hover{background:#246b5c}#seed{width:150px}#prompt{color:#ffdda0;font-weight:700}
+#loading{position:fixed;inset:0;background:#10241ff2;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:25px}#loading[hidden]{display:none}
+#loading h2{font-size:23px;color:#a4f2d5}#loadDetail{font-size:14px;color:#c8e1d8;max-width:520px;white-space:pre-line}
+#retry{display:none;background:#2f6957}#diagnostic{font-size:12px;color:#ffcdac}
+@media(max-width:680px){#hud{font-size:11px;padding:9px;width:250px}h1{font-size:16px}#map{width:104px;height:104px;top:auto;bottom:150px}#actions{bottom:90px}#controls{font-size:10px;max-width:75vw}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head><body>
+<canvas id="game" aria-label="Expedición 3D"></canvas>
+<div id="loading" role="status"><h2>WILDTRAP</h2><div id="loadDetail">Preparando expedición…</div><div id="diagnostic"></div><button id="retry" onclick="location.reload()">Reintentar</button></div>
+<div id="hud"><h1>WILDTRAP <span class="minor">· prototipo 0.2</span></h1><div class="minor">Mapa fijo · expediciones procedurales</div><div id="status"></div><h2>Objetivos</h2><ol id="objectives"></ol><div id="prompt"></div><div class="minor" id="modelStatus">Farolera: selecciona un GLB para sustituir al personaje técnico.</div></div>
+<canvas id="map" width="180" height="180" aria-label="Minimapa"></canvas><div id="message"></div>
+<div id="actions"><input id="seed" value="bosque-001" aria-label="Semilla de expedición"><button id="new">Nueva expedición</button><label class="fileLabel">Cargar Farolera GLB<input hidden id="modelFile" type="file" accept=".glb"></label><button id="save">Guardar botín local</button></div>
+<div id="controls">WASD / flechas: mover · Shift: correr · E: interactuar · Espacio: ahuyentar · X: extraer en campamento · R: repetir semilla. Prototipo individual.</div>
+<script>
+(function(){const loading=document.getElementById('loading'),detail=document.getElementById('loadDetail'),error=document.getElementById('diagnostic'),retry=document.getElementById('retry');let ready=false;
+window.__wildtrapReady=()=>{ready=true;loading.hidden=true};
+window.__wildtrapFailure=(reason)=>{if(ready)return;detail.textContent='No se pudo iniciar la expedición.';error.textContent=String(reason);retry.style.display='block'};
+window.addEventListener('error',e=>window.__wildtrapFailure(e.message||'Error de JavaScript'));
+window.addEventListener('unhandledrejection',e=>window.__wildtrapFailure(e.reason?.message||e.reason||'Error asíncrono'));
+setTimeout(()=>{if(!ready)window.__wildtrapFailure('Tiempo de carga excedido. Comprueba conexión a la CDN, navegador y consola.')},12000);
+})();
+</script>
+<script type="module">import('./main.mjs').catch(e=>window.__wildtrapFailure(e.message||e));</script>
+</body></html>
