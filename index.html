@@ -20,13 +20,32 @@ input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
 #boot{position:fixed;inset:0;display:grid;place-items:center;background:#10231eed;z-index:9;text-align:center;padding:30px}
 #boot[hidden]{display:none}#boot p{max-width:480px;color:#bad5c9}
 @media(max-width:720px){#side{width:260px}#viewport{left:260px;width:calc(100% - 260px)}#overlay,#toast{left:268px}.grid{grid-template-columns:repeat(2,1fr)}}
+#testPanel{border:1px solid #6abfa2;border-radius:9px;padding:10px;margin:8px 0;background:#1b3930}
+#test{background:#006f59;border-color:#61e6bd;font-size:14px;font-weight:750;color:white}
+#test[disabled]{opacity:.6;cursor:wait}
+#playHud{display:none;position:fixed;inset:0;pointer-events:none;z-index:8}
+#playTop{position:absolute;left:16px;top:12px;background:#0b221bcf;border:1px solid #4b9079;border-radius:10px;padding:12px 16px;max-width:min(550px,calc(100vw - 32px));font-size:13px}
+#playTop strong{color:#9cffe0}
+#playBottom{position:absolute;left:16px;bottom:16px;color:#c8eee0;font-size:12px;background:#0b221bcf;padding:10px 12px;border-radius:8px}
+#stopTest{pointer-events:auto;position:absolute;right:16px;top:14px;background:#215440;border:1px solid #75d0ae;font-size:14px;padding:11px 16px}
+body.testing #side,body.testing #overlay{display:none}
+body.testing #viewport{left:0;top:0;width:100%;height:100%;cursor:grab}
+body.testing #viewport:active{cursor:grabbing}
+body.testing #playHud{display:block}
+body.testing #toast{left:16px;bottom:75px;z-index:9}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.4 · 630 × 630 unidades · Sin criaturas · guardado automático local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.5 · 630 × 630 unidades · Sin criaturas · guardado automático local</small>
 <section>
-<h2>Vista y proyecto</h2>
+<h2>Vista y proyecto</h2><section id="testPanel">
+<h2>▶ Modo de prueba 3D</h2>
+<button id="test" style="width:100%">▶ Probar</button>
+<p class="hint">Usa el terreno y las alturas actuales. Carga automáticamente la Farolera original animada desde el visor de R.O.K. y activa una cámara cercana sobre el hombro. Puedes volver a editar sin perder cambios.</p>
+<div class="grid2"><label class="fileBtn" style="margin:0">GLB local (respaldo)<input id="localFarolera" type="file" accept=".glb,model/gltf-binary"></label><small id="testModelStatus" style="align-self:center">Farolera de R.O.K. · lista para cargar</small></div>
+</section>
+
 <div class="grid2"><button id="top">Vista cenital</button><button id="angle">Vista 3D</button><button id="undo">Deshacer</button><button id="reset">Vaciar todo</button></div>
 <div class="grid2" style="margin-top:6px">
 <button id="export">Exportar JSON</button><label class="fileBtn" style="margin:0">Importar JSON<input id="importJSON" type="file" accept=".json,application/json"></label>
@@ -74,6 +93,14 @@ input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
 <canvas id="viewport"></canvas>
 <div id="overlay"><b id="viewType">Vista cenital</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div></div>
 <div id="toast"></div>
+<div id="playHud">
+  <div id="playTop"><strong>WILDTRAP · Prueba de terreno</strong>
+    <div id="testCoords">Posición Farolera</div>
+    <div>WASD para caminar · Shift para correr · arrastra el ratón para girar la cámara</div>
+  </div>
+  <button id="stopTest">Volver al editor · Esc</button>
+  <div id="playBottom">Modelo: Farolera original R.O.K. · cámara sobre el hombro · terreno del editor</div>
+</div>
 <div id="boot"><div><h1>Iniciando editor WILDTRAP</h1><p id="bootMsg">Cargando motor gráfico…</p><button onclick="location.reload()">Reintentar</button></div></div>
 <script>window.__editorReady=()=>document.getElementById('boot').hidden=true;
 window.__editorError=err=>{document.getElementById('bootMsg').textContent='No se pudo abrir: '+err};
