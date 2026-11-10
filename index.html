@@ -1,38 +1,83 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WILDTRAP · Expedición procedural</title>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WILDTRAP · Editor de escenarios</title>
 <style>
-:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#e8f6f1;background:#101d1b}*{box-sizing:border-box}
-body{margin:0;overflow:hidden}#game{position:fixed;inset:0;width:100%;height:100%;display:block}
-#hud{position:fixed;z-index:2;top:12px;left:12px;width:min(335px,calc(100% - 24px));padding:13px 15px;background:#0e201cdd;border:1px solid #5c8d7c99;border-radius:12px;backdrop-filter:blur(7px);font-size:13px;line-height:1.5}
-h1{font-size:20px;margin:0;color:#9df5d7}h2{font-size:13px;margin:10px 0 2px}ol{margin:4px 0;padding-left:20px}li.done{text-decoration:line-through;color:#87b7a2}.minor{color:#abc9bc}
-#controls{position:fixed;z-index:2;bottom:12px;left:12px;padding:8px 12px;background:#102822e8;border-radius:8px;font-size:12px;max-width:calc(100% - 24px)}
-#message{position:fixed;top:13%;left:50%;transform:translateX(-50%);z-index:5;background:#174236f5;padding:11px 16px;border-radius:10px;max-width:85vw;text-align:center;opacity:0;pointer-events:none}
-#map{position:fixed;right:12px;top:12px;border:1px solid #83b9a6;border-radius:10px;background:#0c241cdd;z-index:2}
-#actions{position:fixed;right:12px;bottom:12px;display:flex;gap:6px;flex-direction:column;z-index:3}
-button,input,.fileLabel{background:#165044;color:#e5fff6;border:1px solid #7dc5a9;border-radius:8px;padding:9px;font:inherit;font-size:12px;cursor:pointer}
-button:hover,.fileLabel:hover{background:#246b5c}#seed{width:150px}#prompt{color:#ffdda0;font-weight:700}
-#loading{position:fixed;inset:0;background:#10241ff2;z-index:9;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:25px}#loading[hidden]{display:none}
-#loading h2{font-size:23px;color:#a4f2d5}#loadDetail{font-size:14px;color:#c8e1d8;max-width:520px;white-space:pre-line}
-#retry{display:none;background:#2f6957}#diagnostic{font-size:12px;color:#ffcdac}
-@media(max-width:680px){#hud{font-size:11px;padding:9px;width:250px}h1{font-size:16px}#map{width:104px;height:104px;top:auto;bottom:150px}#actions{bottom:90px}#controls{font-size:10px;max-width:75vw}}
+:root{font-family:system-ui,Segoe UI,sans-serif;color:#ddefe4;background:#0d1b18}*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden}button,input,select{font:inherit}
+#side{width:340px;height:100vh;overflow-y:auto;padding:14px;position:fixed;top:0;left:0;background:#142a23;border-right:1px solid #386957;scrollbar-color:#476c5e transparent}
+#viewport{position:fixed;left:340px;top:0;width:calc(100% - 340px);height:100%;display:block;touch-action:none;cursor:crosshair}
+h1{font-size:19px;margin:0;color:#a6ffdd}h2{font-size:13px;color:#a3e9ca;margin:13px 0 8px}
+small,.hint{font-size:11px;color:#abc6ba;line-height:1.45}
+section{padding:10px 0;border-bottom:1px solid #385548}
+button,.fileBtn{padding:8px 9px;background:#254739;color:#eafff6;border:1px solid #497967;border-radius:7px;cursor:pointer;text-align:center;font-size:12px}
+button:hover,.fileBtn:hover{background:#326f57}.active{background:#007f69;border-color:#96ffe0;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+label{display:block;font-size:12px;margin:8px 0 5px}
+input[type=number],input[type=range]{width:100%}input[type=number]{border-radius:6px;padding:6px;color:#fff;background:#1e4034;border:1px solid #598071}
+input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
+#overlay{position:fixed;left:352px;top:12px;background:#112a22d9;border:1px solid #528371;padding:8px 12px;border-radius:8px;font-size:12px;pointer-events:none}
+#toast{position:fixed;left:352px;bottom:14px;color:#ffdb8e;background:#10251fda;padding:8px 12px;border-radius:8px;max-width:calc(100vw - 365px)}
+#boot{position:fixed;inset:0;display:grid;place-items:center;background:#10231eed;z-index:9;text-align:center;padding:30px}
+#boot[hidden]{display:none}#boot p{max-width:480px;color:#bad5c9}
+@media(max-width:720px){#side{width:260px}#viewport{left:260px;width:calc(100% - 260px)}#overlay,#toast{left:268px}.grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
-<canvas id="game" aria-label="Expedición 3D"></canvas>
-<div id="loading" role="status"><h2>WILDTRAP</h2><div id="loadDetail">Preparando expedición…</div><div id="diagnostic"></div><button id="retry" onclick="location.reload()">Reintentar</button></div>
-<div id="hud"><h1>WILDTRAP <span class="minor">· prototipo 0.3</span></h1><div class="minor">420 × 420 · cinco biomas variables</div><div id="status"></div><h2>Objetivos</h2><ol id="objectives"></ol><div id="prompt"></div><div class="minor" id="modelStatus">Farolera: selecciona un GLB para sustituir al personaje técnico.</div></div>
-<canvas id="map" width="180" height="180" aria-label="Minimapa"></canvas><div id="message"></div>
-<div id="actions"><input id="seed" value="bosque-001" aria-label="Semilla de expedición"><button id="new">Nueva expedición</button><label class="fileLabel">Cargar Farolera GLB<input hidden id="modelFile" type="file" accept=".glb"></label><button id="save">Guardar botín local</button></div>
-<div id="controls">WASD: mover · Arrastra el ratón: girar cámara · Shift: correr · E: interactuar · Espacio: ahuyentar · X: extraer en la cueva de salida · R: repetir semilla. Prototipo individual.</div>
-<script>
-(function(){const loading=document.getElementById('loading'),detail=document.getElementById('loadDetail'),error=document.getElementById('diagnostic'),retry=document.getElementById('retry');let ready=false;
-window.__wildtrapReady=()=>{ready=true;loading.hidden=true};
-window.__wildtrapFailure=(reason)=>{if(ready)return;detail.textContent='No se pudo iniciar la expedición.';error.textContent=String(reason);retry.style.display='block'};
-window.addEventListener('error',e=>window.__wildtrapFailure(e.message||'Error de JavaScript'));
-window.addEventListener('unhandledrejection',e=>window.__wildtrapFailure(e.reason?.message||e.reason||'Error asíncrono'));
-setTimeout(()=>{if(!ready)window.__wildtrapFailure('Tiempo de carga excedido. Comprueba conexión a la CDN, navegador y consola.')},12000);
-})();
+<aside id="side">
+<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.4 · 630 × 630 unidades · Sin modelos ni criaturas</small>
+<section>
+<h2>Vista y proyecto</h2>
+<div class="grid2"><button id="top">Vista cenital</button><button id="angle">Vista 3D</button><button id="undo">Deshacer</button><button id="reset">Vaciar todo</button></div>
+<div class="grid2" style="margin-top:6px">
+<button id="export">Exportar JSON</button><label class="fileBtn" style="margin:0">Importar JSON<input id="importJSON" type="file" accept=".json,application/json"></label>
+</div>
+</section>
+<section>
+<h2>1. Esculpir el terreno</h2>
+<div class="grid">
+<button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Nivelar</button><button data-tool="smooth">Suavizar</button><button data-tool="select">Seleccionar</button><button data-tool="move">Mover</button>
+</div>
+<label>Radio del pincel <input id="brushRadius" type="range" min="4" max="65" value="18"></label>
+<label>Intensidad <input id="strength" type="range" min="1" max="30" value="12"></label>
+<div class="grid2"><label>Altura de nivelación<input id="flatHeight" type="number" min="0" max="100" value="14"></label>
+<label>Altura máxima<input id="maxHeight" type="number" min="1" max="150" value="48"></label></div>
+</section>
+<section>
+<h2>2. Importar mapa de alturas</h2>
+<p class="hint">Una imagen limpia con tonalidades verdes. <b>Verde oscuro = zona alta; verde claro = zona baja.</b> El editor convierte los tonos de luminosidad en una malla con relieve.</p>
+<label class="fileBtn">Importar PNG/JPG de alturas<input id="importHeight" type="file" accept="image/png,image/jpeg,image/webp"></label>
+<div class="grid2" style="margin-top:6px"><button id="exportHeight">Exportar mapa PNG</button><label><input id="invertHeight" type="checkbox"> Invertir alturas</label></div>
+</section>
+<section>
+<h2>3. Anclajes, caminos y estructuras</h2>
+<div class="grid">
+<button data-tool="anchor">Anclaje</button><button data-tool="path">Camino</button><button data-tool="wall">Muro</button>
+<button data-tool="stairs">Escalera</button><button data-tool="gate">Compuerta</button><button data-tool="cave">Cueva</button>
+<button data-tool="mountain">Montaña</button><button data-tool="tree">Spawn árbol</button><button data-tool="wallspawn">Spawn muro</button>
+<button data-tool="spawn">Respawn</button><button data-tool="exit">Salida</button><button data-tool="delete">Borrar</button>
+</div>
+<label>Altura de los muros<input id="wallHeight" type="number" min="2" max="60" value="12"></label>
+<p class="hint">Camino, muro, escalera y compuerta: haz clic en el punto inicial y luego en el final. La montaña es un módulo autónomo con camino espiral y entrada de cueva. El punto de spawn de árboles es solo un marcador: no genera árboles definitivos.</p>
+</section>
+<section>
+<h2>4. Cueva bajo el terreno</h2>
+<label><input id="underground" type="checkbox"> Mostrar interiores subterráneos</label>
+<p class="hint">Cada cueva tiene una entrada visible y una sala separada bajo la malla (Y = −15). En el juego, el portal debe cambiar de capa de colisiones y activar solo los colliders del interior; no se desactivará todo el suelo.</p>
+</section>
+<section>
+<h2>Selección</h2><small id="selected">Nada seleccionado</small><div class="grid2" style="margin-top:8px"><button id="remove">Eliminar seleccionado</button></div><small id="pending"></small>
+</section>
+<div class="hint">Clic izquierdo: editar · Arrastrar: pintar o mover · Rueda: zoom · Botón central: desplazar · Vista 3D: botón derecho para orbitar · Ctrl+Z: deshacer · Supr: eliminar elemento · Escape: cancelar herramienta.</div>
+</aside>
+<canvas id="viewport"></canvas>
+<div id="overlay"><b id="viewType">Vista cenital</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div></div>
+<div id="toast"></div>
+<div id="boot"><div><h1>Iniciando editor WILDTRAP</h1><p id="bootMsg">Cargando motor gráfico…</p><button onclick="location.reload()">Reintentar</button></div></div>
+<script>window.__editorReady=()=>document.getElementById('boot').hidden=true;
+window.__editorError=err=>{document.getElementById('bootMsg').textContent='No se pudo abrir: '+err};
+window.addEventListener('error',e=>window.__editorError(e.message));
+window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
+setTimeout(()=>{if(!document.getElementById('boot').hidden)window.__editorError('Tiempo excedido al cargar Three.js. Revisa conexión o consola.')},14000);
 </script>
-<script type="module">import('./main.mjs').catch(e=>window.__wildtrapFailure(e.message||e));</script>
+<script type="module">import('./editor.mjs').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
