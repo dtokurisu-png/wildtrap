@@ -102,17 +102,21 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   const distance=last?Math.hypot(...position.map((x,i)=>x-last.center[i])):Infinity;
   if(last&&distance<minGap)return;
   // Interpolate fast mouse strokes, no gaps between neighbouring brushes.
-  const steps=last?Math.min(24,Math.ceil(distance/minGap)):1;
-  for(let i=1;i<=steps;i++){
-   if(selected.length>=180){toast('Selección completa: aplica el corte y continúa con otra pasada');break}
+  const steps=last?Math.max(1,Math.ceil(distance/minGap)):1;
+  const count=Math.min(steps,Math.max(0,180-selected.length));
+  for(let i=1;i<=count;i++){
+   // Never stretch individual brush stamps across a fast mouse movement.
+   // When selection is full, leave the remaining distance for a new pass.
    const t=i/steps;
    const center=last?last.center.map((x,k)=>x+(position[k]-x)*t):position.slice();
    const normal=last?last.normal.map((x,k)=>x+(hit.normal[k]-x)*t):hit.normal.slice();
    const s={center,normal,radius,depth,shape,dir};
    if(prepareCutStamp(s))selected.push(s);
   }
-  previous={center:position,normal:hit.normal.slice()};
-  renderSelection();
+  if(count<steps)toast('Selección completa: aplica el corte y continúa con otra pasada');
+  const tail=selected[selected.length-1];
+  previous=tail?{center:tail.center.slice(),normal:tail.normal.slice()}:last;
+  if(count)renderSelection();
  }
  function clearSelection(){selected.length=0;previous=null;renderSelection()}
  function endStroke(){previous=null}
