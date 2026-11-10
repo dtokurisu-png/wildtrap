@@ -122,3 +122,12 @@ La herramienta antigua eliminaba **celdas completas X/Z** de la cuadrícula y, e
 **Geometría:** el archivo [adaptive-terrain-cuts.mjs](adaptive-terrain-cuts.mjs) aplica diferencias exactas de polígonos convexos, con interpolación de UV, colores y normales; las caras intactas mantienen los vértices originales indexados. El cortador limita su profundidad para no borrar todas las superficies bajo el mismo X/Z. El módulo [terrain-holes.mjs](terrain-holes.mjs) maneja el raycast y la interfaz, y [tests/adaptive-terrain-cuts.test.mjs](tests/adaptive-terrain-cuts.test.mjs) verifica cortes, restauración, continuidad de datos y serialización. GitHub Actions ejecuta esas pruebas.
 
 **Alcance:** el recorte abre la **superficie de la heightmap**, no genera automáticamente paredes interiores, bóvedas, suelos de cuevas, colisiones complejas ni un modelo 3D cerrado. El interior y la decoración siguen construyéndose con módulos independientes. La navegación de prueba usa todavía un controlador simplificado de terreno. La actualización requiere comprobación visual final en el navegador con un corte real sobre la pared.
+
+
+## Hoja de desarrollo de WILDTRAP — expediciones y cooperación
+
+**Documento de diseño (no implementado todavía):** [Hoja de desarrollo: cinco biomas, recursos, herramientas, fabricación, contratos y recompensas](docs/HOJA_DE_DESARROLLO_WILDTRAP.md).
+
+Recoge las decisiones posteriores al documento del [Guardián de los Ecos](docs/PROPUESTA_GUARDIAN_DE_LOS_ECOS.md): cinco biomas (Bosque, Pantano, Desierto, Llanura y Cuevas), quince recursos iniciales propuestos, diez objetos fabricables, especies de árboles comunes y raras, extracción mediante herramientas o habilidades de guardianes, equipamiento con espacio limitado, fabricación costosa de herramientas de emergencia con componentes escasos y compartidos, intercambio entre aliados, almacén, tienda y quince tipos de contratos aleatorios con principal viable, secundarios opcionales y recompensa extraordinaria por huevos de jefes.
+
+**Estado:** documentación de futuro diseño; este repositorio sigue siendo actualmente un editor de escenarios. Guardar la hoja **no** añade estos sistemas al juego.
