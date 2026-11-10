@@ -89,3 +89,17 @@ El terreno **630 × 630** del usuario se guardó **sin modificar** en [assets/te
 - Se eliminó totalmente la animación procedural de brazos/piernas y no se usa `Walking.fbx` para caminar. Si el FBX oficial o su retarget falla, se muestra error explícito y permanece Idle, sin reemplazo inventado.
 
 **Estado de validación:** se verificaron estáticamente los módulos y la correspondencia de controles, la identidad exacta del terreno base y con un ensayo de geometría se probó que el corte elimina triángulos y la restauración los repone. No se ha ejecutado una prueba visual en WebGL/Chrome sobre GitHub Pages; el aspecto de la retargetización requiere comprobación en navegador.
+
+
+## v0.7 — Biblioteca modular de guaridas (fase 1)
+
+La nueva categoría **Estructuras / Cuevas** ofrece seis mallas independientes en color gris:
+**suelo**, **pared**, **bóveda**, **túnel abierto**, **rampa** y **cámara de jefe sin techo**.
+
+Desde el editor puedes **colocarlas, seleccionarlas, moverlas, girarlas, modificar su anchura/altura/longitud/grosor, cambiar la escala y la elevación, duplicarlas y guardarlas en JSON**, manteniendo las funciones existentes de terreno, perforaciones y modo Probar.
+
+Las piezas poseen una topología realmente **deformable por vértice**, UV y normales, más geometría interior separada en los módulos que la necesitan. Se probó la deformación regional con recuperación exacta de la posición editada al regenerar cada una de las seis mallas. Los cambios por vértice se representan mediante `vertexEdits` y quedan incluidos en el JSON al existir.
+
+**Fases pendientes:** el pincel interactivo sobre los vértices de cada módulo (fase 2); exportación/importación y validación GLB de modelos deformados (fase 3); colisiones simplificadas y acabados finales (fase 4). El botón **Exportar JSON** actual no exporta GLB. El personaje del modo Probar aún no colisiona con los módulos de cuevas.
+
+[Diseño y límites de la fase 1](docs/CAVE_LIBRARY_PHASE1.md) · [Pruebas automáticas](tests/cave-pieces.test.mjs)
