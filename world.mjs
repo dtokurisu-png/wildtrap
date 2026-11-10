@@ -58,7 +58,7 @@ if(b.type==='rock'&&dist(x,z,b.x,b.z)<b.radius)return false;
 return true;
 }
 function chooseSpot(s,r,occupied,spacing=8,tries=100){
-for(let i=0;i<tries;i++){const a=r()*Math.PI*2,rad=14+Math.sqrt(r())*(s.r-17),x=s.x+Math.cos(a)*rad,z=s.z+Math.sin(a)*rad;
+for(let i=0;i<tries;i++){const a=r()*Math.PI*2,rad=14+Math.sqrt(r())*(s.r-17),x=Math.round((s.x+Math.cos(a)*rad)*10)/10,z=Math.round((s.z+Math.sin(a)*rad)*10)/10;
 if(!clearCorridor(x,z)||occupied.some(o=>dist(x,z,o.x,o.z)<spacing))continue;
 const p={x:Math.round(x*10)/10,z:Math.round(z*10)/10,sector:s.id};occupied.push(p);return p
 }return null;
@@ -88,14 +88,15 @@ const gateX=s.x-Math.cos(toward)*(s.r+5),gateZ=s.z-Math.sin(toward)*(s.r+5);
 if(dist(gateX,gateZ,SPAWN.x,SPAWN.z)>21)w.gates.push({id:'gate-'+s.id,x:gateX,z:gateZ,sector:s.id,closed:true});
 const sideAng=toward+1.75;
 w.stairs.push({id:'stairs-'+s.id,x:s.x+Math.cos(sideAng)*(s.r+3),z:s.z+Math.sin(sideAng)*(s.r+3),sector:s.id});
+const cave=chooseSpot(s,r,occupied,9);
+if(cave)w.caves.push({...cave,id:'cave-'+s.id,active:false});
 const nest=chooseSpot(s,r,occupied,13,600);
 if(nest)w.nests.push({...nest,id:'nest-'+s.id,rare:biomeBySector[s.id]==='mountain'});
 for(let j=0;j<7;j++){const p=chooseSpot(s,r,occupied,6);if(p)w.resources.push({...p,id:'resource-'+w.resources.length})}
 for(let j=0;j<4;j++){const p=chooseSpot(s,r,occupied,7);if(p)w.enemies.push({...p,id:'enemy-'+w.enemies.length,type:['muscarabajo','lobrisco','ecosombra','cornazul'][Math.floor(r()*4)]})}
 const density=BIOMES.find(b=>b.id===biomeBySector[s.id]).treeDensity;
 for(let j=0;j<Math.round(48*density);j++){const p=chooseSpot(s,r,occupied,4.2,80);if(p)w.trees.push({...p,id:'veg-'+w.trees.length,kind:vegetation[Math.floor(r()*vegetation.length)],scale:.65+r()*.9,rotation:r()*Math.PI*2})}
-const cave=chooseSpot(s,r,occupied,9);
-if(cave)w.caves.push({...cave,id:'cave-'+s.id,active:false});
+
 }
 for(const s of [SECTORS[1],SECTORS[3]]){const p=chooseSpot(s,r,occupied,9,550);if(p)w.beacons.push({...p,id:'beacon-'+w.beacons.length})}
 const pool=OBJECTIVES.slice(1);for(let i=pool.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
