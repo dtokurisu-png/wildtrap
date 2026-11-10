@@ -1,28 +1,27 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
-import {retargetClip} from 'three/addons/utils/SkeletonUtils.js';
+import {adaptSummonWalk} from './walk-adapter.mjs';
 
 // Source is the original Farolera, read-only, published by the user's R.O.K. repository.
 export const FAROLERA_URL='https://dtokurisu-png.github.io/rok-3d-test/assets/models/casters/farolera/chiara_idle.glb';
-const WALK_URL='https://dtokurisu-png.github.io/rok-3d-test/animations/Walking.fbx';
+// Official summon walk #40 in the R.O.K. Arena 2.5D tester (Semillera).
+const WALK_URL='https://dtokurisu-png.github.io/rok-3d-test/animations/Catwalk%20Walking.fbx';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const forwardOf=yaw=>new THREE.Vector3(Math.sin(yaw),0,-Math.cos(yaw));
-const flatDistance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 
-export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor}){
+export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,$,resizeEditor}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const clock=new THREE.Clock();
  const player=new THREE.Group();
  player.name='FaroleraPlaytestPlayer';
- let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.12,walkTime=0;
+ let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.12;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  let oldShow=null,oldShadow=null;
 const hiddenDebugMarkers=[];
  const keys=new Set();
- let runOffset=0,modelURL=FAROLERA_URL;
+ let modelURL=FAROLERA_URL;
  let localURL=null,loadingPromise=null,sourceError='';
- const bones={};
  const modelStatus=()=>$('testModelStatus');
  const say=(message)=>{modelStatus().textContent=message;};
  function resize(){
@@ -39,10 +38,10 @@ const hiddenDebugMarkers=[];
  function resetPosition(){
   const s=positionSpawn(),ground=heightAt(s.x,s.z);
   player.position.set(s.x,ground,s.z);
-  yaw=0;pitch=.12;walkTime=0;
+  yaw=0;pitch=.12;
   player.rotation.y=0;
-  camera.position.set(s.x+1,ground+3.6,s.z+5);
-  camera.lookAt(s.x,ground+1.5,s.z-6);
+  camera.position.set(s.x+.7,ground+2.1,s.z+3.1);
+  camera.lookAt(s.x,ground+1.1,s.z-4);
  }
  async function fetchModel(){
   if(imported)return imported;
@@ -70,7 +69,8 @@ const hiddenDebugMarkers=[];
     const bounds=new THREE.Box3().setFromObject(gltf.scene),size=new THREE.Vector3();
     bounds.getSize(size);
     if(!Number.isFinite(size.y)||size.y<.01)throw Error('Escala GLB inválida');
-    const scale=clamp(2.18/size.y,.001,100);
+    // Exactly half of the v0.5 on-screen size (2.18 -> 1.09 world units).
+    const scale=clamp(1.09/size.y,.001,100);
     gltf.scene.scale.setScalar(scale);
     gltf.scene.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(gltf.scene);
@@ -83,13 +83,6 @@ const hiddenDebugMarkers=[];
     player.add(visual);
     gltf.scene.traverse(object=>{
       if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
-      if(object.isBone){
-       const k=object.name.toLowerCase().replace(/[^a-z]/g,'');
-       if(k.includes('leftupleg'))bones.leftLeg=object;
-       if(k.includes('rightupleg'))bones.rightLeg=object;
-       if(k.includes('leftarm')&&!k.includes('fore'))bones.leftArm=object;
-       if(k.includes('rightarm')&&!k.includes('fore'))bones.rightArm=object;
-      }
     });
     imported=gltf;
     if(gltf.animations?.length){
@@ -107,39 +100,26 @@ const hiddenDebugMarkers=[];
  async function loadWalk(){
    if(!imported||!mixer)return;
    try{
-     const response=await fetch(WALK_URL,{signal:AbortSignal.timeout(14000)});
-     if(!response.ok)throw Error('HTTP '+response.status);
-     const data=await response.arrayBuffer();
+     say('Farolera cargada · preparando caminata oficial #40 del tester R.O.K.…');
+     const abort=new AbortController();
+     const timer=setTimeout(()=>abort.abort(),18000);
+     let data;
+     try{
+      const response=await fetch(WALK_URL,{signal:abort.signal});
+      if(!response.ok)throw Error('HTTP '+response.status);
+      data=await response.arrayBuffer();
+     }finally{clearTimeout(timer)}
      const fbx=new FBXLoader().parse(data,WALK_URL.slice(0,WALK_URL.lastIndexOf('/')+1));
-     if(!fbx.animations?.length)throw Error('FBX sin pistas');
-     const converted=retargetClip(imported.scene,fbx,fbx.animations[0],{fps:30});
-     if(!converted?.tracks?.length)throw Error('Rig incompatible');
-     // No inherited XY/Z root travel: locomotion is computed by the WILDTRAP controller.
-     for(const track of converted.tracks){
-        if(!track.name.endsWith('.position')||track.getValueSize()!==3)continue;
-        const x0=track.values[0],z0=track.values[2];
-        for(let i=0;i<track.values.length;i+=3){track.values[i]=x0;track.values[i+2]=z0}
-     }
-     walk=mixer.clipAction(converted);walk.enabled=true;walk.setEffectiveWeight(0);
-     if(active)say('Farolera · Idle original y caminata R.O.K. adaptada');
+     if(!fbx.animations?.length)throw Error('FBX #40 sin clip');
+     const converted=adaptSummonWalk(fbx,fbx.animations[0],imported.scene);
+     if(!converted?.tracks?.length)throw Error('Rig incompatible con la Farolera');
+     walk=mixer.clipAction(converted);
+     walk.enabled=true;walk.setLoop(THREE.LoopRepeat,Infinity);walk.setEffectiveWeight(0);
+     say('Farolera · Idle original y caminata oficial de invocaciones #40');
    }catch(error){
-     // Explicit fallback: preserve the original idle animation and animate locomotion procedurally.
-     if(active)say('Farolera · Idle original; caminata procedural (FBX no compatible)');
-   }
- }
- const tempQuat=new THREE.Quaternion(),tempEuler=new THREE.Euler();
- function movementBones(dt,moving){
-   if(!mixer||!imported)return;
-   // Applied after mixer.update so original idle remains intact.
-   if(walk)return;
-   if(!moving)return;
-   const amp=.19,cycle=walkTime*9;
-   for(const [bone,offset,axis] of [[bones.leftLeg,0,'x'],[bones.rightLeg,Math.PI,'x'],
-                                     [bones.leftArm,Math.PI,'x'],[bones.rightArm,0,'x']]){
-     if(!bone)continue;
-     tempEuler.set(Math.sin(cycle+offset)*amp*(axis==='x'?1:0),0,0);
-     tempQuat.setFromEuler(tempEuler);
-     bone.quaternion.multiply(tempQuat);
+     // Never substitute an improvised animation for the requested movement.
+     walk=null;
+     say('Error caminata oficial #40: '+error.message+' · se mantiene Idle');
    }
  }
  function crossfade(moving){
@@ -203,7 +183,7 @@ const hiddenDebugMarkers=[];
     $('test').textContent='Probando…';
     resizeEditor();resize();
     clock.getDelta();
-    say(walk?'Farolera · Idle y caminata animada':'Farolera · animación Idle original (caminata en carga)');
+    say(walk?'Farolera · caminata oficial #40':'Farolera · preparando caminata oficial #40');
   }).catch(err=>{
     busy=false;$('test').disabled=false;sourceError=err.message;
     say('Error: '+err.message);
@@ -232,29 +212,30 @@ const hiddenDebugMarkers=[];
   const front=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);
   const side=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);
   const moving=front!==0||side!==0;
-  const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?8.5:5.2;
-  const f=forwardOf(yaw),right=new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw));
+  // Half v0.5 speed: 5.2/8.5 -> 2.6/4.25.
+  const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?4.25:2.6;
+  // Character movement uses fixed world axes, unrelated to the camera yaw.
+  const f=new THREE.Vector3(0,0,-1),right=new THREE.Vector3(1,0,0);
   if(moving){
     const move=f.multiplyScalar(front).addScaledVector(right,side).normalize();
     const nx=clamp(player.position.x+move.x*speed*dt,-live.size/2+3,live.size/2-3);
     const nz=clamp(player.position.z+move.z*speed*dt,-live.size/2+3,live.size/2-3);
     const ny=heightAt(nx,nz),dy=ny-player.position.y;
-    if(dy<1.2&&dy>-2.2){
+    if(!isHoleAt(nx,nz)&&dy<1.2&&dy>-2.2){
       player.position.set(nx,THREE.MathUtils.damp(player.position.y,ny,17,dt),nz);
       const heading=Math.atan2(move.x,-move.z);
       player.rotation.y+=Math.atan2(Math.sin(heading-player.rotation.y),Math.cos(heading-player.rotation.y))*Math.min(1,dt*11);
     }
-    walkTime+=dt*(speed/5.2);
   }else player.position.y=THREE.MathUtils.damp(player.position.y,heightAt(player.position.x,player.position.z),17,dt);
   crossfade(moving);
-  if(mixer){mixer.update(dt);movementBones(dt,moving)}
+  if(mixer)mixer.update(dt);
   const camF=forwardOf(yaw),camR=new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw));
-  const desired=player.position.clone().addScaledVector(camF,-5.1).addScaledVector(camR,1.25);
-  desired.y+=3.0+pitch*4.2;
+  const desired=player.position.clone().addScaledVector(camF,-3.15).addScaledVector(camR,.75);
+  desired.y+=2.15+pitch*2.8;
   desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+1.25);
   camera.position.lerp(desired,1-Math.exp(-dt*14));
   const look=player.position.clone().addScaledVector(camF,4.8);
-  look.y+=1.9-pitch*3.5;
+  look.y+=1.05-pitch*2.1;
   camera.lookAt(look);
   $('testCoords').textContent='X '+player.position.x.toFixed(1)+' · Z '+player.position.z.toFixed(1)+' · altura '+heightAt(player.position.x,player.position.z).toFixed(1);
   return camera;
