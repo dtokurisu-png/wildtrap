@@ -21,6 +21,7 @@ const material=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.Doubl
 const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';scene.add(terrain);
 const surface=new THREE.Group();scene.add(surface);
 const interiors=new THREE.Group();scene.add(interiors);
+const cavePiecesLayer=new THREE.Group();scene.add(cavePiecesLayer);
 const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasicMaterial({color:0xffdd7a,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));cursor.rotation.x=-Math.PI/2;cursor.renderOrder=20;scene.add(cursor);
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
@@ -122,7 +123,7 @@ shape('',new THREE.BoxGeometry(5,6,2.2),0x10131c,radius*.25,height+3.5,1.5,group
 function resolvePoint(p){const a=p?.anchorId&&live.nodes.find(n=>n.id===p.anchorId&&n.kind==='anchor');return a?{x:a.x,z:a.z}:{x:p.x,z:p.z}}
 function snapPoint(x,z){let near=null,best=10;for(const n of live.nodes){if(n.kind!=='anchor')continue;const d=Math.hypot(n.x-x,n.z-z);if(d<best){best=d;near=n}}return near?{x:near.x,z:near.z,anchorId:near.id}:{x,z}}
 function draw(){
-for(const collection of [surface,interiors])while(collection.children.length){const g=collection.children[0];collection.remove(g);g.traverse(m=>{m.geometry?.dispose();if(m.material?.dispose)m.material.dispose()})}
+for(const collection of [surface,interiors,cavePiecesLayer])while(collection.children.length){const g=collection.children[0];collection.remove(g);g.traverse(m=>{m.geometry?.dispose();const mats=Array.isArray(m.material)?m.material:(m.material?[m.material]:[]);for(const mat of mats)mat?.dispose?.()})}
 for(const n of live.nodes){
 if(n.kind==='anchor')marker(n.x,n.z,colours.anchor,1.4);
 if(n.kind==='tree')marker(n.x,n.z,colours.tree,2.2);
@@ -131,7 +132,7 @@ if(n.kind==='spawn')marker(n.x,n.z,colours.spawn,3);
 if(n.kind==='exit')marker(n.x,n.z,colours.exit,3);
 if(n.kind==='cave')caveModel(n);
 if(n.kind==='mountain')mountainModel(n);
-if(n.kind==='cavePiece')surface.add(createCavePieceObject(n,heightAt));
+if(n.kind==='cavePiece')cavePiecesLayer.add(createCavePieceObject(n,heightAt));
 if(n.kind==='path')routeMesh(resolvePoint(n.a),resolvePoint(n.b),'path');
 if(n.kind==='stairs')stairMesh(resolvePoint(n.a),resolvePoint(n.b),n.rise||8);
 if(n.kind==='wall')wallMesh(resolvePoint(n.a),resolvePoint(n.b),n.height||12);
