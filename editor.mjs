@@ -44,7 +44,7 @@ for(let i=0;i<COUNT;i++){
 p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();
 }
 function shape(type,geo,color,x,y,z,group=surface){const m=new THREE.Mesh(geo,solid(color));m.position.set(x,y,z);group.add(m);return m}
-function marker(x,z,color,scale=2){const g=new THREE.Group();g.position.set(x,heightAt(x,z),z);surface.add(g);
+function marker(x,z,color,scale=2){const g=new THREE.Group();g.name='EditorOnlyMarker';g.userData.editorOnly=true;g.position.set(x,heightAt(x,z),z);surface.add(g);
 shape('marker',new THREE.ConeGeometry(scale,scale*2,5),color,0,scale+1.5,0,g);
 return g}
 function routeMesh(a,b,type){
