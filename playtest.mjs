@@ -221,7 +221,7 @@ const hiddenDebugMarkers=[];
     const nx=clamp(player.position.x+move.x*speed*dt,-live.size/2+3,live.size/2-3);
     const nz=clamp(player.position.z+move.z*speed*dt,-live.size/2+3,live.size/2-3);
     const ny=heightAt(nx,nz),dy=ny-player.position.y;
-    if(!isHoleAt(nx,nz)&&dy<1.2&&dy>-2.2){
+    if(!isHoleAt(nx,ny,nz)&&dy<1.2&&dy>-2.2){
       player.position.set(nx,THREE.MathUtils.damp(player.position.y,ny,17,dt),nz);
       const heading=Math.atan2(move.x,-move.z);
       player.rotation.y+=Math.atan2(Math.sin(heading-player.rotation.y),Math.cos(heading-player.rotation.y))*Math.min(1,dt*11);
