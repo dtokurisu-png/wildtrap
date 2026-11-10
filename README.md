@@ -69,3 +69,23 @@ Pulsar **▶ Probar** oculta los controles del editor y abre una vista jugable d
 Esta función está separada en `playtest.mjs`, no altera la biblioteca de R.O.K. ni cambia los ajustes del mapa. El navegador necesita conexión para descargar Three.js y el GLB original, salvo que se seleccione uno local (Three.js sigue siendo externo).
 
 La comprobación hasta ahora ha sido **estática** (sintaxis y conexiones entre HTML/JS); queda pendiente la validación visual real en un navegador con acceso a la página y a los recursos del modelo.
+
+
+## v0.6 — Terreno base, perforación real y locomoción oficial
+
+El terreno **630 × 630** del usuario se guardó **sin modificar** en [assets/terrain/wildtrap-terreno-base.json](assets/terrain/wildtrap-terreno-base.json), incluyendo sus 16 641 alturas originales y sus marcadores. Al abrir, el editor recupera primero el guardado automático local si existe; si no, importa el terreno base de GitHub. El botón **Cargar terreno base** permite restaurarlo tras confirmación (las modificaciones se pueden exportar previamente).
+
+### Herramienta de agujeros
+- Selecciona **Pintar selección** y el radio del pincel. Formas: circular, semicírculo orientable, cuadrada y trazo libre mediante arrastre.
+- **Crear agujero** elimina los *triángulos reales* de las celdas seleccionadas de la geometría indexada de la heightmap. No se aplica color negro ni se desactivan ficticiamente todos los colliders.
+- **Restaurar terreno** repone esas mismas celdas (incluidas sus alturas previas); **Limpiar selección** no modifica geometría. Funciona con Ctrl+Z y queda guardado con `holes: [indicesDeCelda]` en el JSON del proyecto.
+- Las perforaciones se hacen sobre la malla principal; **las cuevas, techos de túnel y arcos siguen siendo modelos 3D independientes** que el usuario podrá colocar encima/debajo. No se generan automáticamente sus interiores ni colliders.
+- En el modo de prueba, la Farolera **no puede caminar sobre celdas ausentes** mientras no exista un módulo navegable con suelo/colisión propios.
+
+### Farolera
+- Sigue siendo el **GLB original** `assets/models/casters/farolera/chiara_idle.glb` de R.O.K. Su escala en el mundo se redujo de **2.18 a 1.09 unidades de altura** (50 %). No cambia la escala del escenario.
+- **WASD mueve con ejes absolutos del mundo**, independientemente de la rotación del ratón. El ratón **solo rota la cámara sobre el hombro**. Velocidad normal **2.6** (antes 5.2), Shift **4.25** (antes 8.5): disminución del 50 %.
+- Idle = original incrustado en el GLB. **Único clip de caminata** = **animación #40 de las invocaciones** `Catwalk Walking.fbx`, del tester `arena-25d.html` de R.O.K., adaptada al rig Mixamo de la Farolera mediante el mismo patrón de retarget de ese tester.
+- Se eliminó totalmente la animación procedural de brazos/piernas y no se usa `Walking.fbx` para caminar. Si el FBX oficial o su retarget falla, se muestra error explícito y permanece Idle, sin reemplazo inventado.
+
+**Estado de validación:** se verificaron estáticamente los módulos y la correspondencia de controles, la identidad exacta del terreno base y con un ensayo de geometría se probó que el corte elimina triángulos y la restauración los repone. No se ha ejecutado una prueba visual en WebGL/Chrome sobre GitHub Pages; el aspecto de la retargetización requiere comprobación en navegador.
