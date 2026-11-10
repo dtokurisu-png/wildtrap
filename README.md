@@ -103,3 +103,22 @@ Las piezas poseen una topología realmente **deformable por vértice**, UV y nor
 **Fases pendientes:** el pincel interactivo sobre los vértices de cada módulo (fase 2); exportación/importación y validación GLB de modelos deformados (fase 3); colisiones simplificadas y acabados finales (fase 4). El botón **Exportar JSON** actual no exporta GLB. El personaje del modo Probar aún no colisiona con los módulos de cuevas.
 
 [Diseño y límites de la fase 1](docs/CAVE_LIBRARY_PHASE1.md) · [Pruebas automáticas](tests/cave-pieces.test.mjs)
+
+
+## v0.8 — Pincel de corte 3D sobre acantilados
+
+La herramienta antigua eliminaba **celdas completas X/Z** de la cuadrícula y, en una pared de mucho desnivel, un corte podía afectar toda su altura. La v0.8 sustituye ese recorte para los cortes nuevos por una operación en **espacio 3D**:
+
+1. Pasa a **Vista 3D** y orienta la cámara hacia la pared del acantilado que quieras perforar.
+2. Escoge **Pintar corte 3D** en la sección «Pincel de corte 3D».
+3. Ajusta el **Radio del pincel**, la **Profundidad de corte** (por defecto ±2 unidades en dirección perpendicular a la cara), y la forma circular, semicircular, rectangular o trazo libre.
+4. Pinta directamente sobre la superficie en 3D; se dibujan marcas ámbar en la cara tocada.
+5. Pulsa **Crear agujero**: un algoritmo de recorte de prismas convexos divide solamente los triángulos interceptados, genera vértices en los bordes y elimina las regiones interiores. No aumenta los 129 × 129 vértices base.
+6. Para recuperar total o parcialmente una abertura, pinta su región usando la malla original de referencia invisible (permite seleccionar el espacio ya perforado) y pulsa **Restaurar región**. **Borrar trazo pendiente** solo modifica la preselección, no el terreno.
+7. Los recortes y restauraciones se guardan en el JSON como una lista cronológica `cuts3d` con posición `[x,y,z]`, normal, radio, profundidad, forma y acción. **Deshacer** y **Cargar terreno base** también gestionan esta lista.
+
+**Compatibilidad:** los agujeros antiguos de celda completa se conservan en `holes` y siguen visualizándose. Los cortes nuevos no los convierten ni los borran automáticamente; la restauración 3D puede recuperar partes de un hueco antiguo. El proyecto guarda ambas representaciones sin cambiar las dimensiones 630 × 630 del escenario.
+
+**Geometría:** el archivo [adaptive-terrain-cuts.mjs](adaptive-terrain-cuts.mjs) aplica diferencias exactas de polígonos convexos, con interpolación de UV, colores y normales; las caras intactas mantienen los vértices originales indexados. El cortador limita su profundidad para no borrar todas las superficies bajo el mismo X/Z. El módulo [terrain-holes.mjs](terrain-holes.mjs) maneja el raycast y la interfaz, y [tests/adaptive-terrain-cuts.test.mjs](tests/adaptive-terrain-cuts.test.mjs) verifica cortes, restauración, continuidad de datos y serialización. GitHub Actions ejecuta esas pruebas.
+
+**Alcance:** el recorte abre la **superficie de la heightmap**, no genera automáticamente paredes interiores, bóvedas, suelos de cuevas, colisiones complejas ni un modelo 3D cerrado. El interior y la decoración siguen construyéndose con módulos independientes. La navegación de prueba usa todavía un controlador simplificado de terreno. La actualización requiere comprobación visual final en el navegador con un corte real sobre la pared.
