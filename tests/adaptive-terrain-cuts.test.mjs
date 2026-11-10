@@ -75,8 +75,9 @@ test('desplazamiento XYZ, rotación normal y profundidad evitan cortes lejanos',
 test('semicírculos y rectángulos generan un contorno orientado',()=>{
  const s=prepareCutStamp({...stamp(),shape:'semicircle',dir:'east'});
  const rect=prepareCutStamp({...stamp(),shape:'rectangle'});
- assert.ok(pointInStamp([1,30,0],s));
- assert.ok(!pointInStamp([-1,30,0],s));
+ // The cliff's outward normal is -Z, so its screen-right tangent is -X.
+ assert.ok(pointInStamp([-1,30,0],s));
+ assert.ok(!pointInStamp([1,30,0],s));
  assert.ok(pointInStamp([1.5,30,0],rect));
  assert.ok(!pointInStamp([2.5,30,0],rect));
 });
