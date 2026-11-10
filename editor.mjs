@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {createPlaytest} from './playtest.mjs';
 import {createTerrainHoles} from './terrain-holes.mjs';
+import {createCavePieceObject} from './cave-pieces-three.mjs';
+import {pieceOptions} from './cave-pieces.mjs';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -129,6 +131,7 @@ if(n.kind==='spawn')marker(n.x,n.z,colours.spawn,3);
 if(n.kind==='exit')marker(n.x,n.z,colours.exit,3);
 if(n.kind==='cave')caveModel(n);
 if(n.kind==='mountain')mountainModel(n);
+if(n.kind==='cavePiece')surface.add(createCavePieceObject(n,heightAt));
 if(n.kind==='path')routeMesh(resolvePoint(n.a),resolvePoint(n.b),'path');
 if(n.kind==='stairs')stairMesh(resolvePoint(n.a),resolvePoint(n.b),n.rise||8);
 if(n.kind==='wall')wallMesh(resolvePoint(n.a),resolvePoint(n.b),n.height||12);
@@ -142,6 +145,17 @@ $('status').textContent=live.nodes.length+' elementos · '+(live.holes||[]).leng
 const picked=live.nodes.find(n=>n.id===selectedId);
 $('selected').textContent=selectedId===null?'Nada seleccionado':('ID '+selectedId+' · '+(picked?.kind||''));
 if(picked){$('moduleHeight').value=picked.height||35;$('moduleRadius').value=picked.radius||33;$('moduleScale').value=picked.scale||1}
+if(picked?.kind==='cavePiece'){
+ $('cavePieceType').value=picked.piece;
+ $('pieceWidth').value=picked.width;
+ $('pieceLength').value=picked.length;
+ $('pieceHeight').value=picked.height;
+ $('pieceThickness').value=picked.thickness;
+ $('pieceRotation').value=(picked.rotation||0)*180/Math.PI;
+ $('pieceOffsetY').value=picked.offsetY||0;
+ $('pieceScale').value=picked.scale||1;
+ $('pieceVertexInfo').textContent='Pieza #'+picked.id+' · deformaciones guardadas: '+Object.keys(picked.vertexEdits||{}).length+' vértices';
+}else $('pieceVertexInfo').textContent='Selecciona una pieza para modificarla';
 $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
 }
 function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
@@ -183,7 +197,18 @@ else if(n.a&&n.b){const a=resolvePoint(n.a),b=resolvePoint(n.b),vx=b.x-a.x,vz=b.
 if(dd<d){d=dd;best=n}}
  if(best&&d<16){if(mode==='delete'){snapshot();live.nodes=live.nodes.filter(n=>n.id!==best.id);selectedId=null;draw();persist()}else{selectedId=best.id;if(mode==='move'){snapshot();dragId=best.id;best._drag={x,z,start:structuredClone(best)}}draw()}}return;
 }
-if(mode==='mountain')addNode({kind:'mountain',x,z,radius:33,height:35,prefab:'mountain_spiral_v1',independentTerrain:true,caveDoor:{localX:8.25,localY:38.5,localZ:1.5}});
+if(mode==='cavePiece'){
+ const piece=$('cavePieceType').value;
+ const options=pieceOptions(piece,{
+  width:Number($('pieceWidth').value),length:Number($('pieceLength').value),
+  height:Number($('pieceHeight').value),thickness:Number($('pieceThickness').value)
+ });
+ addNode({kind:'cavePiece',piece,x,z,
+  width:options.width,length:options.length,height:options.height,thickness:options.thickness,
+  rotation:Number($('pieceRotation').value)*Math.PI/180,offsetY:Number($('pieceOffsetY').value)||0,
+  scale:Math.max(.2,Math.min(5,Number($('pieceScale').value)||1)),vertexEdits:{}});
+}
+else if(mode==='mountain')addNode({kind:'mountain',x,z,radius:33,height:35,prefab:'mountain_spiral_v1',independentTerrain:true,caveDoor:{localX:8.25,localY:38.5,localZ:1.5}});
 else if(mode==='cave')addNode({kind:'cave',x,z,scale:1,prefab:'cave_room_v1',portal:{shape:'box',width:5,height:8,depth:3.6,transition:'layer-swap',outsideLayer:'terrain',insideLayer:'cave',interiorFloorY:-15},interior:{width:34,length:38,height:8}});
 else if(['tree','wallspawn','spawn','exit','anchor'].includes(mode))addNode({kind:mode,x,z});
 }
@@ -224,6 +249,28 @@ $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
 $('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.holes=[];live.nextId=1;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 $('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);if(!Array.isArray(live.holes))live.holes=[];holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('applyCavePiece').onclick=()=>{
+ const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cavePiece');
+ if(!n){toast('Selecciona primero una pieza de Estructuras / Cuevas');return}
+ const opts=pieceOptions(n.piece,{
+  width:Number($('pieceWidth').value),length:Number($('pieceLength').value),
+  height:Number($('pieceHeight').value),thickness:Number($('pieceThickness').value)
+ });
+ snapshot();
+ Object.assign(n,opts,{rotation:(Number($('pieceRotation').value)||0)*Math.PI/180,
+  offsetY:Number($('pieceOffsetY').value)||0,
+  scale:Math.max(.2,Math.min(5,Number($('pieceScale').value)||1))});
+ draw();persist();toast('Dimensiones de pieza actualizadas sin borrar deformaciones');
+};
+$('duplicateCavePiece').onclick=()=>{
+ const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cavePiece');
+ if(!n){toast('Selecciona primero una pieza de cueva');return}
+ const copy=structuredClone(n);delete copy._drag;
+ copy.x=clamp(copy.x+Math.max(6,copy.width*.7),-SIZE/2+3,SIZE/2-3);
+ copy.z=clamp(copy.z+3,-SIZE/2+3,SIZE/2-3);
+ delete copy.id;addNode(copy);
+ toast('Pieza duplicada como malla independiente');
+};
 $('applyModule').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId);if(!n||!['mountain','cave'].includes(n.kind)){toast('Selecciona una montaña o cueva');return}snapshot();if(n.kind==='mountain'){n.height=clamp(Number($('moduleHeight').value)||35,4,100);n.radius=clamp(Number($('moduleRadius').value)||33,10,90);n.caveDoor={localX:n.radius*.25,localY:n.height+3.5,localZ:1.5}}else{n.scale=clamp(Number($('moduleScale').value)||1,.3,3)}draw();persist();toast('Módulo actualizado')};
 $('focusCave').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cave');if(!n){toast('Selecciona primero una cueva con la herramienta Seleccionar');return}$('underground').checked=true;draw();camera.up.set(0,1,0);camera.position.set(n.x+26,24,n.z+32);orbit.target.set(n.x,-13,n.z);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Interior de cueva';toast('Vista de interior subterráneo: la superficie queda oculta')};
 $('surfaceView').onclick=()=>{$('underground').checked=false;draw();setTop();$('viewType').textContent='Vista cenital'};
