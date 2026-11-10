@@ -3,7 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {createPlaytest} from './playtest.mjs';
 import {createTerrainHoles} from './terrain-holes.mjs';
 import {createCavePieceObject} from './cave-pieces-three.mjs';
-import {pieceOptions} from './cave-pieces.mjs';
+import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -158,7 +158,7 @@ if(picked?.kind==='cavePiece'){
 }else $('pieceVertexInfo').textContent='Selecciona una pieza para modificarla';
 $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
 }
-function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
+function setMode(v){mode=v;pending=null;if(v==='cavePiece')selectedId=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
 const tools={raise:1,lower:1,flatten:1,smooth:1,holePaint:1,holeErase:1};
 function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
@@ -262,6 +262,18 @@ $('applyCavePiece').onclick=()=>{
   scale:Math.max(.2,Math.min(5,Number($('pieceScale').value)||1))});
  draw();persist();toast('Dimensiones de pieza actualizadas sin borrar deformaciones');
 };
+$('cavePieceType').addEventListener('change',()=>{
+ const type=CAVE_PIECE_TYPES.find(p=>p.id===$('cavePieceType').value);
+ if(!type)return;
+ const [w,h,l]=type.defaultSize;
+ $('pieceWidth').value=w;
+ $('pieceHeight').value=h;
+ $('pieceLength').value=l;
+ $('pieceThickness').value=1.25;
+ $('pieceRotation').value=0;
+ $('pieceOffsetY').value=0;
+ $('pieceScale').value=1;
+});
 $('duplicateCavePiece').onclick=()=>{
  const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cavePiece');
  if(!n){toast('Selecciona primero una pieza de cueva');return}
