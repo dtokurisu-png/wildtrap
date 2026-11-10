@@ -46,7 +46,7 @@ input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
 <h2>2. Importar mapa de alturas</h2>
 <p class="hint">Una imagen limpia con tonalidades verdes. <b>Verde oscuro = zona alta; verde claro = zona baja.</b> El editor convierte los tonos de luminosidad en una malla con relieve.</p>
 <label class="fileBtn">Importar PNG/JPG de alturas<input id="importHeight" type="file" accept="image/png,image/jpeg,image/webp"></label>
-<div class="grid2" style="margin-top:6px"><button id="exportHeight">Exportar mapa PNG</button><label><input id="invertHeight" type="checkbox"> Invertir alturas</label></div>
+<div class="grid2" style="margin-top:6px"><button id="exportHeight">Exportar alturas PNG</button><label><input id="invertHeight" type="checkbox"> Invertir alturas</label></div>
 </section>
 <section>
 <h2>3. Anclajes, caminos y estructuras</h2>
@@ -56,8 +56,8 @@ input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
 <button data-tool="mountain">Montaña</button><button data-tool="tree">Spawn árbol</button><button data-tool="wallspawn">Spawn muro</button>
 <button data-tool="spawn">Respawn</button><button data-tool="exit">Salida</button><button data-tool="delete">Borrar</button>
 </div>
-<label>Altura de los muros<input id="wallHeight" type="number" min="2" max="60" value="12"></label>
-<p class="hint">Camino, muro, escalera y compuerta: haz clic en el punto inicial y luego en el final. La montaña es un módulo autónomo con camino espiral y entrada de cueva. El punto de spawn de árboles es solo un marcador: no genera árboles definitivos.</p>
+<div class="grid2"><label>Altura de muros<input id="wallHeight" type="number" min="2" max="60" value="12"></label><label>Subida de escaleras<input id="stairRise" type="number" min="1" max="50" value="8"></label></div>
+<p class="hint">Camino, muro, escalera y compuerta: haz clic en el punto inicial y luego en el final. Si colocas un anclaje cerca, el extremo se ajusta automáticamente a él. Las escaleras generan peldaños reales. La montaña es un módulo autónomo con camino espiral y entrada de cueva. El punto de spawn de árboles es solo un marcador: no genera árboles definitivos.</p>
 </section>
 <section>
 <h2>4. Cueva bajo el terreno</h2>
