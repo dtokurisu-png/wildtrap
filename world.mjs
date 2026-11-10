@@ -37,7 +37,7 @@ return d;
 }
 export function sectorAt(x,z){let best=SECTORS[0],d=Infinity;for(const s of SECTORS){const v=dist(x,z,s.x,s.z);if(v<d){best=s;d=v}}return best}
 export function clearCorridor(x,z){
-return Math.abs(x)<SIZE/2-7 && Math.abs(z)<SIZE/2-7 && dist(x,z,SPAWN.x,SPAWN.z)>17 && dist(x,z,HUB.x,HUB.z)>15 && routeDistance(x,z)>9;
+return Math.abs(x)<SIZE/2-7 && Math.abs(z)<SIZE/2-7 && dist(x,z,SPAWN.x,SPAWN.z)>17 && dist(x,z,HUB.x,HUB.z)>15 && routeDistance(x,z)>10.5;
 }
 export function heightAt(world,x,z){
 const s=sectorAt(x,z),biome=world.biomeBySector[s.id],d=dist(x,z,s.x,s.z);
