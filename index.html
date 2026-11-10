@@ -24,7 +24,7 @@ input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.4 · 630 × 630 unidades · Sin modelos ni criaturas</small>
+<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.4 · 630 × 630 unidades · Sin criaturas · guardado automático local</small>
 <section>
 <h2>Vista y proyecto</h2>
 <div class="grid2"><button id="top">Vista cenital</button><button id="angle">Vista 3D</button><button id="undo">Deshacer</button><button id="reset">Vaciar todo</button></div>
@@ -65,7 +65,9 @@ input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
 <p class="hint">Cada cueva tiene una entrada visible y una sala separada bajo la malla (Y = −15). En el juego, el portal debe cambiar de capa de colisiones y activar solo los colliders del interior; no se desactivará todo el suelo.</p>
 </section>
 <section>
-<h2>Selección</h2><small id="selected">Nada seleccionado</small><div class="grid2" style="margin-top:8px"><button id="remove">Eliminar seleccionado</button></div><small id="pending"></small>
+<h2>Selección y módulos</h2><small id="selected">Nada seleccionado</small>
+<div class="grid2"><label>Altura montaña<input id="moduleHeight" type="number" min="4" max="100" value="35"></label><label>Radio montaña<input id="moduleRadius" type="number" min="10" max="90" value="33"></label></div>
+<label>Escala de cueva<input id="moduleScale" type="number" min="0.3" max="3" step="0.1" value="1"></label><button id="applyModule">Aplicar dimensiones al módulo</button><div class="grid2" style="margin-top:8px"><button id="remove">Eliminar seleccionado</button></div><small id="pending"></small>
 </section>
 <div class="hint">Clic izquierdo: editar · Arrastrar: pintar o mover · Rueda: zoom · Botón central: desplazar · Vista 3D: botón derecho para orbitar · Ctrl+Z: deshacer · Supr: eliminar elemento · Escape: cancelar herramienta.</div>
 </aside>
