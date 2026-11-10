@@ -39,7 +39,7 @@ test('módulos de interior y exterior mantienen superficies y materiales separad
 test('cambios de dimensiones no cambian la topología',()=>{
  for(const {id} of CAVE_PIECE_TYPES){
   const a=createCavePieceData(id);
-  const b=createCavePieceData(id,{width:32,height:12,length:28});
+  const b=createCavePieceData(id,{width:41,height:19,length:37});
   assert.equal(a.positions.length,b.positions.length,id+' vértices');
   assert.deepEqual(a.indices,b.indices,id+' conectividad');
   assert.notDeepEqual(a.positions,b.positions,id+' tamaño no aplicado');
