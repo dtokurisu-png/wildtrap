@@ -6,6 +6,7 @@ export function createTerrainHoles({scene,terrainGeo,live,heightAt,refreshTerrai
  const N=live.resolution,side=N-1,step=live.size/side,origin=-live.size/2;
  const original=Array.from(terrainGeo.index.array);
  const selected=new Set();
+ let currentHoles=new Set();
  const overlayMaterial=new THREE.MeshBasicMaterial({
   color:0xffcf68,transparent:true,opacity:.43,depthWrite:false,
   side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2
@@ -22,10 +23,11 @@ export function createTerrainHoles({scene,terrainGeo,live,heightAt,refreshTerrai
   if(x<origin||z<origin||x>=-origin||z>=-origin)return false;
   const i=clamp(Math.floor((x-origin)/step),0,side-1);
   const j=clamp(Math.floor((z-origin)/step),0,side-1);
-  return setOfHoles().has(cellIndex(i,j));
+  return currentHoles.has(cellIndex(i,j));
  }
  function syncGeometry(){
-  const removed=setOfHoles(),buffer=[];
+  currentHoles=setOfHoles();
+  const removed=currentHoles,buffer=[];
   for(let id=0;id<side*side;id++){
    if(removed.has(id))continue;
    const begin=id*6;
@@ -91,7 +93,7 @@ export function createTerrainHoles({scene,terrainGeo,live,heightAt,refreshTerrai
   const i=clamp(Math.floor((x-origin)/step),0,side-1);
   const j=clamp(Math.floor((z-origin)/step),0,side-1);
   const id=cellIndex(i,j);
-  if(setOfHoles().has(id)){selected.add(id);renderSelection()}
+  if(currentHoles.has(id)){selected.add(id);renderSelection()}
  }
  function count(){return (live.holes||[]).length}
  return {paint,clearSelection,apply,syncGeometry,isHoleAt,selectExistingAt,count,overlay};
