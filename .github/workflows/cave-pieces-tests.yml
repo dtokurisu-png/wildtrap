@@ -1,0 +1,22 @@
+name: Validación de biblioteca de cuevas
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cave-pieces.mjs'
+      - 'cave-pieces-three.mjs'
+      - 'tests/cave-pieces.test.mjs'
+      - '.github/workflows/cave-pieces-tests.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check cave-pieces.mjs
+      - run: node --check cave-pieces-three.mjs
+      - run: node --test tests/cave-pieces.test.mjs
