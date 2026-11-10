@@ -37,7 +37,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.7 · 630 × 630 unidades · Sin criaturas · guardado automático local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.8 · 630 × 630 unidades · Sin criaturas · guardado automático local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -59,21 +59,21 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="grid">
 <button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Nivelar</button><button data-tool="smooth">Suavizar</button><button data-tool="select">Seleccionar</button><button data-tool="move">Mover</button>
 </div>
-<label>Radio del pincel <input id="brushRadius" type="range" min="4" max="65" value="18"></label>
+<label>Radio del pincel <input id="brushRadius" type="range" min="1" max="65" step=".5" value="12"></label>
 <label>Intensidad <input id="strength" type="range" min="1" max="30" value="12"></label>
 <div class="grid2"><label>Altura de nivelación<input id="flatHeight" type="number" min="0" max="100" value="14"></label>
 <label>Altura máxima<input id="maxHeight" type="number" min="1" max="150" value="120"></label></div>
 </section>
 
 <section id="holesPanel">
-<h2>✂ Perforar la malla (cuevas y arcos)</h2>
-<p class="hint">Marca el área con el pincel amarillo. Pulsa <b>Crear agujero</b> para eliminar las caras reales del terreno, o <b>Restaurar terreno</b> para cerrarlas. No borra las alturas: puedes deshacer o restaurar después.</p>
-<div class="grid2"><button data-tool="holePaint">Pintar selección</button><button data-tool="holeErase">Borrar selección</button></div>
+<h2>✂ Pincel de corte 3D (cuevas y acantilados)</h2>
+<p class="hint"><b>Activa Vista 3D</b> para pintar directamente sobre la pared de un acantilado. Se registra el punto exacto X/Y/Z y su orientación. Al cortar, aparecen vértices solo alrededor del contorno, sin aumentar toda la cuadrícula. La selección de color ámbar es una vista previa: nada se borra hasta pulsar Crear agujero.</p>
+<div class="grid2"><button data-tool="holePaint">Pintar corte 3D</button><button data-tool="holeErase">Borrar trazo pendiente</button></div>
 <div class="grid2">
 <label>Forma del pincel
 <select id="holeShape" style="width:100%;background:#1e4034;color:#fff;border:1px solid #598071;border-radius:6px;padding:6px">
 <option value="circle">Circular</option><option value="semicircle">Semicírculo / arco</option>
-<option value="rectangle">Cuadrado</option><option value="free">Trazo libre</option>
+<option value="rectangle">Cuadrado</option><option value="free">Trazo libre (arrastrar)</option>
 </select></label>
 <label>Orientación del semicírculo
 <select id="holeDirection" style="width:100%;background:#1e4034;color:#fff;border:1px solid #598071;border-radius:6px;padding:6px">
@@ -81,10 +81,12 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <option value="west">Hacia izquierda</option><option value="east">Hacia derecha</option>
 </select></label>
 </div>
-<div class="grid2"><button id="createHole" style="background:#755533">✂ Crear agujero</button><button id="restoreHole">Restaurar terreno</button></div>
+<label>Profundidad de corte a cada lado de la superficie (unidades)
+<input id="holeDepth" type="number" min=".25" max="20" step=".25" value="2"></label>
+<div class="grid2"><button id="createHole" style="background:#755533">✂ Crear agujero</button><button id="restoreHole">Restaurar región</button></div>
 <button id="clearHoleSelection" style="width:100%;margin-top:6px">Limpiar selección</button>
-<div class="hint"><span id="holeSelectionCount">0 celdas seleccionadas</span> · <span id="holeCounter">0 celdas perforadas</span></div>
-<p class="hint">El radio se ajusta arriba con <b>Radio del pincel</b>. El agujero deja espacio para colocar después un modelo 3D independiente de cueva, túnel o arco.</p>
+<div class="hint"><span id="holeSelectionCount">0 trazos 3D seleccionados</span> · <span id="holeCounter">0 celdas antiguas · 0 cortes 3D · 0 restauraciones</span></div><div class="hint" id="holeMeshStats">Malla base sin recortes adicionales</div>
+<p class="hint"><b>Radio del pincel:</b> arriba, desde 1 unidad. <b>Profundidad:</b> limita el corte alrededor de la cara elegida; súbela solo si la pared lo necesita. Para cerrar una parte del agujero, pinta sobre ella (también se puede seleccionar una superficie que ya no existe) y pulsa <b>Restaurar región</b>. Los cortes se guardan en el proyecto JSON, con Ctrl+Z disponible. Luego coloca la cueva o el arco como pieza independiente.</p>
 </section>
 <section>
 <h2>2. Importar mapa de alturas</h2>
