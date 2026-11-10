@@ -1,61 +1,55 @@
-# WILDTRAP · Prototipo 3D v0.3
+# WILDTRAP — Editor modular de escenarios v0.4
 
-Juego cooperativo de expediciones y búsqueda de huevos de Guardianes. **Esta versión es exclusivamente una prueba individual**, sin servidor, comercio ni Guardianes funcionales todavía.
+**Fecha:** 10 noviembre 2026. **Estado:** editor técnico, no es todavía una partida jugable.
 
-## Archivos
-- `index.html`: interfaz y diagnóstico de carga (12 segundos máximo).
-- `main.mjs`: escena Three.js, movimiento, enemigos, nidos, botín, extracción, HUD y opción de cargar un GLB.
-- `world.mjs`: generador por semilla, sin dependencias del navegador.
-- `test-world.mjs`: pruebas automatizadas del generador.
-- `.nojekyll`: publicación estática sin procesamiento Jekyll.
+La aplicación anterior de expediciones procedurales fue retirada de la rama `main` a petición del usuario. Este repositorio sirve ahora como **herramienta para diseñar y guardar el terreno de WILDTRAP**. La historia de Git permite recuperar el antiguo código si alguna vez hiciera falta, pero no forma parte de la aplicación actual.
 
-## Abrir con GitHub Pages
-1. Abrir el repositorio y entrar a **Settings → Pages**.
-2. En **Build and deployment**, elegir **Deploy from a branch**.
-3. En **Branch**, elegir **main**, carpeta **/(root)** y **Save**.
-4. La dirección esperada, una vez publicada y confirmada por GitHub, será `https://dtokurisu-png.github.io/wildtrap/`. No asumir que funciona antes de que Pages confirme el deployment.
+## Abrir
+Si GitHub Pages está activado para la rama `main`, carpeta `/(root)`:
+https://dtokurisu-png.github.io/wildtrap/
 
-No hace falta PowerShell una vez activado GitHub Pages. Por usar importaciones ESM y archivos locales, no abrir `index.html` mediante `file://` (doble clic).
+El editor tiene dos archivos activos: `index.html` y `editor.mjs`. Three.js se carga desde jsDelivr. Si falla la red o la importación, el arranque informa del error en lugar de quedarse esperando eternamente. No se han incluido modelos definitivos ni enemigos.
 
-## Controles de teclado
-- **WASD / flechas**: desplazarse según la orientación de cámara.
-- **Arrastrar el ratón sobre el escenario**: girar la cámara cercana sobre el hombro.
-- **Shift**: correr, produce ruido y aumenta alerta.
-- **E**: interactuar con nidos, recursos, faros, nota, sello y mochila.
-- **Espacio**: ahuyentar temporalmente a una criatura cercana.
-- **X**: extraer al encontrar la **cueva de salida activa** y llevar un huevo. También sirve **E** junto a esa cueva.
-- **R**: reconstruir misma semilla.
-- **Nueva expedición**: regenerar la distribución usando el valor del campo Semilla.
+## Tamaño y perspectiva
+- Terreno vacío inicial **630 × 630 unidades Three.js**: 50 % más anchura y longitud que los 420 × 420 previos.
+- Malla de altura de 129 × 129 vértices con altitud entre 0 y la cota máxima configurable (inicialmente 48).
+- Vista cenital ortográfica como vista inicial y vista tridimensional opcional.
+- Pintura con herramientas **subir, bajar, nivelar y suavizar**, radio, intensidad y altura objetivo.
+- Ratón: izquierdo dibujar/colocar, rueda zoom, central desplazar, derecho orbitar en vista 3D.
 
-El mapa mide **420×420 unidades**. Tiene **cinco regiones** y un refugio fijo en la esquina sureste. Cada expedición asigna aleatoriamente los cinco biomas (pradera, bosque denso, bosque antiguo, humedales y montaña) a estas regiones, con relieve propio, caminos principales, accesos secundarios con escaleras, barreras naturales y compuertas. Cinco cuevas se distribuyen en las regiones; solo una es la extracción activa de la expedición. La semilla cambia vegetación, fauna, nidos, recursos y objetivos. Robar al menos un huevo es la misión principal.
+## Importación de altura desde una imagen
+1. Crear una imagen limpia sin símbolos, flechas ni dibujos que representen otra cosa que alturas.
+2. Usar tonalidades de verde: **más oscuro = más alto; más claro = más bajo**; blanco = altura baja. También se aceptan mapas de grises.
+3. Elegir la altura máxima y pulsar **Importar PNG/JPG de alturas**.
+4. El editor reescala la imagen a la malla de 129 × 129 y traduce su luminosidad en elevación.
+5. Se puede seleccionar **Invertir alturas** para invertir el sentido de los tonos.
+6. **Exportar alturas PNG** produce un mapa en escala de grises para evitar pérdidas al volver a importarlo; el archivo de proyecto JSON guarda los valores numéricos sin pérdida.
 
-## Farolera
-El juego incluye solamente una **cápsula técnica provisional**. Usa **Cargar Farolera GLB** para seleccionar tu propio archivo `.glb`. El modelo no está incorporado al repositorio porque la ruta y los derechos del archivo original aún no se verificaron en los repositorios de R.O.K. Si el GLB falla, el HUD lo indica sin bloquear la partida. Los demás elementos son geometría provisional.
+El importador toma la luminosidad del píxel, por lo que los trazos negros de un boceto también pasarían a ser montañas: se debe subir una **versión limpia exclusiva de alturas**.
 
-## Pruebas
-`node test-world.mjs`
+## Herramientas de estructura
+- **Anclaje**: punto reutilizable. Al crear camino/muro/escalera/compuerta cerca de un anclaje, el extremo queda unido a él.
+- **Camino**: trazado entre dos extremos siguiendo las alturas locales de suelo.
+- **Muro**: bloques segmentados con altura seleccionada.
+- **Escalera**: peldaños entre dos puntos, ajustados a la diferencia de elevación; si están a nivel, aplica una subida configurable para previsualizar.
+- **Compuerta**: estructura de barrotes entre dos puntos.
+- **Montaña**: prefabricado independiente con base, relieve vertical, recorrido en espiral y boca de cueva en su parte superior. Se puede seleccionar, mover, ajustar altura y radio; **NO cambia la malla del terreno**. Geometría provisional que podrá sustituirse por un GLB más adelante.
+- **Cueva**: prefabricado independiente con puerta visible en la superficie y sala cerrada bajo el suelo (cota Y=-15). Se puede seleccionar, mover y redimensionar. **Entrar a cueva elegida** oculta la superficie para inspeccionar su interior 3D; **Volver a superficie** restituye la vista normal.
+- **Spawn árbol / spawn muro / respawn / salida**: marcadores de ubicación, sin instanciar objetos finales.
+- **Seleccionar, mover, borrar, deshacer**; los caminos y muros se pueden seleccionar por proximidad al segmento.
+- **Vaciar todo** deja el suelo plano y borra las estructuras del editor, con confirmación.
 
-El generador ha superado **1.000 semillas** en pruebas de lógica (repetibilidad, cinco biomas sin repetir, cinco nidos, cinco cuevas y una extracción, accesos principales, despeje de corredores), pero la escena 3D **no se ha ejecutado de punta a punta en un navegador en esta sesión**, por lo que aún puede requerir ajustes de rendering, controles y rendimiento.
+## Cuevas: colisión en el futuro juego
+El editor construye y visualiza las dos capas. **Todavía no hay avatar, físicas, teletransporte ni colliders de juego**. Cuando el motor de juego consuma el JSON, la entrada tendrá un volumen de transición: al cruzarlo se cambia el estado a `interior`, se mantiene la colisión de las paredes de la cueva y se desactiva solo la colisión del tramo de superficie incompatible, nunca todas las paredes. Al salir, se restablece el estado `exterior`. Este protocolo evita atravesar terreno y salir a zonas inválidas.
 
-## Solucionar «Preparando la expedición»
-La versión anterior importaba Three.js a través de esm.sh sin controlar el error previo a la ejecución del módulo, por lo que podía quedar congelada en la pantalla de carga. La v0.3 usa un import map con CDN jsDelivr, captura errores de módulo y muestra un mensaje y botón de reintento si la inicialización no concluye en doce segundos.
+## Guardado
+- Borrador automático en el navegador mediante `localStorage` (no sincroniza con GitHub ni con otros equipos).
+- **Exportar JSON** descarga la malla y las estructuras, para reutilizarlas en el motor de juego.
+- **Importar JSON** permite volver a cargar ese proyecto.
+- Se recomienda exportar JSON con frecuencia y conservar copias: la limpieza de datos del navegador elimina el borrador automático.
 
-La dependencia Three.js se descarga por internet en el navegador; si una red bloquea la CDN, aparecerá el diagnóstico correspondiente. En ese caso, la solución de producción será integrar una copia vendorizada o un bundle local, no ocultar el problema.
+## Límites de la versión
+Los bloques, montañas, cuevas, escaleras y barreras son **geometría provisional**. Aún no hay importación de modelos GLB, edición de topología interior por habitaciones, simulación de colisiones del personaje, navegación de criaturas, generación automática de árboles, IA, multijugador ni expedición. La cámara cenital y la conversión de mapas de altura existen, pero el render aún requiere una prueba de interacción real en navegador. No se ha afirmado que esta edición esté lista para producción.
 
-## Próximas fases
-1. Confirmar funcionamiento real desde GitHub Pages y cargar Farolera GLB.
-2. Mejorar colisiones, navegación de fauna, percepción y manadas.
-3. Agregar sistema de Guardianes e incubación.
-4. Implementar salas cooperativas de 1 a 4 jugadores con servidor autoritativo y persistencia de botín.
-5. Integrar intercambios y tienda únicamente después de validar el backend.
-
-**No usar el guardado en localStorage para producción, pagos o intercambio.**
-
-## Cambios de v0.3 (10 noviembre 2026)
-- Cámara tercera persona sobre hombro con arrastre para orientar, terreno elevado y cámara ajustada al suelo.
-- Refugio de reaparición siempre en la esquina inferior derecha (sureste).
-- Cinco regiones que intercambian biomas por semilla, incluyendo la montaña, manteniendo la conectividad base.
-- Barreras de roca y arboleda densa con colisión, accesos alternativos, compuertas interactivas y escaleras.
-- Cinco cuevas, con una de salida aleatoria; el campamento no es ya el destino de extracción.
-- La Farolera sigue siendo GLB opcional, sin assets externos inventados. El resto permanece geométrico.
-- Advertencia: el relieve y los obstáculos están en fase de prototipo. La navegación no utiliza todavía navmesh ni colisiones físicas completas; hay que validar los accesos en el navegador y ajustar las geometrías a la escala del modelo real.
+## Desarrollo
+No es necesario instalar nada si GitHub Pages ya está activado. Como es una aplicación ES Modules, para abrir localmente se necesita un servidor HTTP (no doble clic sobre `index.html`), por ejemplo `python -m http.server 8080`.
