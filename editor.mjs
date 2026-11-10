@@ -201,7 +201,7 @@ view.addEventListener('pointermove',e=>{const p=convertCoords(e);if(!p)return;
 $('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
 cursor.position.set(p.x,p.y+.3,p.z);const radius=tools[mode]?Number($('brushRadius').value):4;cursor.scale.setScalar(radius);
 if(pointerDown&&tools[mode])brush(p.x,p.z);
-if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){if(n.a&&n.b){const old=n._drag?.start||n,dx=p.x-(n._drag?.x||p.x),dz=p.z-(n._drag?.z||p.z);n.a={x:old.a.x+dx,z:old.a.z+dz};n.b={x:old.b.x+dx,z:old.b.z+dz}}else{n.x=p.x;n.z=p.z}draw();persist()}}
+if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){if(n.a&&n.b){const old=n._drag?.start||n,dx=p.x-(n._drag?.x??p.x),dz=p.z-(n._drag?.z??p.z);n.a={x:old.a.x+dx,z:old.a.z+dz};n.b={x:old.b.x+dx,z:old.b.z+dz}}else{n.x=p.x;n.z=p.z}draw();persist()}}
 });
 window.addEventListener('pointerup',()=>{pointerDown=false;if(dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n)delete n._drag;persist()}dragId=null});
 view.addEventListener('wheel',e=>{if(!camera.isOrthographicCamera)return;e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()},{passive:false});
