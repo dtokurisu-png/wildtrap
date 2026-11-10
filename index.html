@@ -37,16 +37,19 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.5 · 630 × 630 unidades · Sin criaturas · guardado automático local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.6 · 630 × 630 unidades · Sin criaturas · guardado automático local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
 <button id="test" style="width:100%">▶ Probar</button>
-<p class="hint">Usa el terreno y las alturas actuales. Carga automáticamente la Farolera original animada desde el visor de R.O.K. y activa una cámara cercana sobre el hombro. Puedes volver a editar sin perder cambios.</p>
+<p class="hint">Usa el terreno y las alturas actuales. Carga la Farolera original al 50 % con la animación de caminata #40 de las invocaciones de R.O.K. y activa una cámara cercana sobre el hombro. Puedes volver a editar sin perder cambios.</p>
 <div class="grid2"><label class="fileBtn" style="margin:0">GLB local (respaldo)<input id="localFarolera" type="file" accept=".glb,model/gltf-binary"></label><small id="testModelStatus" style="align-self:center">Farolera de R.O.K. · lista para cargar</small></div>
 </section>
 
 <div class="grid2"><button id="top">Vista cenital</button><button id="angle">Vista 3D</button><button id="undo">Deshacer</button><button id="reset">Vaciar todo</button></div>
+<div class="grid2" style="margin-top:6px">
+<button id="restoreBase">Cargar terreno base</button><small style="align-self:center">Relieve original guardado en GitHub.</small>
+</div>
 <div class="grid2" style="margin-top:6px">
 <button id="export">Exportar JSON</button><label class="fileBtn" style="margin:0">Importar JSON<input id="importJSON" type="file" accept=".json,application/json"></label>
 </div>
@@ -59,7 +62,29 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <label>Radio del pincel <input id="brushRadius" type="range" min="4" max="65" value="18"></label>
 <label>Intensidad <input id="strength" type="range" min="1" max="30" value="12"></label>
 <div class="grid2"><label>Altura de nivelación<input id="flatHeight" type="number" min="0" max="100" value="14"></label>
-<label>Altura máxima<input id="maxHeight" type="number" min="1" max="150" value="48"></label></div>
+<label>Altura máxima<input id="maxHeight" type="number" min="1" max="150" value="120"></label></div>
+</section>
+
+<section id="holesPanel">
+<h2>✂ Perforar la malla (cuevas y arcos)</h2>
+<p class="hint">Marca el área con el pincel amarillo. Pulsa <b>Crear agujero</b> para eliminar las caras reales del terreno, o <b>Restaurar terreno</b> para cerrarlas. No borra las alturas: puedes deshacer o restaurar después.</p>
+<div class="grid2"><button data-tool="holePaint">Pintar selección</button><button data-tool="holeErase">Borrar selección</button></div>
+<div class="grid2">
+<label>Forma del pincel
+<select id="holeShape" style="width:100%;background:#1e4034;color:#fff;border:1px solid #598071;border-radius:6px;padding:6px">
+<option value="circle">Circular</option><option value="semicircle">Semicírculo / arco</option>
+<option value="rectangle">Cuadrado</option><option value="free">Trazo libre</option>
+</select></label>
+<label>Orientación del semicírculo
+<select id="holeDirection" style="width:100%;background:#1e4034;color:#fff;border:1px solid #598071;border-radius:6px;padding:6px">
+<option value="north">Hacia arriba</option><option value="south">Hacia abajo</option>
+<option value="west">Hacia izquierda</option><option value="east">Hacia derecha</option>
+</select></label>
+</div>
+<div class="grid2"><button id="createHole" style="background:#755533">✂ Crear agujero</button><button id="restoreHole">Restaurar terreno</button></div>
+<button id="clearHoleSelection" style="width:100%;margin-top:6px">Limpiar selección</button>
+<div class="hint"><span id="holeSelectionCount">0 celdas seleccionadas</span> · <span id="holeCounter">0 celdas perforadas</span></div>
+<p class="hint">El radio se ajusta arriba con <b>Radio del pincel</b>. El agujero deja espacio para colocar después un modelo 3D independiente de cueva, túnel o arco.</p>
 </section>
 <section>
 <h2>2. Importar mapa de alturas</h2>
@@ -96,10 +121,10 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div id="playHud">
   <div id="playTop"><strong>WILDTRAP · Prueba de terreno</strong>
     <div id="testCoords">Posición Farolera</div>
-    <div>WASD para caminar · Shift para correr · arrastra el ratón para girar la cámara</div>
+    <div>WASD: direcciones fijas del terreno · Shift: rápido · arrastra: mirar (no altera movimiento)</div>
   </div>
   <button id="stopTest">Volver al editor · Esc</button>
-  <div id="playBottom">Modelo: Farolera original R.O.K. · cámara sobre el hombro · terreno del editor</div>
+  <div id="playBottom">Modelo: Farolera R.O.K. al 50 % · animación de invocación #40 · cámara independiente</div>
 </div>
 <div id="boot"><div><h1>Iniciando editor WILDTRAP</h1><p id="bootMsg">Cargando motor gráfico…</p><button onclick="location.reload()">Reintentar</button></div></div>
 <script>window.__editorReady=()=>document.getElementById('boot').hidden=true;
