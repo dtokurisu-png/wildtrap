@@ -58,6 +58,18 @@ for(let i=0;i<count;i++){
 const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.computeVertexNormals();
 const m=new THREE.Mesh(g,solid(type==='path'?colours.path:colours.stairs));surface.add(m);
 }
+function stairMesh(a,b,rise=8){
+const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<.2)return;
+const steps=Math.max(2,Math.ceil(len/2.8)),heading=-Math.atan2(dz,dx);
+const y1=heightAt(a.x,a.z),rawY2=heightAt(b.x,b.z);
+const y2=Math.abs(rawY2-y1)>=1.5?rawY2:y1+rise;
+for(let i=0;i<steps;i++){
+ const t=(i+.5)/steps,x=a.x+dx*t,z=a.z+dz*t;
+ const y=y1+(y2-y1)*(i+1)/steps;
+ const block=shape('',new THREE.BoxGeometry(len/steps+.07,.6,5),colours.stairs,x,y-.25,z);
+ block.rotation.y=heading;
+}
+}
 function wallMesh(a,b){
 const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<.2)return;
 const segments=Math.max(1,Math.ceil(len/7));
@@ -102,6 +114,8 @@ const step=shape('',new THREE.BoxGeometry(7,1.2,5),colours.path,x,1.3+t*(height-
 shape('',new THREE.BoxGeometry(8,7,2),colours.cave,radius*.25,height+4,0,group);
 shape('',new THREE.BoxGeometry(5,6,2.2),0x10131c,radius*.25,height+3.5,1.5,group);
 }
+function resolvePoint(p){const a=p?.anchorId&&live.nodes.find(n=>n.id===p.anchorId&&n.kind==='anchor');return a?{x:a.x,z:a.z}:{x:p.x,z:p.z}}
+function snapPoint(x,z){let near=null,best=10;for(const n of live.nodes){if(n.kind!=='anchor')continue;const d=Math.hypot(n.x-x,n.z-z);if(d<best){best=d;near=n}}return near?{x:near.x,z:near.z,anchorId:near.id}:{x,z}}
 function draw(){
 for(const collection of [surface,interiors])while(collection.children.length){const g=collection.children[0];collection.remove(g);g.traverse(m=>{m.geometry?.dispose();if(m.material?.dispose)m.material.dispose()})}
 for(const n of live.nodes){
@@ -112,9 +126,10 @@ if(n.kind==='spawn')marker(n.x,n.z,colours.spawn,3);
 if(n.kind==='exit')marker(n.x,n.z,colours.exit,3);
 if(n.kind==='cave')caveModel(n);
 if(n.kind==='mountain')mountainModel(n);
-if(n.kind==='path'||n.kind==='stairs')routeMesh(n.a,n.b,n.kind);
-if(n.kind==='wall')wallMesh(n.a,n.b);
-if(n.kind==='gate')gateMesh(n.a,n.b);
+if(n.kind==='path')routeMesh(resolvePoint(n.a),resolvePoint(n.b),'path');
+if(n.kind==='stairs')stairMesh(resolvePoint(n.a),resolvePoint(n.b),n.rise||8);
+if(n.kind==='wall')wallMesh(resolvePoint(n.a),resolvePoint(n.b));
+if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
 }
 surface.visible=!$('underground').checked;terrain.visible=!$('underground').checked;interiors.visible=$('underground').checked;
 updateStatus();
@@ -153,13 +168,17 @@ return ray.ray.intersectPlane(plane,temp)?{x:temp.x,z:temp.z,y:heightAt(temp.x,t
 function act(point){
 const {x,z}=point,link=['path','wall','stairs','gate'];
 if(link.includes(mode)){
- if(!pending){pending={x,z};updateStatus();return}
- addNode({kind:mode,a:pending,b:{x,z}});pending=null;return;
+ if(!pending){pending=snapPoint(x,z);updateStatus();return}
+ addNode({kind:mode,a:pending,b:snapPoint(x,z),...(mode==='stairs'?{rise:Number($('stairRise').value)||8}:{})});pending=null;return;
 }
 if(mode==='select'||mode==='move'||mode==='delete'){
  let best=null,d=Infinity;
- for(const n of live.nodes){if(n.x===undefined)continue;const dd=Math.hypot(x-n.x,z-n.z);if(dd<d){d=dd;best=n}}
- if(best&&d<16){if(mode==='delete'){snapshot();live.nodes=live.nodes.filter(n=>n.id!==best.id);selectedId=null;draw();persist()}else{selectedId=best.id;if(mode==='move'){snapshot();dragId=best.id}draw()}}return;
+ for(const n of live.nodes){
+let dd=Infinity;
+if(n.x!==undefined)dd=Math.hypot(x-n.x,z-n.z);
+else if(n.a&&n.b){const a=resolvePoint(n.a),b=resolvePoint(n.b),vx=b.x-a.x,vz=b.z-a.z,len=vx*vx+vz*vz;const t=len?clamp(((x-a.x)*vx+(z-a.z)*vz)/len,0,1):0;dd=Math.hypot(x-(a.x+vx*t),z-(a.z+vz*t))}
+if(dd<d){d=dd;best=n}}
+ if(best&&d<16){if(mode==='delete'){snapshot();live.nodes=live.nodes.filter(n=>n.id!==best.id);selectedId=null;draw();persist()}else{selectedId=best.id;if(mode==='move'){snapshot();dragId=best.id;best._drag={x,z,start:structuredClone(best)}}draw()}}return;
 }
 if(mode==='mountain')addNode({kind:'mountain',x,z,radius:33,height:35});
 else if(mode==='cave')addNode({kind:'cave',x,z});
@@ -182,9 +201,9 @@ view.addEventListener('pointermove',e=>{const p=convertCoords(e);if(!p)return;
 $('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
 cursor.position.set(p.x,p.y+.3,p.z);const radius=tools[mode]?Number($('brushRadius').value):4;cursor.scale.setScalar(radius);
 if(pointerDown&&tools[mode])brush(p.x,p.z);
-if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){n.x=p.x;n.z=p.z;draw();persist()}}
+if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){if(n.a&&n.b){const old=n._drag?.start||n,dx=p.x-(n._drag?.x||p.x),dz=p.z-(n._drag?.z||p.z);n.a={x:old.a.x+dx,z:old.a.z+dz};n.b={x:old.b.x+dx,z:old.b.z+dz}}else{n.x=p.x;n.z=p.z}draw();persist()}}
 });
-window.addEventListener('pointerup',()=>{pointerDown=false;dragId=null});
+window.addEventListener('pointerup',()=>{pointerDown=false;if(dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n)delete n._drag;persist()}dragId=null});
 view.addEventListener('wheel',e=>{if(!camera.isOrthographicCamera)return;e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()},{passive:false});
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
@@ -218,7 +237,7 @@ finally{URL.revokeObjectURL(url);e.target.value=''}
 $('exportHeight').onclick=()=>{
 const canvas=document.createElement('canvas');canvas.width=canvas.height=N;
 const ctx=canvas.getContext('2d'),image=ctx.createImageData(N,N);
-for(let i=0;i<COUNT;i++){const t=1-clamp(live.heights[i]/Number($('maxHeight').value),0,1);image.data[i*4]=Math.round(70*t);image.data[i*4+1]=Math.round(255*t);image.data[i*4+2]=Math.round(94*t);image.data[i*4+3]=255}
+for(let i=0;i<COUNT;i++){const t=1-clamp(live.heights[i]/Number($('maxHeight').value),0,1);const gray=Math.round(255*t);image.data[i*4]=gray;image.data[i*4+1]=gray;image.data[i*4+2]=gray;image.data[i*4+3]=255}
 ctx.putImageData(image,0,0);canvas.toBlob(b=>{if(b)download('wildtrap-alturas.png',b)});
 };
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
