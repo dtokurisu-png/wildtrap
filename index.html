@@ -21,10 +21,10 @@ button:hover,.fileLabel:hover{background:#246b5c}#seed{width:150px}#prompt{color
 </head><body>
 <canvas id="game" aria-label="Expedición 3D"></canvas>
 <div id="loading" role="status"><h2>WILDTRAP</h2><div id="loadDetail">Preparando expedición…</div><div id="diagnostic"></div><button id="retry" onclick="location.reload()">Reintentar</button></div>
-<div id="hud"><h1>WILDTRAP <span class="minor">· prototipo 0.2</span></h1><div class="minor">Mapa fijo · expediciones procedurales</div><div id="status"></div><h2>Objetivos</h2><ol id="objectives"></ol><div id="prompt"></div><div class="minor" id="modelStatus">Farolera: selecciona un GLB para sustituir al personaje técnico.</div></div>
+<div id="hud"><h1>WILDTRAP <span class="minor">· prototipo 0.3</span></h1><div class="minor">420 × 420 · cinco biomas variables</div><div id="status"></div><h2>Objetivos</h2><ol id="objectives"></ol><div id="prompt"></div><div class="minor" id="modelStatus">Farolera: selecciona un GLB para sustituir al personaje técnico.</div></div>
 <canvas id="map" width="180" height="180" aria-label="Minimapa"></canvas><div id="message"></div>
 <div id="actions"><input id="seed" value="bosque-001" aria-label="Semilla de expedición"><button id="new">Nueva expedición</button><label class="fileLabel">Cargar Farolera GLB<input hidden id="modelFile" type="file" accept=".glb"></label><button id="save">Guardar botín local</button></div>
-<div id="controls">WASD / flechas: mover · Shift: correr · E: interactuar · Espacio: ahuyentar · X: extraer en campamento · R: repetir semilla. Prototipo individual.</div>
+<div id="controls">WASD: mover · Arrastra el ratón: girar cámara · Shift: correr · E: interactuar · Espacio: ahuyentar · X: extraer en la cueva de salida · R: repetir semilla. Prototipo individual.</div>
 <script>
 (function(){const loading=document.getElementById('loading'),detail=document.getElementById('loadDetail'),error=document.getElementById('diagnostic'),retry=document.getElementById('retry');let ready=false;
 window.__wildtrapReady=()=>{ready=true;loading.hidden=true};
