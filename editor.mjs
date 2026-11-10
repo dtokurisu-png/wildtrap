@@ -1,0 +1,228 @@
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
+const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+scene.add(new THREE.HemisphereLight(0xffffff,0x68765b,2.4));
+const light=new THREE.DirectionalLight(0xffffff,1.8);light.position.set(-160,280,120);scene.add(light);
+const view=$('viewport');
+const camera=new THREE.OrthographicCamera(-SIZE*.65,SIZE*.65,SIZE*.65,-SIZE*.65,.1,2600);
+const orbit=new OrbitControls(camera,view);orbit.enableDamping=true;orbit.screenSpacePanning=true;
+orbit.mouseButtons={LEFT:null,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
+const terrainGeo=new THREE.PlaneGeometry(SIZE,SIZE,N-1,N-1);terrainGeo.rotateX(-Math.PI/2);
+const material=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
+const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';scene.add(terrain);
+const surface=new THREE.Group();scene.add(surface);
+const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasicMaterial({color:0xffdd7a,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));cursor.rotation.x=-Math.PI/2;cursor.renderOrder=20;scene.add(cursor);
+const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
+const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
+const live={version:1,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],nextId:1,settings:{heightMax:48}};
+const undo=[];let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+const temp=new THREE.Vector3();
+const pos=(x,z)=>({x:clamp(x,-SIZE/2,SIZE/2),z:clamp(z,-SIZE/2,SIZE/2)});
+function heightAt(x,z){
+const fx=clamp((x/SIZE+.5)*(N-1),0,N-1),fz=clamp((z/SIZE+.5)*(N-1),0,N-1),ix=Math.floor(fx),iz=Math.floor(fz),xx=Math.min(N-1,ix+1),zz=Math.min(N-1,iz+1),tx=fx-ix,tz=fz-iz;
+const a=live.heights[index(ix,iz)],b=live.heights[index(xx,iz)],c=live.heights[index(ix,zz)],d=live.heights[index(xx,zz)];
+return(a*(1-tx)+b*tx)*(1-tz)+(c*(1-tx)+d*tx)*tz;
+}
+function snapshot(){undo.push(JSON.stringify(live));if(undo.length>20)undo.shift()}
+function refreshTerrain(){
+const p=terrainGeo.attributes.position;
+const rgb=new Float32Array(COUNT*3),color=new THREE.Color();
+for(let i=0;i<COUNT;i++){
+ const h=live.heights[i];p.setY(i,h);
+ const green=.40+clamp(h/55,0,1)*-.25;color.setRGB(.20+green*.18,green+.20,.26+green*.08);
+ rgb[i*3]=color.r;rgb[i*3+1]=color.g;rgb[i*3+2]=color.b;
+}
+p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();
+}
+function shape(type,geo,color,x,y,z,group=surface){const m=new THREE.Mesh(geo,solid(color));m.position.set(x,y,z);group.add(m);return m}
+function marker(x,z,color,scale=2){const g=new THREE.Group();g.position.set(x,heightAt(x,z),z);surface.add(g);
+shape('marker',new THREE.ConeGeometry(scale,scale*2,5),color,0,scale+1.5,0,g);
+return g}
+function routeMesh(a,b,type){
+const dx=b.x-a.x,dz=b.z-a.z,d=Math.hypot(dx,dz);if(d<.2)return;
+const count=Math.ceil(d/4),width=type==='path'?8:5,verts=[];
+for(let i=0;i<count;i++){
+ const build=(t,offset)=>{const x=a.x+dx*t+(-dz/d)*offset,z=a.z+dz*t+(dx/d)*offset;
+ return[x,heightAt(x,z)+(type==='path'?.25:.1),z]};
+ const x=i/count,y=(i+1)/count,aa=build(x,-width/2),bb=build(x,width/2),cc=build(y,-width/2),dd=build(y,width/2);
+ verts.push(...aa,...bb,...dd,...aa,...dd,...cc);
+}
+const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.computeVertexNormals();
+const m=new THREE.Mesh(g,solid(type==='path'?colours.path:colours.stairs));surface.add(m);
+}
+function wallMesh(a,b){
+const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<.2)return;
+const segments=Math.max(1,Math.ceil(len/7));
+for(let k=0;k<segments;k++){
+ const t=(k+.5)/segments,x=a.x+dx*t,z=a.z+dz*t,y=heightAt(x,z);
+ const h=Number($('wallHeight').value)||12;
+ const block=shape('',new THREE.BoxGeometry(len/segments+.3,h,3.6),colours.wall,x,y+h/2,z);
+ block.rotation.y=-Math.atan2(dz,dx);
+}
+}
+function gateMesh(a,b){const dx=b.x-a.x,dz=b.z-a.z,d=Math.hypot(dx,dz);if(!d)return;
+const y=(heightAt(a.x,a.z)+heightAt(b.x,b.z))/2;
+for(let i=0;i<Math.ceil(d/1.7);i++){
+ const t=i/Math.max(1,Math.ceil(d/1.7)-1),x=a.x+dx*t,z=a.z+dz*t;
+ shape('',new THREE.CylinderGeometry(.25,.25,8,5),colours.gate,x,heightAt(x,z)+4,z);
+}
+const bar=shape('',new THREE.BoxGeometry(d,.7,.7),colours.gate,(a.x+b.x)/2,y+7.4,(a.z+b.z)/2);bar.rotation.y=-Math.atan2(dz,dx);
+}
+function caveModel(o){
+const {x,z}=o,y=heightAt(x,z);
+const group=new THREE.Group();group.position.set(x,y,z);surface.add(group);
+shape('',new THREE.BoxGeometry(13,10,3),colours.cave,0,4.5,0,group);
+shape('',new THREE.BoxGeometry(5,8,3.6),0x090c14,0,4,1.9,group);
+shape('',new THREE.BoxGeometry(18,2,8),colours.wall,0,10,0,group);
+shape('',new THREE.ConeGeometry(11,7,5),colours.wall,0,13,0,group);
+const interior=new THREE.Group();interior.position.set(x,-15,z);surface.add(interior);
+const floor=shape('',new THREE.BoxGeometry(34,.4,38),0x665e54,0,-.2,0,interior);
+for(const [xx,zz,w,d] of [[-17,0,2,40],[17,0,2,40],[0,-19,36,2],[0,19,36,2]]){
+shape('',new THREE.BoxGeometry(w,8,d),colours.wall,xx,4,zz,interior)}
+interior.visible=$('underground').checked;
+const lip=shape('',new THREE.BoxGeometry(5,1,5),colours.stairs,0,y-2,0,group);lip.visible=false;
+}
+function mountainModel(o){
+const y=heightAt(o.x,o.z),radius=o.radius||33,height=o.height||35,group=new THREE.Group();group.position.set(o.x,y,o.z);surface.add(group);
+shape('',new THREE.CylinderGeometry(radius*.62,radius,height,7,1),colours.mountain,0,height/2,0,group);
+shape('',new THREE.CylinderGeometry(radius*.62,radius*.64,1.1,7),0x9ca08a,0,height+.5,0,group);
+const steps=28;
+for(let i=0;i<steps;i++){
+const t=i/steps,a=t*Math.PI*2*1.35,x=Math.cos(a)*(radius-3-t*radius*.43),z=Math.sin(a)*(radius-3-t*radius*.43);
+const step=shape('',new THREE.BoxGeometry(7,1.2,5),colours.path,x,1.3+t*(height-2),z,group);step.rotation.y=-a;
+}
+shape('',new THREE.BoxGeometry(8,7,2),colours.cave,radius*.25,height+4,0,group);
+shape('',new THREE.BoxGeometry(5,6,2.2),0x10131c,radius*.25,height+3.5,1.5,group);
+}
+function draw(){
+while(surface.children.length){const g=surface.children[0];surface.remove(g);g.traverse(m=>{m.geometry?.dispose();if(m.material?.dispose)m.material.dispose()})}
+for(const n of live.nodes){
+if(n.kind==='anchor')marker(n.x,n.z,colours.anchor,1.4);
+if(n.kind==='tree')marker(n.x,n.z,colours.tree,2.2);
+if(n.kind==='wallspawn')marker(n.x,n.z,colours.wall,2.2);
+if(n.kind==='spawn')marker(n.x,n.z,colours.spawn,3);
+if(n.kind==='exit')marker(n.x,n.z,colours.exit,3);
+if(n.kind==='cave')caveModel(n);
+if(n.kind==='mountain')mountainModel(n);
+if(n.kind==='path'||n.kind==='stairs')routeMesh(n.a,n.b,n.kind);
+if(n.kind==='wall')wallMesh(n.a,n.b);
+if(n.kind==='gate')gateMesh(n.a,n.b);
+}
+updateStatus();
+}
+function updateStatus(){
+$('status').textContent=live.nodes.length+' elementos · '+live.nodes.filter(n=>n.kind==='cave').length+' cuevas · '+live.nodes.filter(n=>n.kind==='mountain').length+' montañas';
+$('selected').textContent=selectedId===null?'Nada seleccionado':('ID '+selectedId+' · '+(live.nodes.find(n=>n.id===selectedId)?.kind||''));
+$('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
+}
+function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
+const tools={raise:1,lower:1,flatten:1,smooth:1};
+function brush(x,z){
+const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
+const cx=Math.round((x/SIZE+.5)*(N-1)),cz=Math.round((z/SIZE+.5)*(N-1));const r=Math.ceil(radius/cell);
+let source=mode==='smooth'?live.heights.slice():null;
+for(let j=Math.max(0,cz-r);j<=Math.min(N-1,cz+r);j++)for(let i=Math.max(0,cx-r);i<=Math.min(N-1,cx+r);i++){
+const px=(i/(N-1)-.5)*SIZE,pz=(j/(N-1)-.5)*SIZE,d=Math.hypot(px-x,pz-z);
+if(d>radius)continue;const falloff=(1-d/radius)**2,k=index(i,j),old=live.heights[k],delta=strength*.12*falloff;
+if(mode==='raise')live.heights[k]=clamp(old+delta,0,Number($('maxHeight').value));
+if(mode==='lower')live.heights[k]=clamp(old-delta,0,Number($('maxHeight').value));
+if(mode==='flatten')live.heights[k]=clamp(old+(target-old)*clamp(delta*.17,0,1),0,Number($('maxHeight').value));
+if(mode==='smooth'){let v=0,num=0;for(let yy=Math.max(0,j-1);yy<=Math.min(N-1,j+1);yy++)for(let xx=Math.max(0,i-1);xx<=Math.min(N-1,i+1);xx++){v+=source[index(xx,yy)];num++}live.heights[k]=old+(v/num-old)*clamp(delta*.4,0,1)}
+}
+refreshTerrain();draw();
+}
+function addNode(node){snapshot();const n={id:live.nextId++,...node};live.nodes.push(n);selectedId=n.id;draw()}
+function convertCoords(event){
+const rect=view.getBoundingClientRect();
+mouse.x=((event.clientX-rect.left)/rect.width)*2-1;mouse.y=-((event.clientY-rect.top)/rect.height)*2+1;
+ray.setFromCamera(mouse,camera);const hits=ray.intersectObject(terrain);
+if(hits.length)return{x:hits[0].point.x,z:hits[0].point.z,y:hits[0].point.y};
+return ray.ray.intersectPlane(plane,temp)?{x:temp.x,z:temp.z,y:heightAt(temp.x,temp.z)}:null;
+}
+function act(point){
+const {x,z}=point,link=['path','wall','stairs','gate'];
+if(link.includes(mode)){
+ if(!pending){pending={x,z};updateStatus();return}
+ addNode({kind:mode,a:pending,b:{x,z}});pending=null;return;
+}
+if(mode==='select'||mode==='move'||mode==='delete'){
+ let best=null,d=Infinity;
+ for(const n of live.nodes){if(n.x===undefined)continue;const dd=Math.hypot(x-n.x,z-n.z);if(dd<d){d=dd;best=n}}
+ if(best&&d<16){if(mode==='delete'){snapshot();live.nodes=live.nodes.filter(n=>n.id!==best.id);selectedId=null;draw()}else{selectedId=best.id;if(mode==='move'){snapshot();dragId=best.id}draw()}}return;
+}
+if(mode==='mountain')addNode({kind:'mountain',x,z,radius:33,height:35});
+else if(mode==='cave')addNode({kind:'cave',x,z});
+else if(['tree','wallspawn','spawn','exit','anchor'].includes(mode))addNode({kind:mode,x,z});
+}
+function resize(){
+const w=view.clientWidth,h=view.clientHeight;renderer.setSize(w,h,false);
+if(camera.isOrthographicCamera){const aspect=w/h;camera.left=-viewSpan*aspect/2;camera.right=viewSpan*aspect/2;camera.top=viewSpan/2;camera.bottom=-viewSpan/2}
+else camera.aspect=w/h;camera.updateProjectionMatrix();
+}
+let viewSpan=720;
+function setTop(){camera.position.set(0,950,.01);camera.up.set(0,0,-1);orbit.target.set(0,0,0);camera.lookAt(0,0,0);orbit.update();orbit.enableRotate=false;resize()}
+setTop();
+view.addEventListener('pointerdown',e=>{
+if(e.button!==0)return;const p=convertCoords(e);if(!p)return;
+pointerDown=true;changed=false;
+if(tools[mode]){snapshot();brush(p.x,p.z);changed=true}else act(p);
+});
+view.addEventListener('pointermove',e=>{const p=convertCoords(e);if(!p)return;
+$('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
+cursor.position.set(p.x,p.y+.3,p.z);const radius=tools[mode]?Number($('brushRadius').value):4;cursor.scale.setScalar(radius);
+if(pointerDown&&tools[mode])brush(p.x,p.z);
+if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){n.x=p.x;n.z=p.z;draw()}}
+});
+window.addEventListener('pointerup',()=>{pointerDown=false;dragId=null});
+view.addEventListener('wheel',e=>{if(!camera.isOrthographicCamera)return;e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()},{passive:false});
+document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
+$('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
+$('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.nextId=1;refreshTerrain();draw()};
+$('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);refreshTerrain();draw()};
+$('underground').onchange=draw;
+$('remove').onclick=()=>{if(selectedId===null)return;snapshot();live.nodes=live.nodes.filter(n=>n.id!==selectedId);selectedId=null;draw()};
+$('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);refreshTerrain();draw();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
+$('importHeight').addEventListener('change',async e=>{
+const file=e.target.files?.[0];if(!file)return;
+const url=URL.createObjectURL(file);
+try{
+ const img=new Image();img.src=url;await img.decode();
+ const canvas=document.createElement('canvas');canvas.width=N;canvas.height=N;const ctx=canvas.getContext('2d',{willReadFrequently:true});
+ ctx.drawImage(img,0,0,N,N);const data=ctx.getImageData(0,0,N,N).data,max=Number($('maxHeight').value);
+ snapshot();
+ for(let z=0;z<N;z++)for(let x=0;x<N;x++){
+ const i=(z*N+x)*4,r=data[i],g=data[i+1],b=data[i+2],alpha=data[i+3];
+ const lum=(.2126*r+.7152*g+.0722*b)/255;
+ // Negro alto / blanco bajo. Verdes oscuros resultan más elevados.
+ const h=alpha<10?0:($('invertHeight').checked?lum:1-lum)*max;
+ live.heights[index(x,z)]=clamp(h,0,max);
+ }
+ refreshTerrain();draw();toast('Alturas importadas desde '+file.name);
+}catch(err){toast('Error en imagen: '+err.message)}
+finally{URL.revokeObjectURL(url);e.target.value=''}
+});
+$('exportHeight').onclick=()=>{
+const canvas=document.createElement('canvas');canvas.width=canvas.height=N;
+const ctx=canvas.getContext('2d'),image=ctx.createImageData(N,N);
+for(let i=0;i<COUNT;i++){const t=1-clamp(live.heights[i]/Number($('maxHeight').value),0,1);image.data[i*4]=Math.round(70*t);image.data[i*4+1]=Math.round(255*t);image.data[i*4+2]=Math.round(94*t);image.data[i*4+3]=255}
+ctx.putImageData(image,0,0);canvas.toBlob(b=>{if(b)download('wildtrap-alturas.png',b)});
+};
+function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+function toast(msg){$('toast').textContent=msg;setTimeout(()=>{if($('toast').textContent===msg)$('toast').textContent=''},4500)}
+window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea'))return;
+if(e.key==='Escape'){pending=null;setMode('select')}
+if(e.key==='Delete')$('remove').click();
+if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
+});
+window.addEventListener('resize',resize);
+refreshTerrain();draw();setMode('raise');
+function animate(){requestAnimationFrame(animate);orbit.update();renderer.render(scene,camera)}animate();
+window.__editorReady?.();
