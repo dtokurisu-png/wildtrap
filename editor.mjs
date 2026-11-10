@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {createPlaytest} from './playtest.mjs';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -192,12 +193,17 @@ else camera.aspect=w/h;camera.updateProjectionMatrix();
 let viewSpan=720;
 function setTop(){camera.position.set(0,950,.01);camera.up.set(0,0,-1);orbit.target.set(0,0,0);camera.lookAt(0,0,0);orbit.update();orbit.enableRotate=false;resize()}
 setTop();
+const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize});
+$('test').onclick=()=>preview.start();
+$('stopTest').onclick=()=>preview.stop();
+$('localFarolera').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview.fromFile(file);e.target.value=''});
 view.addEventListener('pointerdown',e=>{
+if(preview.active||preview.busy)return;
 if(e.button!==0)return;const p=convertCoords(e);if(!p)return;
 pointerDown=true;changed=false;
 if(tools[mode]){snapshot();brush(p.x,p.z);changed=true}else act(p);
 });
-view.addEventListener('pointermove',e=>{const p=convertCoords(e);if(!p)return;
+view.addEventListener('pointermove',e=>{if(preview.active||preview.busy)return;const p=convertCoords(e);if(!p)return;
 $('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
 cursor.position.set(p.x,p.y+.3,p.z);const radius=tools[mode]?Number($('brushRadius').value):4;cursor.scale.setScalar(radius);
 if(pointerDown&&tools[mode])brush(p.x,p.z);
@@ -244,13 +250,13 @@ ctx.putImageData(image,0,0);canvas.toBlob(b=>{if(b)download('wildtrap-alturas.pn
 };
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function toast(msg){$('toast').textContent=msg;setTimeout(()=>{if($('toast').textContent===msg)$('toast').textContent=''},4500)}
-window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea'))return;
+window.addEventListener('keydown',e=>{if(preview.active||preview.busy)return;if(e.target.matches('input,textarea'))return;
 if(e.key==='Escape'){pending=null;setMode('select')}
 if(e.key==='Delete')$('remove').click();
 if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
 });
-window.addEventListener('resize',resize);
+window.addEventListener('resize',()=>{resize();preview.resize()});
 try{const saved=localStorage.getItem('wildtrap-editor-draft-v1');if(saved){const d=JSON.parse(saved);if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){Object.assign(live,d);toast('Proyecto recuperado del guardado automático')}}}catch(e){toast('No se pudo recuperar el proyecto local')}
 refreshTerrain();draw();setMode('raise');
-function animate(){requestAnimationFrame(animate);orbit.update();renderer.render(scene,camera)}animate();
+function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();renderer.render(scene,preview.frame()||camera)}animate();
 window.__editorReady?.();
