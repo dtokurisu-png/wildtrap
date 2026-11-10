@@ -18,6 +18,7 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.12,walkTime=0;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  let oldShow=null,oldShadow=null;
+const hiddenDebugMarkers=[];
  const keys=new Set();
  let runOffset=0,modelURL=FAROLERA_URL;
  let localURL=null,loadingPromise=null,sourceError='';
@@ -192,6 +193,8 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
+    hiddenDebugMarkers.length=0;
+    scene.traverse(object=>{if(object.userData.editorOnly&&object.visible){hiddenDebugMarkers.push(object);object.visible=false}});
     scene.add(player);
     orbit.enabled=false;
     active=true;busy=false;
@@ -214,7 +217,10 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
   player.removeFromParent();
   cursor.visible=oldShow===null?true:oldShow;
   terrain.visible=oldShadow===null?true:oldShadow;
+  for(const node of hiddenDebugMarkers)node.visible=true;
+  hiddenDebugMarkers.length=0;
   orbit.enabled=true;walkWanted=false;
+  if(mixer){mixer.stopAllAction();idle?.reset().play();if(walk)walk.setEffectiveWeight(0)}
   $('test').textContent='▶ Probar';
   document.body.classList.remove('testing');
   resizeEditor();resize();
