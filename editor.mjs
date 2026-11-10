@@ -16,6 +16,7 @@ const terrainGeo=new THREE.PlaneGeometry(SIZE,SIZE,N-1,N-1);terrainGeo.rotateX(-
 const material=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
 const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';scene.add(terrain);
 const surface=new THREE.Group();scene.add(surface);
+const interiors=new THREE.Group();scene.add(interiors);
 const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasicMaterial({color:0xffdd7a,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));cursor.rotation.x=-Math.PI/2;cursor.renderOrder=20;scene.add(cursor);
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
@@ -81,11 +82,11 @@ shape('',new THREE.BoxGeometry(13,10,3),colours.cave,0,4.5,0,group);
 shape('',new THREE.BoxGeometry(5,8,3.6),0x090c14,0,4,1.9,group);
 shape('',new THREE.BoxGeometry(18,2,8),colours.wall,0,10,0,group);
 shape('',new THREE.ConeGeometry(11,7,5),colours.wall,0,13,0,group);
-const interior=new THREE.Group();interior.position.set(x,-15,z);surface.add(interior);
+const interior=new THREE.Group();interior.position.set(x,-15,z);interiors.add(interior);
 const floor=shape('',new THREE.BoxGeometry(34,.4,38),0x665e54,0,-.2,0,interior);
 for(const [xx,zz,w,d] of [[-17,0,2,40],[17,0,2,40],[0,-19,36,2],[0,19,36,2]]){
 shape('',new THREE.BoxGeometry(w,8,d),colours.wall,xx,4,zz,interior)}
-interior.visible=$('underground').checked;
+interior.visible=true;
 const lip=shape('',new THREE.BoxGeometry(5,1,5),colours.stairs,0,y-2,0,group);lip.visible=false;
 }
 function mountainModel(o){
@@ -101,7 +102,7 @@ shape('',new THREE.BoxGeometry(8,7,2),colours.cave,radius*.25,height+4,0,group);
 shape('',new THREE.BoxGeometry(5,6,2.2),0x10131c,radius*.25,height+3.5,1.5,group);
 }
 function draw(){
-while(surface.children.length){const g=surface.children[0];surface.remove(g);g.traverse(m=>{m.geometry?.dispose();if(m.material?.dispose)m.material.dispose()})}
+for(const collection of [surface,interiors])while(collection.children.length){const g=collection.children[0];collection.remove(g);g.traverse(m=>{m.geometry?.dispose();if(m.material?.dispose)m.material.dispose()})}
 for(const n of live.nodes){
 if(n.kind==='anchor')marker(n.x,n.z,colours.anchor,1.4);
 if(n.kind==='tree')marker(n.x,n.z,colours.tree,2.2);
@@ -114,6 +115,7 @@ if(n.kind==='path'||n.kind==='stairs')routeMesh(n.a,n.b,n.kind);
 if(n.kind==='wall')wallMesh(n.a,n.b);
 if(n.kind==='gate')gateMesh(n.a,n.b);
 }
+surface.visible=!$('underground').checked;terrain.visible=!$('underground').checked;interiors.visible=$('underground').checked;
 updateStatus();
 }
 function updateStatus(){
@@ -186,7 +188,7 @@ $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
 $('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.nextId=1;refreshTerrain();draw()};
 $('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);refreshTerrain();draw()};
-$('underground').onchange=draw;
+$('underground').onchange=()=>{draw();if($('underground').checked)toast('Vista subterránea: se oculta el terreno para inspeccionar las salas')};
 $('remove').onclick=()=>{if(selectedId===null)return;snapshot();live.nodes=live.nodes.filter(n=>n.id!==selectedId);selectedId=null;draw()};
 $('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
 $('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);refreshTerrain();draw();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
