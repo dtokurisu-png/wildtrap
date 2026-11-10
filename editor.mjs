@@ -70,12 +70,12 @@ for(let i=0;i<steps;i++){
  block.rotation.y=heading;
 }
 }
-function wallMesh(a,b){
+function wallMesh(a,b,wallHeight=12){
 const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<.2)return;
 const segments=Math.max(1,Math.ceil(len/7));
 for(let k=0;k<segments;k++){
  const t=(k+.5)/segments,x=a.x+dx*t,z=a.z+dz*t,y=heightAt(x,z);
- const h=Number($('wallHeight').value)||12;
+ const h=wallHeight;
  const block=shape('',new THREE.BoxGeometry(len/segments+.3,h,3.6),colours.wall,x,y+h/2,z);
  block.rotation.y=-Math.atan2(dz,dx);
 }
@@ -128,7 +128,7 @@ if(n.kind==='cave')caveModel(n);
 if(n.kind==='mountain')mountainModel(n);
 if(n.kind==='path')routeMesh(resolvePoint(n.a),resolvePoint(n.b),'path');
 if(n.kind==='stairs')stairMesh(resolvePoint(n.a),resolvePoint(n.b),n.rise||8);
-if(n.kind==='wall')wallMesh(resolvePoint(n.a),resolvePoint(n.b));
+if(n.kind==='wall')wallMesh(resolvePoint(n.a),resolvePoint(n.b),n.height||12);
 if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
 }
 surface.visible=!$('underground').checked;terrain.visible=!$('underground').checked;interiors.visible=$('underground').checked;
@@ -169,7 +169,7 @@ function act(point){
 const {x,z}=point,link=['path','wall','stairs','gate'];
 if(link.includes(mode)){
  if(!pending){pending=snapPoint(x,z);updateStatus();return}
- addNode({kind:mode,a:pending,b:snapPoint(x,z),...(mode==='stairs'?{rise:Number($('stairRise').value)||8}:{})});pending=null;return;
+ addNode({kind:mode,a:pending,b:snapPoint(x,z),...(mode==='stairs'?{rise:Number($('stairRise').value)||8}:{}),...(mode==='wall'?{height:Number($('wallHeight').value)||12}:{})});pending=null;return;
 }
 if(mode==='select'||mode==='move'||mode==='delete'){
  let best=null,d=Infinity;
@@ -211,6 +211,8 @@ $('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);or
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.nextId=1;refreshTerrain();draw();persist()};
 $('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);refreshTerrain();draw();persist()};
 $('applyModule').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId);if(!n||!['mountain','cave'].includes(n.kind)){toast('Selecciona una montaña o cueva');return}snapshot();if(n.kind==='mountain'){n.height=clamp(Number($('moduleHeight').value)||35,4,100);n.radius=clamp(Number($('moduleRadius').value)||33,10,90)}else{n.scale=clamp(Number($('moduleScale').value)||1,.3,3)}draw();persist();toast('Módulo actualizado')};
+$('focusCave').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cave');if(!n){toast('Selecciona primero una cueva con la herramienta Seleccionar');return}$('underground').checked=true;draw();camera.up.set(0,1,0);camera.position.set(n.x+26,24,n.z+32);orbit.target.set(n.x,-13,n.z);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Interior de cueva';toast('Vista de interior subterráneo: la superficie queda oculta')};
+$('surfaceView').onclick=()=>{$('underground').checked=false;draw();setTop();$('viewType').textContent='Vista cenital'};
 $('underground').onchange=()=>{draw();if($('underground').checked)toast('Vista subterránea: se oculta el terreno para inspeccionar las salas')};
 $('remove').onclick=()=>{if(selectedId===null)return;snapshot();live.nodes=live.nodes.filter(n=>n.id!==selectedId);selectedId=null;draw();persist()};
 $('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
