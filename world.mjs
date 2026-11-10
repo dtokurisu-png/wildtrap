@@ -80,11 +80,11 @@ if(Math.abs(d1)<.27||Math.abs(d2)<.23)continue;
 const radius=s.r+6;
 const x=s.x+Math.cos(ang)*radius,z=s.z+Math.sin(ang)*radius;
 if(Math.abs(x)>SIZE/2-12||Math.abs(z)>SIZE/2-12||routeDistance(x,z)<10||dist(x,z,SPAWN.x,SPAWN.z)<24)continue;
-const b={id:'wall-'+s.id+'-'+step,sector:s.id,x,z,type:r()<.33?'tree':'rock',radius:4.3,altitude:7+Math.floor(r()*5)};
+const b={id:'wall-'+s.id+'-'+step,sector:s.id,x,z,type:r()<.33?'tree':'rock',radius:6.1,altitude:7+Math.floor(r()*5)};
 w.barriers.push(b);
 }
 // Puerta en un paso de la ruta principal. Se abre por interacción; otro paso queda libre.
-const gateX=s.x-Math.cos(toward)*(s.r+5),gateZ=s.z-Math.sin(toward)*(s.r+5);
+const gateX=s.x+Math.cos(toward)*(s.r+5),gateZ=s.z+Math.sin(toward)*(s.r+5);
 if(dist(gateX,gateZ,SPAWN.x,SPAWN.z)>21)w.gates.push({id:'gate-'+s.id,x:gateX,z:gateZ,sector:s.id,closed:true});
 const sideAng=toward+1.75;
 w.stairs.push({id:'stairs-'+s.id,x:s.x+Math.cos(sideAng)*(s.r+3),z:s.z+Math.sin(sideAng)*(s.r+3),sector:s.id});
