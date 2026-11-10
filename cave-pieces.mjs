@@ -92,8 +92,8 @@ function makeWall(b,o){
  b.grid(sx,sz,(u,v)=>[widthX(u,w),h*v,back],true,1);
  b.grid(sx,2,(u,v)=>[widthX(u,w),h,t*(v-.5)],true,0);
  b.grid(sx,2,(u,v)=>[widthX(u,w),0,t*(v-.5)],false,0);
- b.grid(2,sz,(u,v)=>[-w/2,h*v,t*(u-.5)],true,0);
- b.grid(2,sz,(u,v)=>[w/2,h*v,t*(u-.5)],false,0);
+ b.grid(2,sz,(u,v)=>[-w/2,h*v,t*(u-.5)],false,0);
+ b.grid(2,sz,(u,v)=>[w/2,h*v,t*(u-.5)],true,0);
 }
 function makeVault(b,o){
  const s=o.segmentsArch,z=o.segmentsZ;
@@ -102,7 +102,7 @@ function makeVault(b,o){
  b.grid(s,z,(u,v)=>roofPoint(o,u,v,true),true,0);
  // Cross-section lips at both open ends: only shell thickness, no end walls.
  for(const v of [0,1]){
-  b.grid(s,2,(u,t)=>{const p=roofPoint(o,u,v,false);p[1]+=t*o.thickness;return p;},v===1,0);
+  b.grid(s,2,(u,t)=>{const p=roofPoint(o,u,v,false);p[1]+=t*o.thickness;return p;},v===0,0);
  }
  for(const u of [0,1]){
   b.grid(z,2,(v,t)=>{const p=roofPoint(o,u,v,false);p[1]+=t*o.thickness;return p;},u===1,0);
@@ -120,8 +120,8 @@ function makeRamp(b,o){
  const slope=v=>o.height*v;
  b.grid(o.segmentsX,o.segmentsZ,(u,v)=>[widthX(u,o.width),slope(v),depthZ(v,o.length)],true,0);
  b.grid(o.segmentsX,o.segmentsZ,(u,v)=>[widthX(u,o.width),slope(v)-o.thickness,depthZ(v,o.length)],false,1);
- for(const u of [0,1])b.grid(o.segmentsZ,2,(v,t)=>[widthX(u,o.width),slope(v)-o.thickness*t,depthZ(v,o.length)],u===1,0);
- for(const v of [0,1])b.grid(o.segmentsX,2,(u,t)=>[widthX(u,o.width),slope(v)-o.thickness*t,depthZ(v,o.length)],v===0,0);
+ for(const u of [0,1])b.grid(o.segmentsZ,2,(v,t)=>[widthX(u,o.width),slope(v)-o.thickness*t,depthZ(v,o.length)],u===0,0);
+ for(const v of [0,1])b.grid(o.segmentsX,2,(u,t)=>[widthX(u,o.width),slope(v)-o.thickness*t,depthZ(v,o.length)],v===1,0);
 }
 function makeChamber(b,o){
  const seg=Math.max(24,o.segmentsArch*2),rings=6,levels=8;
@@ -138,7 +138,7 @@ function makeChamber(b,o){
   ringVerts.push(arr);
  }
  // Triangle fan, oriented upward.
- for(let i=0;i<seg;i++)b.triangle(center,ringVerts[0][i],ringVerts[0][i+1],1);
+ for(let i=0;i<seg;i++)b.triangle(center,ringVerts[0][i+1],ringVerts[0][i],1);
  for(let r=1;r<rings;r++)for(let i=0;i<seg;i++){
   const inner=ringVerts[r-1],outer=ringVerts[r];
   b.quad(inner[i],inner[i+1],outer[i],outer[i+1],false,1);
@@ -166,7 +166,7 @@ function makeChamber(b,o){
    const theta=a+(bAngle-a)*u,[x,z]=xy(theta,1);
    const t=1+v*o.thickness/(o.width*.5);
    return [x*t,o.height+.03,z*t];
-  },true,0);
+  },false,0);
  }
 }
 export function createCavePieceData(kind,parameters={},vertexEdits={}){
