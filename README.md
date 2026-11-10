@@ -53,3 +53,19 @@ Los bloques, montañas, cuevas, escaleras y barreras son **geometría provisiona
 
 ## Desarrollo
 No es necesario instalar nada si GitHub Pages ya está activado. Como es una aplicación ES Modules, para abrir localmente se necesita un servidor HTTP (no doble clic sobre `index.html`), por ejemplo `python -m http.server 8080`.
+
+
+## v0.5 — Modo Probar: Farolera original y cámara sobre el hombro
+
+Pulsar **▶ Probar** oculta los controles del editor y abre una vista jugable del **mismo terreno** que se esté editando o que se haya importado mediante PNG/JPG de alturas. No modifica la malla ni borra el proyecto: **Volver al editor** o **Esc** restauran la vista de edición y sus controles. La posición inicial es el primer marcador **Respawn**; si no hay uno, se usa una posición segura próxima a la esquina sureste del mapa.
+
+- **WASD / flechas:** desplazarse relativo a la cámara. **Shift:** correr.
+- **Arrastrar el ratón** (botón principal o secundario) sobre el escenario: girar libremente la cámara, que sigue a la Farolera desde cerca de un hombro; la cámara no gira automáticamente con el modelo.
+- La Farolera intenta cargar el **GLB auténtico de R.O.K.** (sin cambiar el archivo original): `https://dtokurisu-png.github.io/rok-3d-test/assets/models/casters/farolera/chiara_idle.glb`. El GLB contiene al menos el clip **Idle** empleado por el visor R.O.K. y ese clip se reproduce mediante `THREE.AnimationMixer`.
+- Se intenta cargar **de manera adicional y no bloqueante** la caminata FBX publicada en `rok-3d-test/animations/Walking.fbx`; si se consigue adaptar al esqueleto, se mezcla con el Idle. Si falla la adaptación o la red, la Farolera sigue visible con el Idle original y una animación procedural de extremidades durante el movimiento (fallback). No se asegura que la caminata sea idéntica a la animación 12 del visor.
+- Si el modelo remoto falla, se muestra un **error visible** y se permite seleccionar un **GLB local (respaldo)** en el editor; no se sustituye silenciosamente por un muñeco.
+- El personaje camina siguiendo la elevación de los datos del terreno y restringe pasos con diferencias verticales abruptas. **Esto es una prueba de movimiento**, no un controlador físico completo; muros, montañas prefabricadas, cuevas y entradas todavía no tienen colisiones jugables.
+
+Esta función está separada en `playtest.mjs`, no altera la biblioteca de R.O.K. ni cambia los ajustes del mapa. El navegador necesita conexión para descargar Three.js y el GLB original, salvo que se seleccione uno local (Three.js sigue siendo externo).
+
+La comprobación hasta ahora ha sido **estática** (sintaxis y conexiones entre HTML/JS); queda pendiente la validación visual real en un navegador con acceso a la página y a los recursos del modelo.
