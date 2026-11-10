@@ -21,7 +21,8 @@ const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasi
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
 const live={version:1,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],nextId:1,settings:{heightMax:48}};
-const undo=[];let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
+const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem('wildtrap-editor-draft-v1',JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
+let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
 const temp=new THREE.Vector3();
 const pos=(x,z)=>({x:clamp(x,-SIZE/2,SIZE/2),z:clamp(z,-SIZE/2,SIZE/2)});
@@ -30,7 +31,7 @@ const fx=clamp((x/SIZE+.5)*(N-1),0,N-1),fz=clamp((z/SIZE+.5)*(N-1),0,N-1),ix=Mat
 const a=live.heights[index(ix,iz)],b=live.heights[index(xx,iz)],c=live.heights[index(ix,zz)],d=live.heights[index(xx,zz)];
 return(a*(1-tx)+b*tx)*(1-tz)+(c*(1-tx)+d*tx)*tz;
 }
-function snapshot(){undo.push(JSON.stringify(live));if(undo.length>20)undo.shift()}
+function snapshot(){undo.push(JSON.stringify(live));if(undo.length>20)undo.shift();persist()}
 function refreshTerrain(){
 const p=terrainGeo.attributes.position;
 const rgb=new Float32Array(COUNT*3),color=new THREE.Color();
@@ -77,12 +78,12 @@ const bar=shape('',new THREE.BoxGeometry(d,.7,.7),colours.gate,(a.x+b.x)/2,y+7.4
 }
 function caveModel(o){
 const {x,z}=o,y=heightAt(x,z);
-const group=new THREE.Group();group.position.set(x,y,z);surface.add(group);
+const group=new THREE.Group();group.position.set(x,y,z);group.scale.setScalar(o.scale||1);surface.add(group);
 shape('',new THREE.BoxGeometry(13,10,3),colours.cave,0,4.5,0,group);
 shape('',new THREE.BoxGeometry(5,8,3.6),0x090c14,0,4,1.9,group);
 shape('',new THREE.BoxGeometry(18,2,8),colours.wall,0,10,0,group);
 shape('',new THREE.ConeGeometry(11,7,5),colours.wall,0,13,0,group);
-const interior=new THREE.Group();interior.position.set(x,-15,z);interiors.add(interior);
+const interior=new THREE.Group();interior.position.set(x,-15,z);interior.scale.setScalar(o.scale||1);interiors.add(interior);
 const floor=shape('',new THREE.BoxGeometry(34,.4,38),0x665e54,0,-.2,0,interior);
 for(const [xx,zz,w,d] of [[-17,0,2,40],[17,0,2,40],[0,-19,36,2],[0,19,36,2]]){
 shape('',new THREE.BoxGeometry(w,8,d),colours.wall,xx,4,zz,interior)}
@@ -90,7 +91,7 @@ interior.visible=true;
 const lip=shape('',new THREE.BoxGeometry(5,1,5),colours.stairs,0,y-2,0,group);lip.visible=false;
 }
 function mountainModel(o){
-const y=heightAt(o.x,o.z),radius=o.radius||33,height=o.height||35,group=new THREE.Group();group.position.set(o.x,y,o.z);surface.add(group);
+const y=heightAt(o.x,o.z),radius=o.radius||33,height=o.height||35,group=new THREE.Group();group.position.set(o.x,y,o.z);group.rotation.y=o.rotation||0;surface.add(group);
 shape('',new THREE.CylinderGeometry(radius*.62,radius,height,7,1),colours.mountain,0,height/2,0,group);
 shape('',new THREE.CylinderGeometry(radius*.62,radius*.64,1.1,7),0x9ca08a,0,height+.5,0,group);
 const steps=28;
@@ -120,7 +121,9 @@ updateStatus();
 }
 function updateStatus(){
 $('status').textContent=live.nodes.length+' elementos · '+live.nodes.filter(n=>n.kind==='cave').length+' cuevas · '+live.nodes.filter(n=>n.kind==='mountain').length+' montañas';
-$('selected').textContent=selectedId===null?'Nada seleccionado':('ID '+selectedId+' · '+(live.nodes.find(n=>n.id===selectedId)?.kind||''));
+const picked=live.nodes.find(n=>n.id===selectedId);
+$('selected').textContent=selectedId===null?'Nada seleccionado':('ID '+selectedId+' · '+(picked?.kind||''));
+if(picked){$('moduleHeight').value=picked.height||35;$('moduleRadius').value=picked.radius||33;$('moduleScale').value=picked.scale||1}
 $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
 }
 function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
@@ -137,9 +140,9 @@ if(mode==='lower')live.heights[k]=clamp(old-delta,0,Number($('maxHeight').value)
 if(mode==='flatten')live.heights[k]=clamp(old+(target-old)*clamp(delta*.17,0,1),0,Number($('maxHeight').value));
 if(mode==='smooth'){let v=0,num=0;for(let yy=Math.max(0,j-1);yy<=Math.min(N-1,j+1);yy++)for(let xx=Math.max(0,i-1);xx<=Math.min(N-1,i+1);xx++){v+=source[index(xx,yy)];num++}live.heights[k]=old+(v/num-old)*clamp(delta*.4,0,1)}
 }
-refreshTerrain();draw();
+refreshTerrain();draw();persist();
 }
-function addNode(node){snapshot();const n={id:live.nextId++,...node};live.nodes.push(n);selectedId=n.id;draw()}
+function addNode(node){snapshot();const n={id:live.nextId++,...node};live.nodes.push(n);selectedId=n.id;draw();persist()}
 function convertCoords(event){
 const rect=view.getBoundingClientRect();
 mouse.x=((event.clientX-rect.left)/rect.width)*2-1;mouse.y=-((event.clientY-rect.top)/rect.height)*2+1;
@@ -156,7 +159,7 @@ if(link.includes(mode)){
 if(mode==='select'||mode==='move'||mode==='delete'){
  let best=null,d=Infinity;
  for(const n of live.nodes){if(n.x===undefined)continue;const dd=Math.hypot(x-n.x,z-n.z);if(dd<d){d=dd;best=n}}
- if(best&&d<16){if(mode==='delete'){snapshot();live.nodes=live.nodes.filter(n=>n.id!==best.id);selectedId=null;draw()}else{selectedId=best.id;if(mode==='move'){snapshot();dragId=best.id}draw()}}return;
+ if(best&&d<16){if(mode==='delete'){snapshot();live.nodes=live.nodes.filter(n=>n.id!==best.id);selectedId=null;draw();persist()}else{selectedId=best.id;if(mode==='move'){snapshot();dragId=best.id}draw()}}return;
 }
 if(mode==='mountain')addNode({kind:'mountain',x,z,radius:33,height:35});
 else if(mode==='cave')addNode({kind:'cave',x,z});
@@ -179,19 +182,20 @@ view.addEventListener('pointermove',e=>{const p=convertCoords(e);if(!p)return;
 $('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
 cursor.position.set(p.x,p.y+.3,p.z);const radius=tools[mode]?Number($('brushRadius').value):4;cursor.scale.setScalar(radius);
 if(pointerDown&&tools[mode])brush(p.x,p.z);
-if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){n.x=p.x;n.z=p.z;draw()}}
+if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){n.x=p.x;n.z=p.z;draw();persist()}}
 });
 window.addEventListener('pointerup',()=>{pointerDown=false;dragId=null});
 view.addEventListener('wheel',e=>{if(!camera.isOrthographicCamera)return;e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()},{passive:false});
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
 $('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
-$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.nextId=1;refreshTerrain();draw()};
-$('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);refreshTerrain();draw()};
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.nextId=1;refreshTerrain();draw();persist()};
+$('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);refreshTerrain();draw();persist()};
+$('applyModule').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId);if(!n||!['mountain','cave'].includes(n.kind)){toast('Selecciona una montaña o cueva');return}snapshot();if(n.kind==='mountain'){n.height=clamp(Number($('moduleHeight').value)||35,4,100);n.radius=clamp(Number($('moduleRadius').value)||33,10,90)}else{n.scale=clamp(Number($('moduleScale').value)||1,.3,3)}draw();persist();toast('Módulo actualizado')};
 $('underground').onchange=()=>{draw();if($('underground').checked)toast('Vista subterránea: se oculta el terreno para inspeccionar las salas')};
-$('remove').onclick=()=>{if(selectedId===null)return;snapshot();live.nodes=live.nodes.filter(n=>n.id!==selectedId);selectedId=null;draw()};
+$('remove').onclick=()=>{if(selectedId===null)return;snapshot();live.nodes=live.nodes.filter(n=>n.id!==selectedId);selectedId=null;draw();persist()};
 $('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);refreshTerrain();draw();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
 $('importHeight').addEventListener('change',async e=>{
 const file=e.target.files?.[0];if(!file)return;
 const url=URL.createObjectURL(file);
@@ -207,7 +211,7 @@ try{
  const h=alpha<10?0:($('invertHeight').checked?lum:1-lum)*max;
  live.heights[index(x,z)]=clamp(h,0,max);
  }
- refreshTerrain();draw();toast('Alturas importadas desde '+file.name);
+ refreshTerrain();draw();persist();toast('Alturas importadas desde '+file.name);
 }catch(err){toast('Error en imagen: '+err.message)}
 finally{URL.revokeObjectURL(url);e.target.value=''}
 });
@@ -225,6 +229,7 @@ if(e.key==='Delete')$('remove').click();
 if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
 });
 window.addEventListener('resize',resize);
+try{const saved=localStorage.getItem('wildtrap-editor-draft-v1');if(saved){const d=JSON.parse(saved);if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){Object.assign(live,d);toast('Proyecto recuperado del guardado automático')}}}catch(e){toast('No se pudo recuperar el proyecto local')}
 refreshTerrain();draw();setMode('raise');
 function animate(){requestAnimationFrame(animate);orbit.update();renderer.render(scene,camera)}animate();
 window.__editorReady?.();
