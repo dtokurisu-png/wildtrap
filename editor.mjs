@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {createPlaytest} from './playtest.mjs';
+import {createTerrainHoles} from './terrain-holes.mjs';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -21,7 +22,8 @@ const interiors=new THREE.Group();scene.add(interiors);
 const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasicMaterial({color:0xffdd7a,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));cursor.rotation.x=-Math.PI/2;cursor.renderOrder=20;scene.add(cursor);
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
-const live={version:1,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],nextId:1,settings:{heightMax:48}};
+const live={version:2,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],holes:[],nextId:1,settings:{heightMax:120}};
+let holesEditor=null;
 const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem('wildtrap-editor-draft-v1',JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
@@ -41,7 +43,7 @@ for(let i=0;i<COUNT;i++){
  const green=.40+clamp(h/55,0,1)*-.25;color.setRGB(.20+green*.18,green+.20,.26+green*.08);
  rgb[i*3]=color.r;rgb[i*3+1]=color.g;rgb[i*3+2]=color.b;
 }
-p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();
+p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));holesEditor?.syncGeometry();terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();
 }
 function shape(type,geo,color,x,y,z,group=surface){const m=new THREE.Mesh(geo,solid(color));m.position.set(x,y,z);group.add(m);return m}
 function marker(x,z,color,scale=2){const g=new THREE.Group();g.name='EditorOnlyMarker';g.userData.editorOnly=true;g.position.set(x,heightAt(x,z),z);surface.add(g);
@@ -136,14 +138,14 @@ surface.visible=!$('underground').checked;terrain.visible=!$('underground').chec
 updateStatus();
 }
 function updateStatus(){
-$('status').textContent=live.nodes.length+' elementos · '+live.nodes.filter(n=>n.kind==='cave').length+' cuevas · '+live.nodes.filter(n=>n.kind==='mountain').length+' montañas';
+$('status').textContent=live.nodes.length+' elementos · '+(live.holes||[]).length+' huecos · '+live.nodes.filter(n=>n.kind==='cave').length+' cuevas · '+live.nodes.filter(n=>n.kind==='mountain').length+' montañas';
 const picked=live.nodes.find(n=>n.id===selectedId);
 $('selected').textContent=selectedId===null?'Nada seleccionado':('ID '+selectedId+' · '+(picked?.kind||''));
 if(picked){$('moduleHeight').value=picked.height||35;$('moduleRadius').value=picked.radius||33;$('moduleScale').value=picked.scale||1}
 $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
 }
 function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
-const tools={raise:1,lower:1,flatten:1,smooth:1};
+const tools={raise:1,lower:1,flatten:1,smooth:1,holePaint:1,holeErase:1};
 function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
 const cx=Math.round((x/SIZE+.5)*(N-1)),cz=Math.round((z/SIZE+.5)*(N-1));const r=Math.ceil(radius/cell);
@@ -193,20 +195,26 @@ else camera.aspect=w/h;camera.updateProjectionMatrix();
 let viewSpan=720;
 function setTop(){camera.position.set(0,950,.01);camera.up.set(0,0,-1);orbit.target.set(0,0,0);camera.lookAt(0,0,0);orbit.update();orbit.enableRotate=false;resize()}
 setTop();
-const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize});
+holesEditor=createTerrainHoles({scene,terrainGeo,live,heightAt,refreshTerrain,snapshot,persist,toast,$});
+const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,z)=>holesEditor.isHoleAt(x,z)});
 $('test').onclick=()=>preview.start();
+$('createHole').onclick=()=>{holesEditor.apply(true);draw()};
+$('restoreHole').onclick=()=>{holesEditor.apply(false);draw()};
+$('clearHoleSelection').onclick=()=>holesEditor.clearSelection();
 $('stopTest').onclick=()=>preview.stop();
 $('localFarolera').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview.fromFile(file);e.target.value=''});
 view.addEventListener('pointerdown',e=>{
 if(preview.active||preview.busy)return;
 if(e.button!==0)return;const p=convertCoords(e);if(!p)return;
 pointerDown=true;changed=false;
-if(tools[mode]){snapshot();brush(p.x,p.z);changed=true}else act(p);
+if(mode==='holePaint'||mode==='holeErase'){holesEditor.paint(p.x,p.z,mode==='holeErase');changed=true}
+ else if(tools[mode]){snapshot();brush(p.x,p.z);changed=true}else act(p);
 });
 view.addEventListener('pointermove',e=>{if(preview.active||preview.busy)return;const p=convertCoords(e);if(!p)return;
 $('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
 cursor.position.set(p.x,p.y+.3,p.z);const radius=tools[mode]?Number($('brushRadius').value):4;cursor.scale.setScalar(radius);
-if(pointerDown&&tools[mode])brush(p.x,p.z);
+if(pointerDown&&(mode==='holePaint'||mode==='holeErase'))holesEditor.paint(p.x,p.z,mode==='holeErase');
+else if(pointerDown&&tools[mode])brush(p.x,p.z);
 if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){if(n.a&&n.b){const old=n._drag?.start||n,dx=p.x-(n._drag?.x??p.x),dz=p.z-(n._drag?.z??p.z);n.a={x:old.a.x+dx,z:old.a.z+dz};n.b={x:old.b.x+dx,z:old.b.z+dz}}else{n.x=p.x;n.z=p.z}draw();persist()}}
 });
 window.addEventListener('pointerup',()=>{pointerDown=false;if(dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n)delete n._drag;persist()}dragId=null});
@@ -214,15 +222,15 @@ view.addEventListener('wheel',e=>{if(!camera.isOrthographicCamera)return;e.preve
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
 $('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
-$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.nextId=1;refreshTerrain();draw();persist()};
-$('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);refreshTerrain();draw();persist()};
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.holes=[];live.nextId=1;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);if(!Array.isArray(live.holes))live.holes=[];holesEditor.clearSelection();refreshTerrain();draw();persist()};
 $('applyModule').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId);if(!n||!['mountain','cave'].includes(n.kind)){toast('Selecciona una montaña o cueva');return}snapshot();if(n.kind==='mountain'){n.height=clamp(Number($('moduleHeight').value)||35,4,100);n.radius=clamp(Number($('moduleRadius').value)||33,10,90);n.caveDoor={localX:n.radius*.25,localY:n.height+3.5,localZ:1.5}}else{n.scale=clamp(Number($('moduleScale').value)||1,.3,3)}draw();persist();toast('Módulo actualizado')};
 $('focusCave').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cave');if(!n){toast('Selecciona primero una cueva con la herramienta Seleccionar');return}$('underground').checked=true;draw();camera.up.set(0,1,0);camera.position.set(n.x+26,24,n.z+32);orbit.target.set(n.x,-13,n.z);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Interior de cueva';toast('Vista de interior subterráneo: la superficie queda oculta')};
 $('surfaceView').onclick=()=>{$('underground').checked=false;draw();setTop();$('viewType').textContent='Vista cenital'};
 $('underground').onchange=()=>{draw();if($('underground').checked)toast('Vista subterránea: se oculta el terreno para inspeccionar las salas')};
 $('remove').onclick=()=>{if(selectedId===null)return;snapshot();live.nodes=live.nodes.filter(n=>n.id!==selectedId);selectedId=null;draw();persist()};
 $('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];holesEditor.clearSelection();updateMaxHeightControl();refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
 $('importHeight').addEventListener('change',async e=>{
 const file=e.target.files?.[0];if(!file)return;
 const url=URL.createObjectURL(file);
@@ -256,7 +264,40 @@ if(e.key==='Delete')$('remove').click();
 if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
 });
 window.addEventListener('resize',()=>{resize();preview.resize()});
-try{const saved=localStorage.getItem('wildtrap-editor-draft-v1');if(saved){const d=JSON.parse(saved);if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){Object.assign(live,d);toast('Proyecto recuperado del guardado automático')}}}catch(e){toast('No se pudo recuperar el proyecto local')}
-refreshTerrain();draw();setMode('raise');
+function updateMaxHeightControl(){
+ const peak=live.heights.reduce((a,v)=>Math.max(a,v),0);
+ $('maxHeight').value=Math.min(150,Math.max(120,Math.ceil(peak/10)*10));
+}
+async function restoreSavedBase(confirmOverwrite=false){
+ if(confirmOverwrite&&!confirm('¿Cargar el terreno base? El guardado actual del editor será reemplazado; puedes exportarlo antes.'))return;
+ try{
+  const response=await fetch('./assets/terrain/wildtrap-terreno-base.json',{cache:'no-cache'});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  const data=await response.json();
+  if(data.size!==SIZE||data.resolution!==N||data.heights?.length!==COUNT)throw Error('Terreno base incompatible');
+  if(confirmOverwrite)snapshot();
+  Object.assign(live,data);
+  live.holes=[];
+  live.version=2;
+  holesEditor.clearSelection();updateMaxHeightControl();
+  refreshTerrain();draw();persist();
+  toast('Terreno base original recuperado · 630 × 630');
+ }catch(error){toast('No se pudo abrir terreno base: '+error.message)}
+}
+$('restoreBase').onclick=()=>restoreSavedBase(true);
+let recoveredDraft=false;
+try{
+ const saved=localStorage.getItem('wildtrap-editor-draft-v1');
+ if(saved){
+  const d=JSON.parse(saved);
+  if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
+   Object.assign(live,d);live.holes=Array.isArray(d.holes)?d.holes:[];
+   recoveredDraft=true;
+   toast('Proyecto recuperado del guardado automático; puedes usar Cargar terreno base');
+  }
+ }
+}catch(e){toast('No se pudo recuperar el proyecto local')}
+updateMaxHeightControl();refreshTerrain();draw();setMode('raise');
+if(!recoveredDraft)void restoreSavedBase(false);
 function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();renderer.render(scene,preview.frame()||camera)}animate();
 window.__editorReady?.();
