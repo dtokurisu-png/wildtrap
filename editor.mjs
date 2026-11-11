@@ -439,55 +439,142 @@ window.addEventListener('pointerup',e=>{
  $('selectionMarquee').style.display='none';
  orbit.enabled=previousOrbitEnabled;
 });
-view.addEventListener('pointerdown',e=>{
-if(preview.active||preview.busy||marqueeStart)return;
-if(e.button!==0)return;
-const p=convertCoords(e);if(!p)return;
-pointerDown=true;changed=false;
-if(mode==='move'){
- const hovered=pickedNodeAt(e);
- if(hovered){
-  if(!selectedIds.has(hovered.id))setNodeSelection([hovered.id]);
-  snapshot();dragId=hovered.id;
-  moveBases={x:p.x,z:p.z,nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>({id:n.id,original:structuredClone(n)}))};
-  return;
- }
+// Direct model interaction: the terrain ray positions models; the mesh ray selects them.
+function beginModelDrag(e,node){
+ if(!selectedIds.has(node.id))setNodeSelection([node.id]);
+ selectedId=node.id;
+ const ground=convertCoords(e)||{x:node.x||0,z:node.z||0};
+ dragSession={
+  pointerId:e.pointerId,
+  startX:e.clientX,startY:e.clientY,
+  ground:{x:ground.x,z:ground.z},
+  action:e.shiftKey&&node.kind==='prefab'?'scale':'move',
+  nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>({id:n.id,original:structuredClone(n)})),
+  changed:false
+ };
+ try{view.setPointerCapture(e.pointerId)}catch(_){}
+ view.style.cursor=dragSession.action==='scale'?'ns-resize':'grabbing';
+ updateStatus();
 }
-if(mode==='holePaint'||mode==='holeErase'){holesEditor.paint(p,mode==='holeErase');changed=true}
- else if(tools[mode]){snapshot();brush(p.x,p.z);changed=true}else act(p);
-});
-view.addEventListener('pointermove',e=>{if(preview.active||preview.busy)return;const p=convertCoords(e);if(!p)return;
-$('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
-const holeMode=mode==='holePaint'||mode==='holeErase';
-if(holeMode&&p.normal){
- const normal=new THREE.Vector3(...p.normal);
- cursor.position.set(p.x+.22*normal.x,p.y+.22*normal.y,p.z+.22*normal.z);
- cursor.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),normal);
-}else{
- cursor.position.set(p.x,p.y+.3,p.z);
- cursor.rotation.set(-Math.PI/2,0,0);
-}
-const radius=tools[mode]?Number($('brushRadius').value):4;
-cursor.scale.setScalar(radius);
-if(pointerDown&&holeMode)holesEditor.paint(p,mode==='holeErase');
-else if(pointerDown&&tools[mode])brush(p.x,p.z);
-if(pointerDown&&mode==='move'&&moveBases){
- const dx=p.x-moveBases.x,dz=p.z-moveBases.z;
- for(const entry of moveBases.nodes){
-  const n=live.nodes.find(a=>a.id===entry.id),old=entry.original;
+function updateMovedPrefabs(){
+ let hasNonPrefab=false;
+ for(const id of selectedIds){
+  const n=live.nodes.find(node=>node.id===id);
   if(!n)continue;
-  if(old.a&&old.b){
-   n.a={x:old.a.x+dx,z:old.a.z+dz};
-   n.b={x:old.b.x+dx,z:old.b.z+dz};
-  }else if(old.x!==undefined){
-   n.x=clamp(old.x+dx,-SIZE/2,SIZE/2);
-   n.z=clamp(old.z+dz,-SIZE/2,SIZE/2);
+  if(n.kind!=='prefab'){hasNonPrefab=true;continue}
+  for(const root of renderedNodes.get(id)||[]){
+   if(!root.userData.sharedAsset)continue;
+   root.position.set(n.x,heightAt(n.x,n.z)+(Number(n.offsetY)||0),n.z);
+   root.rotation.y=n.rotation||0;
+   root.scale.setScalar(n.scale||1);
   }
  }
- draw();persist();
+ if(hasNonPrefab)draw();
+ else{updateSelectionHighlights();updateHoverHighlight();updateStatus()}
 }
+function moveModelDrag(e){
+ if(!dragSession)return;
+ if(e.pointerId!==dragSession.pointerId)return;
+ const session=dragSession;
+ if(Math.hypot(e.clientX-session.startX,e.clientY-session.startY)<3&&!session.changed)return;
+ if(!session.changed){snapshot();session.changed=true;}
+ if(session.action==='scale'){
+  const multiplier=Math.exp((session.startY-e.clientY)*.008);
+  for(const item of session.nodes){
+   const n=live.nodes.find(x=>x.id===item.id);
+   if(n?.kind==='prefab')n.scale=clamp((item.original.scale||1)*multiplier,.05,15);
+  }
+ }else{
+  const p=convertCoords(e);
+  if(!p)return;
+  const dx=p.x-session.ground.x,dz=p.z-session.ground.z;
+  for(const item of session.nodes){
+   const n=live.nodes.find(x=>x.id===item.id),orig=item.original;
+   if(!n)continue;
+   if(orig.a&&orig.b){
+    n.a={x:orig.a.x+dx,z:orig.a.z+dz};
+    n.b={x:orig.b.x+dx,z:orig.b.z+dz};
+   }else if(orig.x!==undefined){
+    n.x=clamp(orig.x+dx,-SIZE/2+1,SIZE/2-1);
+    n.z=clamp(orig.z+dz,-SIZE/2+1,SIZE/2-1);
+   }
+  }
+ }
+ updateMovedPrefabs();
+ view.style.cursor=session.action==='scale'?'ns-resize':'grabbing';
+ const current=live.nodes.find(x=>x.id===session.nodes[0]?.id);
+ if(current)setHoverNode(current,e);
+}
+function completeModelDrag(e){
+ if(!dragSession)return;
+ const old=dragSession;
+ dragSession=null;
+ if(old.changed)persist();
+ try{if(view.hasPointerCapture?.(old.pointerId))view.releasePointerCapture(old.pointerId)}catch(_){}
+ view.style.cursor='crosshair';
+}
+view.addEventListener('pointerdown',e=>{
+ if(preview.active||preview.busy||marqueeStart||prefabGallery.isOpen()||e.ctrlKey||e.button!==0)return;
+ // First raycast the actual GLB/scene meshes, so clicking any visible rock selects it.
+ const hovered=pickedNodeAt(e);
+ if(hovered){
+  e.preventDefault();
+  if(mode==='delete'){
+   snapshot();live.nodes=live.nodes.filter(n=>n.id!==hovered.id);
+   selectedIds.delete(hovered.id);selectedId=null;setHoverNode(null,e);draw();persist();
+   return;
+  }
+  if(armedPrefabId)setMode('move'); // Clicking an existing model cancels placement.
+  beginModelDrag(e,hovered);setHoverNode(hovered,e);
+  return;
+ }
+ const p=convertCoords(e);
+ if(!p)return;
+ if(armedPrefabId&&mode==='prefab'){
+  // The translucent preview is NOT an extra node; commit one actual GLB here.
+  act(p);setHoverNode(null,e);return;
+ }
+ pointerDown=true;changed=false;
+ if(mode==='holePaint'||mode==='holeErase'){
+  holesEditor.paint(p,mode==='holeErase');changed=true;
+ }else if(tools[mode]){
+  snapshot();brush(p.x,p.z);changed=true;
+ }else if(mode==='move'){
+  setNodeSelection([]);setHoverNode(null,e);
+ }else act(p);
 });
-window.addEventListener('pointerup',()=>{pointerDown=false;holesEditor.endStroke();moveBases=null;dragId=null});
+view.addEventListener('pointermove',e=>{
+ if(preview.active||preview.busy||prefabGallery.isOpen()||marqueeStart)return;
+ if(dragSession){moveModelDrag(e);return}
+ // Keep hover picking independent of edit mode. Ghosts and selection outlines
+ // are outside these raycast layers and never intercept a model click.
+ const hovered=pickedNodeAt(e);
+ setHoverNode(hovered,e);
+ const p=convertCoords(e);
+ if(!p){updatePlacementAt(null);return}
+ $('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
+ if(armedPrefabId&&mode==='prefab'){updatePlacementAt(p);return}
+ const holeMode=mode==='holePaint'||mode==='holeErase';
+ if(holeMode&&p.normal){
+  const normal=new THREE.Vector3(...p.normal);
+  cursor.position.set(p.x+.22*normal.x,p.y+.22*normal.y,p.z+.22*normal.z);
+  cursor.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),normal);
+ }else{
+  cursor.position.set(p.x,p.y+.3,p.z);
+  cursor.rotation.set(-Math.PI/2,0,0);
+ }
+ const radius=tools[mode]?Number($('brushRadius').value):4;
+ cursor.scale.setScalar(radius);
+ if(pointerDown&&holeMode)holesEditor.paint(p,mode==='holeErase');
+ else if(pointerDown&&tools[mode])brush(p.x,p.z);
+});
+view.addEventListener('pointerleave',e=>{
+ if(!dragSession){setHoverNode(null,e);updatePlacementAt(null)}
+});
+window.addEventListener('pointerup',e=>{
+ completeModelDrag(e);
+ pointerDown=false;holesEditor.endStroke();moveBases=null;dragId=null;
+});
 view.addEventListener('wheel',e=>{if(!camera.isOrthographicCamera)return;e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()},{passive:false});
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
