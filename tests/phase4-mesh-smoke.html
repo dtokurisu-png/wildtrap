@@ -1,0 +1,104 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP fase 4</title></head>
+<body data-result="PENDING"><div id="result">Preparando prueba de malla 3D</div>
+<script>
+(async()=>{
+ const output=document.getElementById('result');
+ const assert=(condition,message)=>{if(!condition)throw Error(message)};
+ const fail=(step,error)=>{document.body.dataset.result='FAIL';output.textContent='FAIL '+step+': '+(error?.message||error)};
+ try{
+  const draft={
+   version:3,size:630,resolution:129,heights:Array(129*129).fill(0),
+   nodes:[
+    {id:901,kind:'prefab',prefabId:'rocky-cave',x:-30,z:-20,scale:1,rotation:0},
+    {id:902,kind:'prefab',prefabId:'mountain',x:50,z:10,scale:1,rotation:0},
+    {id:903,kind:'spawn',x:20,z:-50}
+   ],objectGroups:[],holes:[],cuts3d:[],nextId:904,settings:{heightMax:120}
+  };
+  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
+  const frame=document.createElement('iframe');
+  frame.width=1440;frame.height=900;frame.src='../?safe=1';document.body.append(frame);
+  let working=false,started=Date.now();
+  const monitor=setInterval(async()=>{
+   if(document.body.dataset.result!=='PENDING'){clearInterval(monitor);return}
+   const w=frame.contentWindow,d=frame.contentDocument;
+   if(!d?.querySelector('#boot[hidden]')||!w.__sceneObjectManager||!w.__meshEditor||
+      !d.querySelector('[data-object-id="901"]')||!d.querySelector('[data-object-id="902"]')||
+      !String(d.getElementById('prefabStatus').textContent).includes('4/4')){
+    if(Date.now()-started>26000){clearInterval(monitor);fail('inicio',Error('No se cargó GLB o editor'))}
+    return;
+   }
+   if(working)return;working=true;clearInterval(monitor);
+   let step='gestor intangible';
+   try{
+    w.__workspaceLayout.activateTab('objects');
+    const intangible=d.querySelector('[data-intangible-id="901"]');
+    assert(intangible,'No existe botón intangible individual junto al ojo');
+    assert(intangible.previousElementSibling?.dataset.visibilityId==='901','Intangible no está junto al ojo');
+    intangible.click();
+    assert(d.querySelector('[data-intangible-id="901"]').getAttribute('aria-pressed')==='true','No activó Intangible');
+    assert(d.querySelector('[data-visibility-id="901"]').getAttribute('aria-label').startsWith('Ocultar'),
+     'Intangible ocultó el modelo en vez de volverlo transparente');
+    assert(d.querySelector('[data-intangible-id="902"]').getAttribute('aria-pressed')==='false',
+     'Afectó a otro modelo GLB que debe ser independiente');
+    const group=d.querySelector('[data-group-intangible="type:caves"]');
+    assert(group,'No existe botón Intangible del grupo Cuevas');
+    group.click();
+    assert(d.querySelector('[data-intangible-id="901"]').getAttribute('aria-pressed')==='false',
+     'El control del grupo no volvió tangible el modelo');
+    step='editor de vértices';
+    d.querySelector('[data-object-id="902"]').click();
+    d.querySelector('[data-workspace="mesh"]').click();
+    const state=w.__meshEditor.getState();
+    assert(state.active===true&&state.currentId===902,'Ver malla no activó el modelo seleccionado');
+    assert(state.points>10,'La malla no expone vértices');
+    assert(!d.getElementById('meshEditControls').hidden,'No se mostraron los controles de malla');
+    assert(d.getElementById('axisGizmoSvg')?.innerHTML.includes('>Y</text>'),'Falta indicador de ejes XYZ');
+    step='selección y bloqueo real';
+    d.getElementById('meshSelectAll').click();
+    assert(w.__meshEditor.getState().selected>0,'Seleccionar todos no funciona');
+    d.getElementById('meshLockVertices').click();
+    assert(w.__meshEditor.getState().locked>0,'No se bloquearon los vértices');
+    assert(w.__meshEditor.getState().selected>0,'Bloquear descartó la selección');
+    step='anclaje y transformación';
+    const anchor=d.getElementById('anchorScaleY');
+    anchor.checked=true;anchor.dispatchEvent(new Event('change',{bubbles:true}));
+    assert(anchor.checked,'No se activó el anclaje base Y');
+    for(const axis of ['x','y']){
+     d.querySelector('[data-rotation-lock="'+axis+'"]').click();
+    }
+    assert(d.querySelector('[data-rotation-lock="x"]').getAttribute('aria-pressed')==='true','No bloqueó X');
+    assert(d.querySelector('[data-rotation-lock="y"]').getAttribute('aria-pressed')==='true','No bloqueó Y');
+    assert(d.querySelector('[data-rotation-lock="z"]').getAttribute('aria-pressed')==='false','Z debería seguir libre');
+    d.getElementById('meshScaleAxis').value='y';d.getElementById('meshScaleFactor').value='1.4';
+    d.getElementById('meshScaleApply').click();
+    assert(w.__meshEditor.getState().operations===1,'No registró la operación de escala');
+    assert(w.__meshEditor.getState().locked>0,'El escalado perdió el bloqueo');
+    step='desbloquear y deformar';
+    d.getElementById('meshUnlockVertices').click();
+    assert(w.__meshEditor.getState().locked===0,'No desbloqueó los vértices');
+    d.getElementById('meshScaleApply').click();
+    assert(w.__meshEditor.getState().operations===2,'No registró la segunda deformación');
+    step='persistencia de editor y visibilidad';
+    await new Promise(resolve=>setTimeout(resolve,950));
+    const saved=JSON.parse(localStorage.getItem('wildtrap-editor-draft-safe-v1')||'null');
+    const model=saved?.nodes.find(n=>n.id===902);
+    assert(model?.anchorScaleY===true,'No guardó anclaje base en JSON');
+    assert(model?.rotationLocks?.x&&model.rotationLocks?.y,'No guardó restricciones de rotación');
+    assert(model?.meshScaleOps?.length===2,'No guardó deformaciones GLB');
+    assert(Array.isArray(model.meshScaleOps[0].locked?.['0'])||
+      Object.keys(model.meshScaleOps[0].locked||{}).length>0,
+      'La operación no congeló el estado de vértices bloqueados');
+    assert(saved?.nodes.find(n=>n.id===901)?.editorIntangible===false,'No restauró estado tangible');
+    step='Ctrl+Z y restaurar';
+    d.getElementById('undo').click();
+    assert(w.__meshEditor.getState().operations===1,'Ctrl+Z no quitó la última deformación');
+    d.getElementById('meshResetDeform').click();
+    assert(w.__meshEditor.getState().operations===0,'Restaurar deformación no restauró el GLB');
+    assert(d.getElementById('meshEditControls')?.hidden===false,'Restaurar cerró inesperadamente Ver malla');
+    document.body.dataset.result='PASS';
+    output.textContent='PASS · intangible individual/grupo, x-ray, bloqueo, escala, anclaje Y, XYZ y guardado';
+   }catch(error){fail(step,error)}
+  },160);
+ }catch(error){fail('preparación',error)}
+})();
+</script></body></html>
