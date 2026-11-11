@@ -1,7 +1,7 @@
 name: Validar herramientas y galería integrada · Fase 3
 on:
   push:
-    branches: [main, feat/tool-controls-v0.9.11]
+    branches: [main]
     paths:
       - 'editor.mjs'
       - 'editor-workspace.js'
