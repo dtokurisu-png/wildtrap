@@ -19,3 +19,16 @@ export function translateNodeOnTerrain(original,dx,dz,mapSize=630){
   return {x:x(original.x),z:z(original.z)};
  return {};
 }
+
+// Alt + left drag: horizontal mouse motion rotates around vertical Y;
+// vertical mouse motion tilts around local X. Angles are stored in radians.
+// Drag is measured from the gesture's beginning to avoid accumulating drift.
+export function rotateFromPointerDrag(originalYaw=0,originalPitch=0,startScreenX,startScreenY,screenX,screenY){
+ const yaw=Number.isFinite(originalYaw)?originalYaw:0;
+ const pitch=Number.isFinite(originalPitch)?originalPitch:0;
+ const dx=Number(screenX)-Number(startScreenX);
+ const dy=Number(startScreenY)-Number(screenY);
+ if(!Number.isFinite(dx)||!Number.isFinite(dy))return {rotation:yaw,rotationX:pitch};
+ const radiansPerPixel=Math.PI/360;
+ return {rotation:yaw+dx*radiansPerPixel,rotationX:pitch+dy*radiansPerPixel};
+}
