@@ -10,6 +10,8 @@ on:
       - 'index.html'
       - 'tests/scene-object-catalog.test.mjs'
       - 'tests/scene-object-manager-smoke.html'
+      - 'tests/browser-workspace.mjs'
+      - 'terrain-holes.mjs'
       - 'tests/browser-scene-object-manager.mjs'
       - '.github/workflows/scene-objects-tests.yml'
   workflow_dispatch:
