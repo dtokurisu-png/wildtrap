@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {scaleFromVerticalDrag,translateNodeOnTerrain,MIN_PREFAB_SCALE,MAX_PREFAB_SCALE} from '../prefab-gestures.mjs';
+import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,MIN_PREFAB_SCALE,MAX_PREFAB_SCALE} from '../prefab-gestures.mjs';
 
 const editor=fs.readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
 const library=fs.readFileSync(new URL('../prefab-library.mjs',import.meta.url),'utf8');
@@ -53,4 +53,42 @@ test('selección por raycast real, hover y drag directo',()=>{
  assert.ok(editor.includes('if(old.changed)persist()'));
  assert.ok(html.includes('id="modelHoverIndicator"'));
  assert.ok(html.includes('id="interactionHelp"'));
+});
+
+test('Alt + mover horizontalmente gira solamente el eje Y',()=>{
+ const rot=rotateFromPointerDrag(.3,.6,100,200,200,200);
+ assert.ok(rot.rotation>.3);
+ assert.equal(rot.rotationX,.6);
+ const left=rotateFromPointerDrag(.3,.6,100,200,0,200);
+ assert.ok(left.rotation<.3);
+ assert.equal(left.rotationX,.6);
+});
+test('Alt + mover verticalmente inclina solamente el eje X',()=>{
+ const up=rotateFromPointerDrag(.3,.6,100,200,100,100);
+ const down=rotateFromPointerDrag(.3,.6,100,200,100,300);
+ assert.equal(up.rotation,.3);
+ assert.ok(up.rotationX>.6);
+ assert.equal(down.rotation,.3);
+ assert.ok(down.rotationX<.6);
+});
+test('Alt + arrastre combinado mantiene ambas rotaciones originales como base',()=>{
+ const first=rotateFromPointerDrag(1,-.5,100,100,190,60);
+ const second=rotateFromPointerDrag(1,-.5,100,100,190,60);
+ assert.deepEqual(first,second);
+ assert.ok(first.rotation>1);
+ assert.ok(first.rotationX>-.5);
+ const invalid=rotateFromPointerDrag(1,-.5,100,100,Infinity,90);
+ assert.deepEqual(invalid,{rotation:1,rotationX:-.5});
+});
+test('rotación 3D del GLB usa los ejes correctos y se conserva al editar el proyecto',()=>{
+ assert.ok(library.includes("root.rotation.set(Number(node.rotationX)||0,Number(node.rotation)||0,0,'YXZ')"));
+ assert.ok(editor.includes("action:e.altKey&&node.kind==='prefab'?'rotate'"));
+ assert.ok(editor.includes("}else if(session.action==='rotate'){"));
+ assert.ok(editor.includes("n.rotationX=result.rotationX"));
+ assert.ok(editor.includes("root.rotation.set(n.rotationX||0,n.rotation||0,0,'YXZ')"));
+ assert.ok(editor.includes("snapshot();session.changed=true"));
+ assert.ok(editor.includes("if(old.changed)persist()"));
+ assert.ok(editor.includes("tiltDelta"));
+ assert.ok(html.includes('id="prefabRotationX"'));
+ assert.ok(html.includes("Alt + arrastrar"));
 });
