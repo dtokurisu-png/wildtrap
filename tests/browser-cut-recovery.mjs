@@ -86,7 +86,7 @@ try{
    const boot=document.querySelector('#boot');
    const counter=document.querySelector('#holeCounter')?.textContent||'';
    const stats=document.querySelector('#holeMeshStats')?.textContent||'';
-   return boot?.hidden&&counter.includes('85')?{counter,stats}:false;
+   return boot?.hidden&&counter.includes('81 cortes 3D')&&counter.includes('4 restauraciones')?{counter,stats}:false;
  })()`),35000);
  console.log('ARRANQUE CON RECORTES OK:',rebuilt);
 
