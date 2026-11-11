@@ -219,11 +219,15 @@
  // Seleccionar un objeto abre su pestaña de propiedades; al tocar una herramienta
  // vuelve a mostrarse el panel de esa herramienta. No alteramos los eventos de escena.
  const selectedLabel=$('selected');
+ let previousSelectionLabel='';
  function syncSelection(){
   const label=selectedLabel.textContent||'';
   const hasSelection=label.includes('ID ')||/\b\d+ elementos seleccionados/.test(label);
   objectEditor.classList.toggle('is-empty',!hasSelection);
-  if(hasSelection)activateTab('object');
+  // Solo abrir la pestaña cuando cambia la selección. Una herramienta activa
+  // no debe perder su propio panel por llamadas repetidas a updateStatus().
+  if(hasSelection&&label!==previousSelectionLabel)activateTab('object');
+  previousSelectionLabel=label;
  }
  new MutationObserver(syncSelection).observe(selectedLabel,{childList:true,subtree:true,characterData:true});
  // Tamaños independientes; el separador solo afecta a los dos paneles vecinos.
