@@ -56,6 +56,30 @@ Son **seis tipos de interacción**, no seis sistemas completos de recolección d
 - Un árbol raro puede no generarse en una expedición; por ello **solo** debe convertirse en requisito secundario / oportunidad rara, salvo que el contrato principal garantice su aparición y la posibilidad de extracción.
 - Ejemplo: un fruto elevado se derriba por disparo, guardián volador o sacudida mediante embestida; las rutas alternativas necesitan sus propias restricciones / consumo.
 
+
+### 3.3. Dos sorteos independientes: especie y recurso (aclaración posterior)
+
+**No confundir la presencia de un árbol con la presencia de botín.** Los diez tipos de árbol pueden existir como vegetación normal aunque el ejemplar no produzca un recurso especial. La generación calcula **dos propiedades distintas**:
+
+1. **Especie / categoría del ejemplar:** común, poco común o raro. Controla qué árboles se colocan en el bosque y su frecuencia relativa.
+2. **Disponibilidad de recurso especial por ejemplar:** probabilidad independiente (o tabla de condiciones) de que *ese árbol concreto* contenga fruta recolectable, resina especial, hojas medicinales u otro material específico. Muchos ejemplares de la misma especie estarán vacíos de recursos especiales.
+
+Ejemplo no vinculante para pensar el equilibrio:
+
+| Categoría de ejemplar | Ejemplares en un ejemplo | Ejemplares con recurso especial |
+| --- | ---: | ---: |
+| Común | 100 | 5 |
+| Poco común | 20 | 3 |
+| Raro | 5 | 1 |
+
+**Son cifras ilustrativas, no probabilidades aprobadas ni cuotas obligatorias por mapa.** En la conversación se mencionaron números y categorías de modo exploratorio, incluso intercambiando términos; la intención acordada es que los árboles comunes predominen, los poco comunes sean menos frecuentes, los raros aún menos frecuentes y **solo una parte de cada grupo tenga un recurso especial**. El balance dependerá del tamaño de cada expedición, bioma y cantidad real de árboles. No hay que asegurar que todas las especies ni todos los recursos especiales aparezcan en todas las partidas.
+
+**Recursos genéricos versus recursos especiales:** un árbol apropiado puede ofrecer **madera ordinaria** al talarlo aunque no tenga ninguna fruta, savia u otro recurso especial. La madera es un material de construcción/recetas simples; la rareza de una fruta o resina se determina por separado. Evitar que cada árbol parezca un contenedor de tesoros. La extracción ordinaria debe tener una cantidad finita por ejemplar y requerir una acción real.
+
+**Detección:** una capacidad de rastreo puede revelar señales de que un árbol contiene recurso especial sin entregar ese recurso directamente. El aspecto del árbol puede dar pistas, pero no debe hacer que todos los ejemplares de una especie rara sean fuentes garantizadas de botín.
+
+**Diseño de datos recomendado** (sin implementarlo todavía): `tree_species_id`, `species_rarity`, `has_special_resource`, `special_resource_id`, `generic_wood_yield`, `extraction_tags` y `depleted` por ejemplar. Mantener independientes la tabla de aparición de especies y la tabla de botín de cada ejemplar. Hacer los datos configurables para pruebas, sin codificar 100/20/5 como norma permanente.
+
 ## 4. Materiales iniciales del entorno (15; catálogo propuesto)
 
 | Bioma | Material | Rareza inicial | Extracción |
@@ -149,6 +173,23 @@ Hay una distinción fundamental entre **escasez para cooperar** e **imposibilida
 6. El equipo debe decidir si conserva el pico para la siguiente veta o si prefiere emplear materiales y espacio en otras actividades.
 
 Las cifras de coste, resistencia y slots quedarán sujetas a balance. **No implementar aún desgaste o reparación compleja** salvo que la prueba indique que son imprescindibles.
+
+
+### 6.5. Materiales básicos accesibles, pero transporte y fabricación estratégicos (aclaración posterior)
+
+**Objetivo:** que la abundancia de madera en un bosque no implique que tenga sentido talar todos los árboles, y que el equipo necesite compartir herramientas/capacidades entre regiones sin imponer restricciones arbitrarias.
+
+- **Madera ordinaria:** podrá extraerse de árboles adecuados aunque no tengan materiales especiales. No debería ser una tirada de botín raro. Será necesaria para fabricar, por ejemplo, un **pico con madera + mineral metálico/hierro** (receta ilustrativa, no receta aprobada).
+- **Mineral metálico / hierro:** componente básico futuro de ciertas herramientas; su ubicación, extracción, receta y disponibilidad todavía deben definirse. Se trata de un recurso de fabricación genérico propuesto **adicional al catálogo provisional de 15 recursos**, que se actualizará cuando cerremos el sistema de herramientas. No confundirlo con el mineral solar especializado.
+- **Capacidad de la mochila:** la madera, los minerales y las herramientas ocupan casillas o capacidad/peso. **No tiene sentido arrastrar cien troncos** si eso impide transportar huevos, materiales valiosos, medicinas y herramientas. Los límites concretos de peso, apilado y slots no están decididos.
+- **Límite de extracción por árbol:** acciones de corte con rendimiento finito; recogida no automática. Recolectar lleva tiempo y supone coste de oportunidad. No se requiere inventar un desgaste complejo ahora.
+- **Cantidad de material para herramientas:** repartir pocos componentes de fabricación de emergencia por expedición, suficientes en determinadas situaciones para elaborar **una herramienta compartida**, pero **no suficientes para entregar un equipo completo a cada integrante**. Crear herramientas durante la misión es una excepción posible y costosa, no la opción óptima por defecto.
+- **Trabajo entre biomas:** ejemplo propuesto: un integrante va al **Bosque** por un poco de madera y otro se queda en el **Desierto o una cueva** porque tiene un guardián capaz de extraer metal. Se reúnen, combinan ingredientes y fabrican un pico o una herramienta útil. Los materiales y el uso del objeto pueden intercambiarse entre aliados.
+- **Guardianes y herramientas:** son **métodos alternativos** de extracción. Puede haber casos donde el guardián evita llevar un pico, pero no se decidió que lo haga sin límites en todas las situaciones. Enfriamiento, energía, condiciones especiales o usos restringidos **son posibilidades a evaluar**, no reglas definidas. El objetivo es dar valor tanto al guardián como al equipo físico.
+- **Fricción que genera cooperación:** localizar, recolectar, transportar, encontrarse, fabricar y prestar una herramienta deben importar. Evitar un menú universal de creación que permita al equipo fabricar cualquier herramienta sin desplazarse ni obtener insumos.
+- **Contratos principales siempre viables:** si la misión requiere metal o un pico que nadie lleva, el generador debe asegurar alguna vía **realmente disponible** en esa expedición (guardián, herramienta preparada o receta con materiales y acceso suficientes) o elegir otro contrato. No resolverlo llenando el mundo de hierro para todos; **una ruta compartida de obtención es suficiente**. Los secundarios sí pueden resultar imposibles por ausencia de materiales raros, como se acordó.
+
+**Ejemplo de decisión:** «La cueva tiene una veta especial; nadie trajo pico. ¿Gastamos capacidad de mochila y tiempo en obtener madera del bosque, material metálico en otra zona y construir uno entre todos, o regresamos con lo que ya conseguimos?» Esa elección es parte de la diversión, **no un error de diseño que deba eliminarse regalando herramientas**.
 
 ## 7. Contratos y misiones aleatorias de expedición
 
