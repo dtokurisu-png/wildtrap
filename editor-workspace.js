@@ -64,6 +64,7 @@
   ['sculpt','▲','Esculpir','Esculpir terreno'],
   ['knife','✂','Cuchillo','Cuchillo poligonal'],
   ['structures','▦','Estruct.','Estructuras'],
+  ['mesh','◫','Malla','Ver y editar malla 3D'],
  ];
  const workspaceButtons=new Map();
  for(const [key,symbol,label,longLabel] of toolbarEntries){
@@ -99,6 +100,9 @@
  const modelNotes=Array.from(models.querySelectorAll(':scope > p.hint'));
  for(const note of modelNotes.slice(1))modelFields.append(note);
  objectEditor.append(selection,empty,modelFields);
+ const constraints=$('transformConstraints'),meshControls=$('meshEditControls');
+ if(!constraints||!meshControls)throw Error('Faltan los controles de malla y transformación');
+ objectEditor.append(constraints,meshControls);
  // Galería GLB original, acoplada al área Estructuras: las cinco cámaras siguen
  // usando las vistas reales de cada archivo, sin modal ni segunda copia.
  const galleryRoot=$('prefabModal');
@@ -193,9 +197,9 @@
   currentWorkspace=key;
   for(const [name,button] of workspaceButtons)button.setAttribute('aria-pressed',String(name===key));
   for(const section of toolViews.querySelectorAll('.workspace-section'))section.hidden=section.dataset.workspaceContent!==key;
-  activateTab('tools');
+  activateTab(key==='mesh'?'object':'tools');
   if(triggerTool){
-   const mode={project:'move',sculpt:'raise',knife:'holePaint',structures:'move'}[key];
+   const mode={project:'move',sculpt:'raise',knife:'holePaint',structures:'move',mesh:'meshEdit'}[key];
    if(mode)document.querySelector('[data-tool="'+mode+'"]')?.click();
   }
   saveLayout();
@@ -293,7 +297,7 @@
  });
  window.addEventListener('resize',applySizes);
  applySizes();
- selectWorkspace(['project','sculpt','knife','structures'].includes(saved?.workspace)?saved.workspace:'project',false);
+ selectWorkspace(['project','sculpt','knife','structures','mesh'].includes(saved?.workspace)?saved.workspace:'project',false);
  syncSelection();
  window.__workspaceLayout={
   open:key=>selectWorkspace(key,true),
