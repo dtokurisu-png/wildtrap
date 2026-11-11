@@ -48,10 +48,45 @@ export function createPrefabLibrary(onChange=()=>{}){
   root.scale.setScalar(Math.max(.01,Number(node.scale)||1));
   return root;
  }
+ function createPreview(id){
+  const model=instance({id:0,prefabId:id,x:0,z:0,offsetY:0,rotation:0,scale:1},()=>0);
+  if(!model)return null;
+  model.name='WILDTRAP GLB placement preview · '+id;
+  model.userData.editorOnly=true;
+  model.userData.previewOnly=true;
+  // Only cloned materials are modified. The original GLB and its materials stay intact.
+  model.traverse(child=>{
+   if(!child.isMesh)return;
+   const faded=material=>{
+    const m=material.clone();
+    m.transparent=true;
+    m.opacity=Math.max(.08,Math.min(.55,(material.opacity??1)*.48));
+    m.depthWrite=false;
+    m.side=THREE.DoubleSide;
+    return m;
+   };
+   child.material=Array.isArray(child.material)?child.material.map(faded):faded(child.material);
+   child.castShadow=false;
+   child.receiveShadow=false;
+   child.raycast=()=>{}; // Ghost can NEVER be selected by the model raycaster.
+  });
+  model.visible=false;
+  return model;
+ }
+ function disposePreview(model){
+  if(!model)return;
+  model.parent?.remove(model);
+  model.traverse(child=>{
+   if(!child.isMesh)return;
+   const materials=Array.isArray(child.material)?child.material:[child.material];
+   for(const material of materials)material?.dispose?.();
+   // DO NOT dispose geometries or textures: they belong to the shared GLB cache.
+  });
+ }
  function preload(){return Promise.all(PREFABS.map(p=>load(p.id)));}
  function status(){return PREFABS.map(p=>({
   id:p.id,name:p.name,state:cache.has(p.id)?'listo':errors.has(p.id)?'error':'cargando',
   error:errors.get(p.id)||''
  }));}
- return {load,preload,instance,status,has:id=>cache.has(id)};
+ return {load,preload,instance,createPreview,disposePreview,status,has:id=>cache.has(id)};
 }
