@@ -99,6 +99,11 @@
  const modelNotes=Array.from(models.querySelectorAll(':scope > p.hint'));
  for(const note of modelNotes.slice(1))modelFields.append(note);
  objectEditor.append(selection,empty,modelFields);
+ // Galería GLB original, acoplada al área Estructuras: las cinco cámaras siguen
+ // usando las vistas reales de cada archivo, sin modal ni segunda copia.
+ const galleryRoot=$('prefabModal');
+ if(!galleryRoot)throw new Error('No existe el catálogo de estructuras');
+ models.append(galleryRoot);
  // Vista de objetos: Fase 1 crea la ventana, Fase 2 conectará el inventario vivo.
  const objectsView=el('div');
  objectsView.innerHTML='<h2>Objetos de la escena</h2><div class="workspace-empty"><strong>Gestor de objetos</strong>Esta ventana está preparada para mostrar únicamente modelos persistentes, agrupados por tipo. La lista sincronizada llegará en la Fase 2.</div>';
@@ -190,10 +195,11 @@
   for(const section of toolViews.querySelectorAll('.workspace-section'))section.hidden=section.dataset.workspaceContent!==key;
   activateTab('tools');
   if(triggerTool){
-   const mode={project:'move',sculpt:'raise',knife:'holePaint'}[key];
+   const mode={project:'move',sculpt:'raise',knife:'holePaint',structures:'move'}[key];
    if(mode)document.querySelector('[data-tool="'+mode+'"]')?.click();
   }
   saveLayout();
+  window.dispatchEvent(new CustomEvent('wildtrap:workspace-tool',{detail:{key}}));
  };
  for(const [key,button] of workspaceButtons)button.addEventListener('click',()=>selectWorkspace(key,true));
  // Acceso rápido a las vistas al mantener presionado el botón Vista.
