@@ -56,7 +56,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.5 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.6 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -72,6 +72,13 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="grid2" style="margin-top:6px">
 <button id="export">Exportar JSON</button><label class="fileBtn" style="margin:0">Importar JSON<input id="importJSON" type="file" accept=".json,application/json"></label>
 </div>
+<section id="recoveryPanel" hidden style="border:1px solid #d9b875;border-radius:9px;padding:10px;margin-top:8px;background:#373123">
+ <h2>Rescate del escenario original</h2>
+ <p class="hint">Estás usando una COPIA del borrador normal, pero sin reconstruir recortes. Los modelos, sus posiciones y los datos de los agujeros siguen guardados.</p>
+ <button type="button" onclick="window.__backupOriginalDraft()" style="width:100%">Descargar borrador ORIGINAL intacto</button>
+ <button id="removeRecoveryCuts" type="button" style="width:100%;margin-top:6px">Quitar recortes solo de esta copia</button>
+ <p class="hint">Si eliges quitar recortes, usa Exportar JSON. El borrador original no se modifica.</p>
+</section>
 </section>
 <section>
 <h2>1. Esculpir el terreno</h2>
@@ -180,14 +187,25 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </div>
 <div id="boot"><div><h1>Iniciando editor WILDTRAP</h1><p id="bootMsg">Cargando motor gráfico…</p>
 <button onclick="location.reload()">Reintentar</button>
-<p class="hint" style="margin-top:14px">¿Se queda cargando? <a href="?safe=1" style="color:#a6ffdd;font-weight:700">Abrir en modo seguro</a></p>
-<p class="hint">El modo seguro conserva tu borrador habitual y utiliza otro guardado local.</p>
+<p class="hint" style="margin-top:14px">¿Se queda cargando? <a href="?recover=1" style="color:#a6ffdd;font-weight:700">Recuperar mi escenario sin reconstruir los recortes</a></p>
+<p class="hint"><button type="button" onclick="window.__backupOriginalDraft()">Descargar borrador original</button></p>
+<p class="hint">El modo recuperación conserva el borrador original y trabaja con una copia. <a href="?safe=1" style="color:#a6ffdd">Iniciar mapa limpio (modo seguro)</a></p>
 </div></div>
-<script>window.__editorReady=()=>document.getElementById('boot').hidden=true;
+<script>window.__backupOriginalDraft=()=>{
+ try{
+  const data=localStorage.getItem('wildtrap-editor-draft-v1');
+  if(!data){alert('No existe un borrador local normal en este navegador.');return}
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='wildtrap-respaldo-original-intacto.json';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+ }catch(error){alert('No se pudo descargar el borrador: '+error.message)}
+};
+window.__editorReady=()=>document.getElementById('boot').hidden=true;
 window.__editorError=err=>{document.getElementById('bootMsg').textContent='No se pudo abrir: '+err};
 window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.5').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.6').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
