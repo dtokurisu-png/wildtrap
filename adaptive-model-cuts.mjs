@@ -92,9 +92,13 @@ export function buildAdaptiveModel(base,rawStamps=[],transformPoint=identity){
  const groups=base.groups?.length?base.groups:[{start:0,count:indices.length,materialIndex:0}];
  const outputIndices=[],outputGroups=[];
  let touched=0,newTriangles=0;
- function makeVertex(id){
+ function makeVertex(id,worldPoint){
   const values=Object.fromEntries(names.map(k=>[k,getAttr(k,id)]));
-  return {p:transformPoint(values.position),values,id};
+  return {p:worldPoint,values,id};
+ }
+ function worldVertex(id){
+  const i=id*3;
+  return transformPoint([p[i],p[i+1],p[i+2]]);
  }
  function addVertex(v){
   if(v.id!==null)return v.id;
@@ -114,9 +118,12 @@ export function buildAdaptiveModel(base,rawStamps=[],transformPoint=identity){
   const end=Math.min(indices.length,group.start+group.count);
   for(let offset=group.start;offset+2<end;offset+=3){
    const a=indices[offset],b=indices[offset+1],c=indices[offset+2];
-   const va=makeVertex(a),vb=makeVertex(b),vc=makeVertex(c);
-   const relevant=affecting.filter(s=>overlapsTriangle(s,va.p,vb.p,vc.p));
+   // Most triangles are untouched: do not allocate per-vertex attributes for
+   // them, particularly important for Tripo GLBs with tens of thousands of faces.
+   const pa=worldVertex(a),pb=worldVertex(b),pc=worldVertex(c);
+   const relevant=affecting.filter(s=>overlapsTriangle(s,pa,pb,pc));
    if(!relevant.length){outputIndices.push(a,b,c);continue;}
+   const va=makeVertex(a,pa),vb=makeVertex(b,pb),vc=makeVertex(c,pc);
    touched++;
    let fragments=[{poly:[va,vb,vc],removed:false}];
    for(const stamp of relevant){
