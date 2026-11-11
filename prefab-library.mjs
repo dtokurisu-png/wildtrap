@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {buildAdaptiveModel} from './adaptive-model-cuts.mjs';
+import {buildAdaptiveModel} from './adaptive-model-cuts.mjs?v=0.9.5';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
-import {PREFABS,prefabById} from './prefab-catalog.mjs';
+import {PREFABS,prefabById} from './prefab-catalog.mjs?v=0.9.5';
 export {PREFABS,prefabById};
 export function createPrefabLibrary(onChange=()=>{}){
  const loader=new GLTFLoader();
