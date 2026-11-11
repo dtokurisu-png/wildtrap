@@ -221,3 +221,49 @@ body.testing #toast{left:16px;max-width:calc(100vw - 32px)}
  #side #prefabCards{grid-template-columns:1fr}
  #side #prefabCards .prefab-card img{aspect-ratio:2}
 }
+
+/* WILDTRAP v0.9.12 — vertex x-ray, axis locks and intangible outliner. */
+.scene-group-intangible,.scene-object-intangible{
+ flex:none;background:transparent;border:1px solid transparent;border-radius:5px;
+ min-width:29px;padding:3px 5px;font-size:19px;color:#9fbeb5;
+}
+.scene-group-intangible:hover,.scene-object-intangible:hover{background:#2f574a;border-color:#5f8b78}
+.scene-group-intangible.is-intangible,.scene-object-intangible.is-intangible{
+ background:#4e416f;color:#e0c9ff;border-color:#977cc7;
+}
+.scene-group-intangible[aria-pressed="true"],.scene-object-intangible[aria-pressed="true"]{
+ box-shadow:inset 0 0 0 1px #bfa3e9;
+}
+#transformConstraints{border-top:1px solid #4c765f;padding-top:10px;margin-top:10px}
+#transformConstraints[hidden],#meshEditControls[hidden]{display:none!important}
+#transformConstraints h2,#meshEditControls h2{font-size:13px;margin:7px 0;color:#bafbe1}
+.axis-lock-row{display:flex;gap:6px;margin:9px 0;min-width:0}
+.axis-lock-row button{flex:1;min-width:0;padding:8px 4px;background:#214035;border-color:#50755f}
+.axis-lock-row button[aria-pressed="true"]{background:#634044;border-color:#e68e88;color:#fff}
+.axis-lock-row button[aria-pressed="true"]:before{content:"🔒 ";font-size:10px}
+.anchor-toggle{display:flex;align-items:center;gap:7px;background:#1f3a2f;border-radius:7px;padding:8px}
+.anchor-toggle input{width:auto;flex:none}
+#meshEditControls{border-top:1px solid #50755f;margin-top:14px;padding:9px 0}
+#meshEditControls .grid2{margin:8px 0}
+.mesh-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin:10px 0}
+.mesh-stats>span{padding:6px;background:#183b31;border:1px solid #426b59;border-radius:5px;font-size:10px;color:#c9eadb}
+.mesh-stats b{font-variant-numeric:tabular-nums;color:#e2ffef}
+#axisGizmo{
+ position:fixed;top:calc(var(--workspace-top) + 14px);
+ right:calc(var(--workspace-dock) + 13px);
+ width:112px;height:125px;z-index:4;
+ display:flex;flex-direction:column;align-items:center;
+ border:1px solid #76ae98b0;border-radius:12px;
+ background:#152a25c4;pointer-events:none;
+ box-shadow:0 5px 14px #0004;
+}
+#axisGizmo span{font-size:9px;letter-spacing:2px;color:#d6f8e9;margin-top:-8px}
+#axisGizmoSvg{flex:none}
+body.testing #axisGizmo{display:none}
+@media(max-width:800px){
+ #axisGizmo{width:78px;height:94px}
+ #axisGizmoSvg{width:78px;height:80px}
+ #axisGizmo span{display:none}
+ .scene-object-eye,.scene-group-eye{padding:3px 4px}
+ .scene-group-intangible,.scene-object-intangible{padding:3px;min-width:25px}
+}
