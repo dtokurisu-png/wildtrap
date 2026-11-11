@@ -627,7 +627,6 @@ view.addEventListener('pointerdown',e=>{
  }
  pointerDown=true;changed=false;
  if(tools[mode]){
- }else if(tools[mode]){
   snapshot();brush(p.x,p.z);changed=true;
  }else if(mode==='move'){
   setNodeSelection([]);setHoverNode(null,e);
