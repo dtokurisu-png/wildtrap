@@ -84,18 +84,21 @@ test('sin intersección espacial, no reconstruye mallas lejanas',()=>{
  assert.equal(buildAdaptiveModel(plane(),[stampFar]),null);
 });
 
-test('Pintar corte 3D tiene prioridad sobre clic, selección y arrastre de modelos',()=>{
+test('el cuchillo poligonal tiene prioridad sobre selección y arrastre de GLB',()=>{
  const editor=fs.readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
- const selectionGuard=editor.indexOf("if(v==='holePaint'||v==='holeErase'){");
- const modelPicking=editor.indexOf('const hovered=pickedNodeAt(e);',editor.indexOf("view.addEventListener('pointerdown',e=>{",editor.indexOf("function completeModelDrag")));
- const paintBranch=editor.indexOf("if(mode==='holePaint'||mode==='holeErase'){",editor.indexOf("view.addEventListener('pointerdown',e=>{",editor.indexOf("function completeModelDrag")));
+ const selectionGuard=editor.indexOf("if(v==='holePaint'){");
+ const down=editor.indexOf("view.addEventListener('pointerdown',e=>{",editor.indexOf("function completeModelDrag"));
+ const modelPicking=editor.indexOf('const hovered=pickedNodeAt(e);',down);
+ const knifeBranch=editor.indexOf("if(mode==='holePaint'){",down);
  assert.ok(selectionGuard>=0);
  assert.ok(editor.includes('selectedIds.clear();selectedId=null;'));
  assert.ok(editor.includes("hoveredNodeId=null;updateHoverHighlight()"));
- assert.ok(paintBranch>=0&&paintBranch<modelPicking,'Debe pintar ANTES de seleccionar el modelo');
- assert.ok(editor.includes("holesEditor.paint(hit,mode==='holeErase')"));
+ assert.ok(knifeBranch>=0&&knifeBranch<modelPicking,'El cuchillo debe preceder al selector');
+ assert.ok(editor.includes("holesEditor.addPoint(hit,[e.clientX,e.clientY])"));
+ assert.ok(editor.includes("holesEditor.hoverAt(p,[e.clientX,e.clientY])"));
+ assert.ok(!editor.includes('holesEditor.paint('),'El pincel de corte fue eliminado');
  assert.ok(editor.includes("getModelRoots:()=>"));
- assert.ok(editor.includes("mode==='holePaint'||mode==='holeErase'||!e.ctrlKey"),'Ctrl debe ignorar selección en corte');
+ assert.ok(editor.includes("mode==='holePaint'||!e.ctrlKey"),'Ctrl no selecciona GLB durante el corte');
 });
 test('los cortes de GLB se guardan por instancia, sin modificar archivos originales',()=>{
  const cutter=fs.readFileSync(new URL('../terrain-holes.mjs',import.meta.url),'utf8');
