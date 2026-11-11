@@ -56,7 +56,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.6 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.7 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -137,21 +137,22 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <label>Posición Z<input id="prefabZ" type="number" step=".5" value="0"></label>
 <label>Rotación horizontal Y (°)<input id="prefabRotation" type="number" step="5" value="0"></label>
 <label>Inclinación vertical X (°)<input id="prefabRotationX" type="number" step="5" value="0"></label>
-<label>Altura adicional Y<input id="prefabOffsetY" type="number" step=".5" value="0"></label>
+<label><span id="prefabHeightLabel">Altura Y (anclada al terreno)</span><input id="prefabOffsetY" type="number" step=".5" value="0" disabled></label>
 <label>Escala<input id="prefabScale" type="number" min=".05" max="15" step=".1" value="1"></label>
 </div>
 <div class="grid2">
 <button id="applyPrefab">Aplicar cambios</button>
 <button id="duplicatePrefab">Duplicar modelo</button>
 </div>
-<p class="hint"><b>Clic sobre modelo:</b> seleccionar · <b>arrastrar:</b> mover por el terreno · <b>Shift + clic y arrastrar hacia arriba/abajo:</b> agrandar/reducir · <b>Alt + clic sostenido y arrastrar:</b> izquierda/derecha rota horizontalmente, arriba/abajo inclina verticalmente · <b>Ctrl + clic:</b> añadir a la selección · <b>Ctrl + clic derecho arrastrando:</b> seleccionar varios. Los campos numéricos permiten ajustes exactos.</p>
+<p class="hint"><b>Solo las cuevas pueden atravesar la malla:</b> elige una cueva y usa <b>Alt + rueda</b> mientras sigue el cursor para elevarla o enterrarla antes de colocarla. Después, usa <b>Alt + Shift + clic y arrastrar</b> arriba/abajo para moverla libremente en Y, o escribe su altura mundial exacta. La montaña y las otras estructuras siguen ancladas al terreno.</p>
+<p class="hint"><b>Clic sobre modelo:</b> seleccionar · <b>arrastrar:</b> mover X/Z · <b>Shift + arrastrar:</b> agrandar/reducir · <b>Alt + arrastrar:</b> rotar · <b>Ctrl + clic:</b> selección múltiple. Los campos numéricos permiten ajustes exactos.</p>
 </section>
 <section>
 <h2>Elementos seleccionados</h2>
 <small id="selected">Nada seleccionado</small>
 <div class="grid2" style="margin-top:8px"><button id="remove">Eliminar selección</button><button id="clearNodeSelection">Deseleccionar</button></div><small id="pending"></small>
 </section>
-<div class="hint">Clic: seleccionar · Arrastrar: mover modelo por la malla · Shift + arrastrar: escalar modelo · Alt + arrastrar: rotar horizontal y vertical · Ctrl + clic: selección múltiple · Ctrl + clic derecho arrastrando: selección rectangular · Rueda: zoom · Botón derecho: orbitar · Ctrl+Z: deshacer · Esc: cancelar colocación.</div>
+<div class="hint">Clic: seleccionar · Arrastrar: mover X/Z · Shift + arrastrar: escalar · Alt + arrastrar: rotar · Cuevas: Alt + rueda antes de colocar, Alt + Shift + arrastrar para elevar/enterrar · Ctrl + clic: selección múltiple · Ctrl + clic derecho arrastrando: selección rectangular · Rueda: zoom · Botón derecho: orbitar · Ctrl+Z: deshacer · Esc: cancelar colocación.</div>
 </aside>
 <canvas id="viewport"></canvas><div id="selectionMarquee"></div>
 <div id="prefabModal" hidden role="dialog" aria-modal="true" aria-labelledby="prefabGalleryTitle">
@@ -207,5 +208,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.6').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.7').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
