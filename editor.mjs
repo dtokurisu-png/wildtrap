@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {createPlaytest} from './playtest.mjs?v=0.9.6';
-import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.6';
+import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.8';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.7';
@@ -275,8 +275,8 @@ function updateStatus(){
 }
 function setMode(v){
  if(v!=='prefab'&&armedPrefabId)clearPlacement();
- if(v==='holePaint'||v==='holeErase'){
-  // The cut brush is exclusive: no picking, selection, moving or scaling GLBs.
+ if(v==='holePaint'){
+  // The polygon knife is exclusive: no picking, selection or moving GLBs.
   if(dragSession)completeModelDrag({pointerId:dragSession.pointerId});
   pointerDown=false;marqueeStart=null;
   $('selectionMarquee').style.display='none';
@@ -286,11 +286,13 @@ function setMode(v){
   updateSelectionHighlights();
  }
  mode=v;pending=null;
+ cursor.visible=v!=='holePaint'&&!placementGhost;
+ if(v!=='holePaint')holesEditor?.hoverAt(null);
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));
  $('openPrefabGallery').classList.toggle('active',v==='prefab');
  updateStatus();
 }
-const tools={raise:1,lower:1,flatten:1,smooth:1,holePaint:1,holeErase:1};
+const tools={raise:1,lower:1,flatten:1,smooth:1};
 function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
 const cx=Math.round((x/SIZE+.5)*(N-1)),cz=Math.round((z/SIZE+.5)*(N-1));const r=Math.ceil(radius/cell);
@@ -310,7 +312,7 @@ function convertCoords(event){
 const rect=view.getBoundingClientRect();
 mouse.x=((event.clientX-rect.left)/rect.width)*2-1;mouse.y=-((event.clientY-rect.top)/rect.height)*2+1;
 ray.setFromCamera(mouse,camera);
-if(mode==='holePaint'||mode==='holeErase')return holesEditor?.pick(ray)||null;
+if(mode==='holePaint')return holesEditor?.pick(ray)||null;
 const hits=ray.intersectObject(terrain);
 if(hits.length)return{x:hits[0].point.x,z:hits[0].point.z,y:hits[0].point.y};
 return ray.ray.intersectPlane(plane,temp)?{x:temp.x,z:temp.z,y:heightAt(temp.x,temp.z)}:null;
@@ -384,6 +386,8 @@ $('test').onclick=()=>preview.start();
 $('createHole').onclick=()=>{holesEditor.apply(true);draw()};
 $('restoreHole').onclick=()=>{holesEditor.apply(false);draw()};
 $('clearHoleSelection').onclick=()=>holesEditor.clearSelection();
+$('undoHolePoint').onclick=()=>holesEditor.removeLastPoint();
+$('closeHoleContour').onclick=()=>holesEditor.closePolygon();
 $('stopTest').onclick=()=>preview.stop();
 $('localFarolera').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview.fromFile(file);e.target.value=''});
 function setNodeSelection(ids){
@@ -472,7 +476,7 @@ function marqueeHits(x,y){
 }
 let previousOrbitEnabled=true;
 view.addEventListener('pointerdown',e=>{
- if(preview.active||preview.busy||mode==='holePaint'||mode==='holeErase'||!e.ctrlKey||(e.button!==0&&e.button!==2))return;
+ if(preview.active||preview.busy||mode==='holePaint'||!e.ctrlKey||(e.button!==0&&e.button!==2))return;
  e.preventDefault();e.stopImmediatePropagation();
  if(e.button===0){
   const picked=pickedNodeAt(e);
@@ -593,13 +597,13 @@ function completeModelDrag(e){
 }
 view.addEventListener('pointerdown',e=>{
  if(preview.active||preview.busy||marqueeStart||prefabGallery.isOpen()||e.ctrlKey||e.button!==0)return;
- if(mode==='holePaint'||mode==='holeErase'){
-  // Painting always wins over model interaction; cut on nearest true surface.
+ if(mode==='holePaint'){
+  // Each click adds one corner; dragging does not create triangles.
   const hit=convertCoords(e);
   if(!hit)return;
   e.preventDefault();
-  pointerDown=true;changed=true;
-  holesEditor.paint(hit,mode==='holeErase');
+  pointerDown=false;
+  holesEditor.addPoint(hit,[e.clientX,e.clientY]);
   return;
  }
  // First raycast the actual GLB/scene meshes, so clicking any visible rock selects it.
@@ -622,8 +626,7 @@ view.addEventListener('pointerdown',e=>{
   act(p);setHoverNode(null,e);return;
  }
  pointerDown=true;changed=false;
- if(mode==='holePaint'||mode==='holeErase'){
-  holesEditor.paint(p,mode==='holeErase');changed=true;
+ if(tools[mode]){
  }else if(tools[mode]){
   snapshot();brush(p.x,p.z);changed=true;
  }else if(mode==='move'){
@@ -633,7 +636,7 @@ view.addEventListener('pointerdown',e=>{
 view.addEventListener('pointermove',e=>{
  if(preview.active||preview.busy||prefabGallery.isOpen()||marqueeStart)return;
  if(dragSession){moveModelDrag(e);return}
- const holeMode=mode==='holePaint'||mode==='holeErase';
+ const holeMode=mode==='holePaint';
  // No GLB selection or hover in cutting mode: only the cutter raycast runs.
  if(holeMode){
   if(hoveredNodeId!==null){hoveredNodeId=null;updateHoverHighlight();}
@@ -644,24 +647,21 @@ view.addEventListener('pointermove',e=>{
   setHoverNode(hovered,e);
  }
  const p=convertCoords(e);
- if(!p){updatePlacementAt(null);return}
+ if(!p){if(holeMode)holesEditor.hoverAt(null);updatePlacementAt(null);return}
  $('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
  if(armedPrefabId&&mode==='prefab'){updatePlacementAt(p);return}
- if(holeMode&&p.normal){
-  const normal=new THREE.Vector3(...p.normal);
-  cursor.position.set(p.x+.22*normal.x,p.y+.22*normal.y,p.z+.22*normal.z);
-  cursor.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),normal);
- }else{
-  cursor.position.set(p.x,p.y+.3,p.z);
-  cursor.rotation.set(-Math.PI/2,0,0);
+ if(holeMode){
+  cursor.visible=false; // No circular brush cursor.
+  holesEditor.hoverAt(p,[e.clientX,e.clientY]);
+  return;
  }
- const radius=tools[mode]?Number($('brushRadius').value):4;
- cursor.scale.setScalar(radius);
- if(pointerDown&&holeMode)holesEditor.paint(p,mode==='holeErase');
- else if(pointerDown&&tools[mode])brush(p.x,p.z);
+ cursor.position.set(p.x,p.y+.3,p.z);
+ cursor.rotation.set(-Math.PI/2,0,0);
+ cursor.scale.setScalar(tools[mode]?Number($('brushRadius').value):4);
+ if(pointerDown&&tools[mode])brush(p.x,p.z);
 });
 view.addEventListener('pointerleave',e=>{
- if(!dragSession){setHoverNode(null,e);updatePlacementAt(null)}
+ if(!dragSession){setHoverNode(null,e);updatePlacementAt(null);holesEditor?.hoverAt(null)}
 });
 window.addEventListener('pointerup',e=>{
  completeModelDrag(e);
@@ -743,7 +743,13 @@ $('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function toast(msg){$('toast').textContent=msg;setTimeout(()=>{if($('toast').textContent===msg)$('toast').textContent=''},4500)}
 window.addEventListener('keydown',e=>{if(preview.active||preview.busy)return;if(e.target.matches('input,textarea'))return;
-if(e.key==='Escape'){pending=null;setNodeSelection([]);setMode('move')}
+if(e.key==='Escape'){
+ if(mode==='holePaint'){holesEditor.clearSelection();e.preventDefault();return;}
+ pending=null;setNodeSelection([]);setMode('move');
+}
+if(mode==='holePaint'&&(e.key==='Backspace'||e.key==='Delete')){
+ e.preventDefault();holesEditor.removeLastPoint();return;
+}
 if(e.key==='Delete')$('remove').click();
 if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
 });
