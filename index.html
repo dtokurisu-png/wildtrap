@@ -56,7 +56,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.7 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.8 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -92,27 +92,20 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 
 <section id="holesPanel">
-<h2>✂ Pincel de corte 3D · Terreno y modelos GLB</h2>
-<p class="hint"><b>Activa Vista 3D</b> para pintar directamente sobre la pared de un acantilado. Puedes pintar tanto sobre el terreno como directamente sobre la montaña y las cuevas GLB. Al activar Pintar corte 3D o Borrar trazo pendiente se desactivan selección, movimiento, rotación y escala: los clics pintan, no manipulan modelos. La malla se abre de verdad solo al pulsar Crear agujero; la selección ámbar es una vista previa.</p>
-<div class="grid2"><button data-tool="holePaint">Pintar corte 3D</button><button data-tool="holeErase">Borrar trazo pendiente</button></div>
-<div class="grid2">
-<label>Forma del pincel
-<select id="holeShape" style="width:100%;background:#1e4034;color:#fff;border:1px solid #598071;border-radius:6px;padding:6px">
-<option value="circle">Circular</option><option value="semicircle">Semicírculo / arco</option>
-<option value="rectangle">Cuadrado</option><option value="free">Trazo libre (arrastrar)</option>
-</select></label>
-<label>Orientación del semicírculo
-<select id="holeDirection" style="width:100%;background:#1e4034;color:#fff;border:1px solid #598071;border-radius:6px;padding:6px">
-<option value="north">Hacia arriba</option><option value="south">Hacia abajo</option>
-<option value="west">Hacia izquierda</option><option value="east">Hacia derecha</option>
-</select></label>
+<h2>✂ Cuchillo poligonal 3D · Terreno y modelos GLB</h2>
+<p class="hint"><b>Como el cuchillo de Blender:</b> activa el cuchillo y haz clic en la malla para colocar el primer vértice. Mueve el cursor: verás una línea uniendo el último punto con el cursor. Cada clic añade un vértice (sin pintar ni arrastrar). Haz clic en el <b>primer punto</b> para cerrar el circuito. Después pulsa <b>Crear agujero</b>. Se crea un solo recorte definido por tus esquinas, sin cientos de sellos de pincel.</p>
+<button data-tool="holePaint" style="width:100%">✂ Activar cuchillo (clic por vértice)</button>
+<div class="grid2" style="margin-top:6px">
+<button id="undoHolePoint" type="button" disabled>↶ Deshacer punto</button>
+<button id="closeHoleContour" type="button" disabled>◇ Cerrar contorno</button>
 </div>
-<label>Profundidad de corte a cada lado de la superficie (unidades)
+<label>Profundidad del recorte en ambos lados de la superficie (unidades)
 <input id="holeDepth" type="number" min=".25" max="20" step=".25" value="2"></label>
-<div class="grid2"><button id="createHole" style="background:#755533">✂ Crear agujero</button><button id="restoreHole">Restaurar región</button></div>
-<button id="clearHoleSelection" style="width:100%;margin-top:6px">Limpiar selección</button>
-<div class="hint"><span id="holeSelectionCount">0 trazos 3D seleccionados</span> · <span id="holeCounter">0 celdas antiguas · 0 cortes 3D · 0 restauraciones</span></div><div class="hint" id="holeMeshStats">Malla base sin recortes adicionales</div>
-<p class="hint"><b>Radio del pincel:</b> arriba, desde 1 unidad. <b>Profundidad:</b> limita el corte alrededor de la cara elegida; súbela solo si la pared lo necesita. Para cerrar una parte del agujero, pinta sobre ella (también se puede seleccionar una superficie que ya no existe) y pulsa <b>Restaurar región</b>. Los recortes del terreno se guardan en el proyecto, y los de cada GLB quedan vinculados a ese modelo aunque lo muevas o gires. También puedes restaurar regiones de modelos pintando encima de ellas. Ctrl+Z permite deshacer.</p>
+<div class="grid2"><button id="createHole" style="background:#755533" disabled>✂ Crear agujero</button><button id="restoreHole" disabled>Restaurar región</button></div>
+<button id="clearHoleSelection" type="button" style="width:100%;margin-top:6px">Cancelar / limpiar contorno</button>
+<div class="hint"><span id="holeSelectionCount">0 vértices · clic para iniciar el contorno</span> · <span id="holeCounter">0 celdas antiguas · 0 cortes 3D · 0 restauraciones</span></div>
+<div class="hint" id="holeMeshStats">Malla base sin recortes adicionales</div>
+<p class="hint"><b>Atajos:</b> Retroceso elimina el último punto; Escape cancela el contorno; Ctrl+Z deshace el corte aplicado. Puedes marcar puntos sobre un acantilado o un GLB, pero cada contorno debe pertenecer a la misma malla. Los agujeros y restauraciones se guardan en el proyecto; la topología original de los modelos se conserva para reconstruir y deshacer.</p>
 </section>
 <section>
 <h2>3. Anclajes, caminos y estructuras</h2>
@@ -208,5 +201,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.7').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.8').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
