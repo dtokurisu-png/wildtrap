@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {buildAdaptiveModel} from './adaptive-model-cuts.mjs?v=0.9.8';
+import {applyVertexOperations,cleanVertexOperations} from './mesh-deform.mjs?v=0.9.12';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
@@ -42,14 +43,40 @@ export function createPrefabLibrary(onChange=()=>{}){
   const box=new THREE.Box3().setFromObject(model);
   const ctr=box.getCenter(new THREE.Vector3());
   model.position.x-=ctr.x;model.position.y-=box.min.y;model.position.z-=ctr.z;
-  model.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;}});
+  let meshIndex=0;
+  model.traverse(child=>{
+   if(child.isMesh){
+    child.castShadow=true;child.receiveShadow=true;
+    if(!child.isSkinnedMesh)child.userData.wildtrapMeshKey=String(meshIndex++);
+   }
+  });
   root.add(model);
-  root.position.set(node.x,prefabWorldY(node,heightAt),node.z);
+  root.position.set(node.x,prefabWorldY(node,heightAt)+(Number(node.scaleAnchorOffsetY)||0),node.z);
   // YXZ: horizontal yaw around world Y and vertical tilt around local X.
-  root.rotation.set(Number(node.rotationX)||0,Number(node.rotation)||0,0,'YXZ');
+  root.rotation.set(Number(node.rotationX)||0,Number(node.rotation)||0,Number(node.rotationZ)||0,'YXZ');
   root.scale.setScalar(Math.max(.01,Number(node.scale)||1));
-  // Cut against the untouched GLB mesh and keep its original geometry for
-  // future restoration and picking inside an already-open aperture.
+  // Every placed model owns only its deformed buffers, never the GLB cache.
+  // Apply vertex changes BEFORE polygon cuts; both are replayed after reload.
+  const operations=cleanVertexOperations(node.meshScaleOps);
+  if(operations.length){
+   root.updateMatrixWorld(true);
+   const inverseRoot=root.matrixWorld.clone().invert();
+   root.traverse(child=>{
+    if(!child.isMesh||child.isSkinnedMesh||child.userData.wildtrapMeshKey===undefined)return;
+    const meshToRoot=inverseRoot.clone().multiply(child.matrixWorld);
+    const rootToMesh=meshToRoot.clone().invert();
+    const point=new THREE.Vector3();
+    const converted=applyVertexOperations(child.geometry,operations,child.userData.wildtrapMeshKey,
+     coords=>point.set(...coords).applyMatrix4(meshToRoot).toArray(),
+     coords=>point.set(...coords).applyMatrix4(rootToMesh).toArray());
+    if(converted){
+     child.geometry=converted;
+     child.userData.wildtrapGeneratedDeformGeometry=converted;
+    }
+   });
+  }
+  // Cut against the current deformed geometry while retaining the uncut
+  // instance buffer for picking through an existing opening.
   const rootCuts=applyCuts&&Array.isArray(node.cuts3d)?node.cuts3d:[];
   if(rootCuts.length){
    root.updateMatrixWorld(true);
@@ -90,6 +117,21 @@ export function createPrefabLibrary(onChange=()=>{}){
     child.userData.wildtrapGeneratedCutGeometry=geometry;
    });
   }
+  if(node.editorIntangible===true){
+   // Per-placement materials are cloned: never fade the shared GLB assets.
+   root.traverse(child=>{
+    if(!child.isMesh)return;
+    const faded=source=>{
+     const mat=source.clone();
+     mat.transparent=true;mat.opacity=Math.min(.26,(source.opacity??1)*.26);
+     mat.depthWrite=false;mat.side=THREE.DoubleSide;
+     return mat;
+    };
+    child.material=Array.isArray(child.material)?child.material.map(faded):faded(child.material);
+    child.userData.wildtrapGeneratedMaterials=
+     Array.isArray(child.material)?child.material:[child.material];
+   });
+  }
   return root;
  }
  function disposeInstance(root){
@@ -97,6 +139,10 @@ export function createPrefabLibrary(onChange=()=>{}){
   root.traverse(child=>{
    const generated=child.userData?.wildtrapGeneratedCutGeometry;
    if(generated){generated.dispose();delete child.userData.wildtrapGeneratedCutGeometry;}
+   const deformed=child.userData?.wildtrapGeneratedDeformGeometry;
+   if(deformed){deformed.dispose();delete child.userData.wildtrapGeneratedDeformGeometry;}
+   for(const mat of child.userData?.wildtrapGeneratedMaterials||[])mat?.dispose?.();
+   delete child.userData.wildtrapGeneratedMaterials;
   });
  }
  function createPreview(id){
