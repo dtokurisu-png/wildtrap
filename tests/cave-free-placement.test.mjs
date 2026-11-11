@@ -60,7 +60,8 @@ test('los GLB usan la altura independiente y el fantasma se muestra a través de
 });
 
 test('el movimiento y el editor de números no vuelven a anclar las cuevas',()=>{
- assert.ok(editor.includes('root.position.set(n.x,prefabWorldY(n,heightAt),n.z)'));
+ assert.ok(editor.includes('root.position.set(n.x,prefabWorldY(n,heightAt)+(Number(n.scaleAnchorOffsetY)||0),n.z)'),
+  'La altura libre se mantiene, sumando únicamente la corrección de anclaje del propio modelo');
  assert.ok(editor.includes('original.y=prefabWorldY(n,heightAt)'));
  assert.ok(editor.includes("n.y=altitudeFromVerticalDrag("));
  assert.ok(editor.includes('if(isFreeCave(n.prefabId))n.y=worldY+heightDelta'));
