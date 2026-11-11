@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es"><head><meta charset="UTF-8"><title>WILDTRAP workspace smoke</title></head>
+<body data-result="PENDING"><div id="result">WAITING</div><iframe id="app" src="../?safe=1" style="width:1440px;height:900px;border:0"></iframe>
+<script>
+const frame=document.getElementById('app'),result=document.getElementById('result');
+const fail=message=>{document.body.dataset.result='FAIL';result.textContent='FAIL '+message};
+const assert=(condition,message)=>{if(!condition)throw Error(message)};
+let started=Date.now(),finished=false;
+const check=()=>{
+ if(finished)return;
+ try{
+  const d=frame.contentDocument,w=frame.contentWindow;
+  if(!d?.querySelector('#boot[hidden]')||!w.__workspaceLayout){
+   if(Date.now()-started<21000)return;
+   throw Error('El editor no terminó de arrancar');
+  }
+  const dock=d.querySelector('#side'),rail=d.querySelector('#workspaceRail'),bar=d.querySelector('#workspaceTopbar');
+  assert(dock&&rail&&bar,'Falta la disposición de tres áreas');
+  assert(dock.querySelectorAll('.dock-pane').length===3,'No existen tres paneles');
+  assert(dock.querySelectorAll('.dock-splitter').length===2,'Los paneles no tienen separadores');
+  assert(dock.querySelectorAll('.dock-tab').length===6,'Las pestañas iniciales están incompletas');
+  assert(bar.contains(d.getElementById('undo')),'Deshacer no se trasladó a la barra superior');
+  assert(bar.contains(d.getElementById('reset')),'Vaciar no está arriba');
+  assert(bar.contains(d.getElementById('export')),'Exportar no está arriba');
+  assert(bar.contains(d.getElementById('importJSON')),'Importar no está arriba');
+  assert(rail.contains(d.getElementById('test')),'El Play no está en la barra compacta');
+  assert(d.getElementById('test').textContent.trim()==='▶','El Play sigue siendo un botón grande');
+  assert(d.getElementById('viewport').getBoundingClientRect().width>250,'Viewport demasiado estrecho');
+  assert(d.getElementById('viewport').getBoundingClientRect().right<=dock.getBoundingClientRect().left+2,
+   'El escenario invade el panel derecho');
+  const knife=rail.querySelector('[data-workspace="knife"]');
+  knife.click();
+  assert(!d.getElementById('holesPanel').hidden,'El cuchillo no aparece en propiedades');
+  assert(d.querySelector('.dock-tab[data-tab="tools"]').classList.contains('active'),'No muestra pestaña Propiedades');
+  const structures=rail.querySelector('[data-workspace="structures"]');
+  structures.click();
+  assert(!d.getElementById('cavePiecesPanel').closest('.workspace-section').hidden,'No muestra herramientas de estructuras');
+  assert(d.getElementById('prefabModal').hidden,'La herramienta estructuras abrió modal inesperado');
+  const sculpt=rail.querySelector('[data-workspace="sculpt"]');
+  sculpt.click();
+  assert(!d.querySelector('[data-workspace-content="sculpt"]').hidden,'No muestra esculpir');
+  assert(d.getElementById('brushRadius'),'Se perdió el radio del pincel');
+  d.getElementById('selected').textContent='ID 7 · Cueva de prueba';
+  Promise.resolve().then(()=>{
+   try{
+    assert(d.querySelector('.dock-tab[data-tab="object"]').classList.contains('active'),
+     'La selección no activó propiedades de objeto');
+    assert(!d.getElementById('workspaceObjectProperties').classList.contains('is-empty'),
+     'La selección no revela sus campos');
+    assert(d.getElementById('prefabX').closest('.object-editor-fields'),
+     'Los campos de coordenadas no se trasladaron');
+    assert(!d.getElementById('workspaceInternalActions').hidden===false || d.getElementById('workspaceInternalActions').hidden,
+     'El movimiento interno no se guardó');
+    const state=w.__workspaceLayout.getState();
+    assert(state.panes.length===3&&state.workspace==='sculpt','El estado del workspace es inválido');
+    finished=true;document.body.dataset.result='PASS';
+    result.textContent='PASS · Fase 1: layout + herramientas + vista + propiedades';
+   }catch(error){finished=true;fail(error.message)}
+  });
+ }catch(error){finished=true;fail(error.message)}
+};
+frame.addEventListener('load',check);
+setInterval(check,150);
+</script></body></html>
