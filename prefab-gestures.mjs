@@ -32,3 +32,11 @@ export function rotateFromPointerDrag(originalYaw=0,originalPitch=0,startScreenX
  const radiansPerPixel=Math.PI/360;
  return {rotation:yaw+dx*radiansPerPixel,rotationX:pitch+dy*radiansPerPixel};
 }
+
+// Alt+Shift+left drag changes cave elevation in absolute world units.
+// It is independent from terrain and does not change the X/Z coordinates.
+export function altitudeFromVerticalDrag(originalY,startScreenY,screenY){
+ const base=Number.isFinite(originalY)?originalY:0;
+ const dy=Number(startScreenY)-Number(screenY);
+ return Number.isFinite(dy)?base+dy*.25:base;
+}
