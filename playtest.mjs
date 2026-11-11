@@ -10,7 +10,7 @@ const WALK_URL='https://dtokurisu-png.github.io/rok-3d-test/animations/Catwalk%2
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const forwardOf=yaw=>new THREE.Vector3(Math.sin(yaw),0,-Math.cos(yaw));
 
-export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,$,resizeEditor}){
+export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,$,resizeEditor,onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const clock=new THREE.Clock();
  const player=new THREE.Group();
@@ -205,6 +205,7 @@ const hiddenDebugMarkers=[];
   document.body.classList.remove('testing');
   resizeEditor();resize();
   $('testModelStatus').textContent='Modo edición · la prueba no cambió el terreno';
+  onStop();
  }
  function frame(){
   if(!active)return null;
