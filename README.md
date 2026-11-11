@@ -156,3 +156,14 @@ El documento [assets/terrain/wildtrap-world.json](assets/terrain/wildtrap-world.
 **Alcance del modo Probar:** se muestran los nuevos GLB, pero la Farolera conserva las colisiones del terreno anterior. La integración de colisión simplificada con los modelos GLB se evaluará por separado.
 
 [Pruebas automáticas del editor y GLB](tests/editor-glb-integration.test.mjs)
+
+
+## v0.9.1 — Galería visual de estructuras GLB
+
+En **Estructuras / Cuevas**, el botón **Colocar modelo GLB · Ver modelos** abre una ventana con cuatro tarjetas: montaña, cueva rocosa, cueva de piedra y cueva estilizada.
+
+Las miniaturas **no son imágenes genéricas**: `prefab-gallery.mjs` las renderiza directamente desde los GLB ya descargados por `prefab-library.mjs`, con una sola sesión WebGL y una caché de capturas PNG por ángulo. El menú ofrece cinco vistas: perspectiva 3D, frente, lado, atrás y arriba. Cada tarjeta muestra el modelo elegido desde el ángulo activo. Al pulsar una tarjeta se cierra la ventana y el editor activa el modo de colocación; el siguiente clic en el escenario añade una instancia independiente.
+
+La galería se cierra con el botón de cerrar, Escape o clic fuera del panel; no modifica los GLB originales ni los datos del escenario hasta colocar un modelo. Las herramientas de terreno, cortes, selección múltiple, guardado y modo Probar quedan intactas.
+
+Pruebas: `node --test tests/prefab-gallery.test.mjs`, incluidas en el flujo de GitHub Actions del editor.
