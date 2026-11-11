@@ -918,11 +918,16 @@ $('undo').onclick=()=>{
  }
  const data=undo.pop();if(!data)return;
  undoSerials.pop();
+ // During mesh editing, preserve the selected object and its vertex workspace
+ // while reverting only the latest geometry/lock change.
+ const meshSelection=mode==='meshEdit'?[...selectedIds]:[];
  const v=JSON.parse(data);Object.assign(live,v);
  if(!Array.isArray(live.holes))live.holes=[];
  if(!Array.isArray(v.cuts3d))live.cuts3d=[];
  live.objectGroups=cleanObjectGroups(v.objectGroups);
- selectedIds.clear();selectedId=null;
+ selectedIds.clear();
+ for(const id of meshSelection)if(live.nodes.some(n=>n.id===id))selectedIds.add(id);
+ selectedId=[...selectedIds].at(-1)??null;
  if(holesEditor.pendingUndoSerial()<0)holesEditor.clearSelection();
  refreshTerrain();draw();persist();
 };
