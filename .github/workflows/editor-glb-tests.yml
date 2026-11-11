@@ -1,0 +1,26 @@
+name: Validar editor y biblioteca GLB
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'editor.mjs'
+      - 'index.html'
+      - 'prefab-catalog.mjs'
+      - 'prefab-library.mjs'
+      - 'assets/terrain/wildtrap-world.json'
+      - 'tests/editor-glb-integration.test.mjs'
+      - '.github/workflows/editor-glb-tests.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check editor.mjs
+      - run: node --check prefab-library.mjs
+      - run: node --check prefab-catalog.mjs
+      - run: node --test tests/editor-glb-integration.test.mjs
