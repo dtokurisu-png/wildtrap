@@ -4,9 +4,10 @@ import {createPlaytest} from './playtest.mjs?v=0.9.6';
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.6';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.6';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.7';
+import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.6';
-import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag} from './prefab-gestures.mjs?v=0.9.6';
+import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag} from './prefab-gestures.mjs?v=0.9.7';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -42,7 +43,7 @@ const draftKey=recoveryMode?'wildtrap-editor-draft-recovered-v1':
 const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
-let armedPrefabId=null,placementGhost=null,hoveredNodeId=null,dragSession=null;
+let armedPrefabId=null,placementGhost=null,placementWorldY=null,hoveredNodeId=null,dragSession=null;
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
 const temp=new THREE.Vector3();
 const pos=(x,z)=>({x:clamp(x,-SIZE/2,SIZE/2),z:clamp(z,-SIZE/2,SIZE/2)});
@@ -206,7 +207,7 @@ function updateHoverHighlight(){
 }
 function clearPlacement(){
  if(placementGhost){prefabLibrary?.disposePreview(placementGhost);placementGhost=null;}
- armedPrefabId=null;
+ armedPrefabId=null;placementWorldY=null;
  $('interactionHelp').style.display='none';cursor.visible=true;
 }
 function armPlacement(id){
@@ -217,14 +218,22 @@ function armPlacement(id){
  if(!placementGhost){armedPrefabId=null;toast('No se pudo preparar la vista del modelo');return false}
  scene.add(placementGhost);
  $('prefabType').value=id;
- $('interactionHelp').textContent='✥ '+(prefabById(id)?.name||id)+' · Mueve el cursor sobre el terreno y haz clic para colocarlo · Esc: cancelar';
+ $('interactionHelp').textContent='✥ '+(prefabById(id)?.name||id)+
+  (isFreeCave(id)?
+  ' · Alt + rueda: subir/bajar libremente · Clic: colocar atravesando terreno · Esc: cancelar':
+  ' · Sigue el terreno · Clic: colocar sobre la superficie · Esc: cancelar');
  $('interactionHelp').style.display='block';cursor.visible=false;
  return true;
 }
 function updatePlacementAt(point){
  if(!placementGhost)return;
  if(!point){placementGhost.visible=false;return}
- placementGhost.position.set(point.x,heightAt(point.x,point.z),point.z);
+ if(isFreeCave(armedPrefabId)){
+  if(!Number.isFinite(placementWorldY))placementWorldY=heightAt(point.x,point.z);
+  placementGhost.position.set(point.x,placementWorldY,point.z);
+  $('interactionHelp').textContent='Cueva libre · Y '+placementWorldY.toFixed(1)+
+   ' · Alt + rueda: subir/bajar · Clic: colocar · Esc: cancelar';
+ }else placementGhost.position.set(point.x,heightAt(point.x,point.z),point.z);
  placementGhost.visible=true;
 }
 function setHoverNode(node,event){
@@ -233,12 +242,13 @@ function setHoverNode(node,event){
  const indicator=$('modelHoverIndicator');
  if(node&&!marqueeStart){
   const noun=node.kind==='prefab'?(prefabById(node.prefabId)?.name||'Modelo'):'Elemento';
-  const action=node.kind==='prefab'&&event.altKey?'rotate':node.kind==='prefab'&&event.shiftKey?'scale':'move';
-   indicator.textContent=(action==='rotate'?'⟳ Rotar ':action==='scale'?'↕ Escalar ':'✥ ')+noun+' · '+(action==='rotate'?'Alt + arrastrar':action==='scale'?'Shift + arrastrar':'Clic y arrastrar');
+  const action=node.kind==='prefab'&&isFreeCave(node.prefabId)&&event.altKey&&event.shiftKey?'height':
+   node.kind==='prefab'&&event.altKey?'rotate':node.kind==='prefab'&&event.shiftKey?'scale':'move';
+   indicator.textContent=(action==='height'?'↕ Altura libre ':action==='rotate'?'⟳ Rotar ':action==='scale'?'↕ Escalar ':'✥ ')+noun+' · '+(action==='height'?'Alt + Shift + arrastrar':action==='rotate'?'Alt + arrastrar':action==='scale'?'Shift + arrastrar':'Clic y arrastrar');
   indicator.style.left=Math.min(event.clientX+18,Math.max(0,innerWidth-220))+'px';
   indicator.style.top=Math.min(event.clientY+18,Math.max(0,innerHeight-42))+'px';
   indicator.style.display='block';
-  view.style.cursor=action==='rotate'?'crosshair':action==='scale'?'ns-resize':'grab';
+  view.style.cursor=action==='height'||action==='scale'?'ns-resize':action==='rotate'?'crosshair':'grab';
  }else{
   indicator.style.display='none';view.style.cursor='crosshair';
  }
@@ -254,9 +264,13 @@ function updateStatus(){
   $('prefabZ').value=picked.z;
   $('prefabRotation').value=((picked.rotation||0)*180/Math.PI).toFixed(1);
   $('prefabRotationX').value=((picked.rotationX||0)*180/Math.PI).toFixed(1);
-  $('prefabOffsetY').value=picked.offsetY||0;
+  const cave=isFreeCave(picked.prefabId);
+  $('prefabOffsetY').disabled=!cave;
+  $('prefabHeightLabel').textContent=cave?'Altura libre Y (mundo)':'Altura Y (anclada al terreno)';
+  $('prefabOffsetY').value=prefabWorldY(picked,heightAt).toFixed(2);
   $('prefabScale').value=picked.scale||1;
  }
+ if(!picked||picked.kind!=='prefab')$('prefabOffsetY').disabled=true;
  $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
 }
 function setMode(v){
@@ -331,7 +345,8 @@ if(dd<d){d=dd;best=n}}
 if(mode==='prefab'){
  const prefabId=armedPrefabId||$('prefabType').value;
  if(!armedPrefabId||!prefabById(prefabId)){toast('Primero elige un modelo en la galería');return}
- addNode({kind:'prefab',prefabId,x,z,rotation:0,scale:1,offsetY:0});
+ addNode({kind:'prefab',prefabId,x,z,rotation:0,scale:1,offsetY:0,
+  ...(isFreeCave(prefabId)?{y:Number.isFinite(placementWorldY)?placementWorldY:heightAt(x,z)}:{})});
  clearPlacement();setMode('move');
  $('prefabChosen').textContent='Modelo colocado · Selecciónalo y arrástralo, o abre la galería para colocar otro';
 }else if(['tree','wallspawn','spawn','exit','anchor'].includes(mode))addNode({kind:mode,x,z});
@@ -495,12 +510,17 @@ function beginModelDrag(e,node){
   pointerId:e.pointerId,
   startX:e.clientX,startY:e.clientY,
   ground:{x:ground.x,z:ground.z},
-  action:e.altKey&&node.kind==='prefab'?'rotate':e.shiftKey&&node.kind==='prefab'?'scale':'move',
-  nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>({id:n.id,original:structuredClone(n)})),
+  action:e.altKey&&e.shiftKey&&node.kind==='prefab'&&isFreeCave(node.prefabId)?'height':
+   e.altKey&&node.kind==='prefab'?'rotate':e.shiftKey&&node.kind==='prefab'?'scale':'move',
+  nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>{
+   const original=structuredClone(n);
+   if(n.kind==='prefab'&&isFreeCave(n.prefabId))original.y=prefabWorldY(n,heightAt);
+   return {id:n.id,original};
+  }),
   changed:false
  };
  try{view.setPointerCapture(e.pointerId)}catch(_){}
- view.style.cursor=dragSession.action==='rotate'?'crosshair':dragSession.action==='scale'?'ns-resize':'grabbing';
+ view.style.cursor=dragSession.action==='height'||dragSession.action==='scale'?'ns-resize':dragSession.action==='rotate'?'crosshair':'grabbing';
  updateStatus();
 }
 function updateMovedPrefabs(){
@@ -511,7 +531,7 @@ function updateMovedPrefabs(){
   if(n.kind!=='prefab'){hasNonPrefab=true;continue}
   for(const root of renderedNodes.get(id)||[]){
    if(!root.userData.sharedAsset)continue;
-   root.position.set(n.x,heightAt(n.x,n.z)+(Number(n.offsetY)||0),n.z);
+   root.position.set(n.x,prefabWorldY(n,heightAt),n.z);
    root.rotation.set(n.rotationX||0,n.rotation||0,0,'YXZ');
    root.scale.setScalar(n.scale||1);
   }
@@ -525,7 +545,13 @@ function moveModelDrag(e){
  const session=dragSession;
  if(Math.hypot(e.clientX-session.startX,e.clientY-session.startY)<3&&!session.changed)return;
  if(!session.changed){snapshot();session.changed=true;}
- if(session.action==='scale'){
+ if(session.action==='height'){
+  for(const item of session.nodes){
+   const n=live.nodes.find(x=>x.id===item.id);
+   if(n?.kind==='prefab'&&isFreeCave(n.prefabId))
+    n.y=altitudeFromVerticalDrag(item.original.y,session.startY,e.clientY);
+  }
+ }else if(session.action==='scale'){
   for(const item of session.nodes){
    const n=live.nodes.find(x=>x.id===item.id);
    if(n?.kind==='prefab')n.scale=scaleFromVerticalDrag(item.original.scale||1,session.startY,e.clientY);
@@ -550,7 +576,7 @@ function moveModelDrag(e){
   }
  }
  updateMovedPrefabs();
- view.style.cursor=session.action==='rotate'?'crosshair':session.action==='scale'?'ns-resize':'grabbing';
+ view.style.cursor=session.action==='height'||session.action==='scale'?'ns-resize':session.action==='rotate'?'crosshair':'grabbing';
  const current=live.nodes.find(x=>x.id===session.nodes[0]?.id);
  if(current)setHoverNode(current,e);
 }
@@ -638,7 +664,22 @@ window.addEventListener('pointerup',e=>{
  completeModelDrag(e);
  pointerDown=false;holesEditor.endStroke();moveBases=null;dragId=null;
 });
-view.addEventListener('wheel',e=>{if(!camera.isOrthographicCamera)return;e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()},{passive:false});
+view.addEventListener('wheel',e=>{
+ if(isFreeCave(armedPrefabId)&&mode==='prefab'&&e.altKey){
+  e.preventDefault();
+  const p=convertCoords(e);
+  if(!Number.isFinite(placementWorldY)){
+   if(!p)return;
+   placementWorldY=heightAt(p.x,p.z);
+  }
+  const unitsPerDelta=e.deltaMode===1?1.5:e.deltaMode===2?12:.10;
+  placementWorldY-=e.deltaY*unitsPerDelta;
+  if(p)updatePlacementAt(p);
+  return;
+ }
+ if(!camera.isOrthographicCamera)return;
+ e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()
+},{passive:false});
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
 $('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
@@ -656,15 +697,21 @@ $('applyPrefab').onclick=()=>{
  const rotX=(Number($('prefabRotationX').value)||0)*Math.PI/180;
  const rotationDelta=rot-(primary.rotation||0);
  const tiltDelta=rotX-(primary.rotationX||0);
- const heightDelta=(Number($('prefabOffsetY').value)||0)-(primary.offsetY||0);
+ const inputY=Number($('prefabOffsetY').value);
+ const heightDelta=isFreeCave(primary.prefabId)&&Number.isFinite(inputY)?
+  inputY-prefabWorldY(primary,heightAt):0;
  const newScale=clamp(Number($('prefabScale').value)||1,.05,15);
  const scaleRatio=newScale/(primary.scale||1);
  for(const n of targets){
+  // Hold a cave's absolute elevation even when the X/Z move crosses a slope.
+  const worldY=isFreeCave(n.prefabId)?prefabWorldY(n,heightAt):null;
   n.x=clamp(n.x+dx,-SIZE/2,SIZE/2);
   n.z=clamp(n.z+dz,-SIZE/2,SIZE/2);
   n.rotation=(n.rotation||0)+rotationDelta;
   n.rotationX=(n.rotationX||0)+tiltDelta;
-  n.offsetY=(n.offsetY||0)+heightDelta;
+  if(isFreeCave(n.prefabId))n.y=worldY+heightDelta;
+  else delete n.y; // Mountains and non-cave structures cannot float.
+  n.offsetY=0;
   n.scale=clamp((n.scale||1)*scaleRatio,.05,15);
  }
  draw();persist();toast(targets.length+' modelo(s) actualizado(s)');
