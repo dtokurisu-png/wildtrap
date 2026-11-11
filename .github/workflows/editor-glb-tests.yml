@@ -8,9 +8,11 @@ on:
       - 'prefab-catalog.mjs'
       - 'prefab-library.mjs'
       - 'prefab-gallery.mjs'
+      - 'prefab-gestures.mjs'
       - 'assets/terrain/wildtrap-world.json'
       - 'tests/editor-glb-integration.test.mjs'
       - 'tests/prefab-gallery.test.mjs'
+      - 'tests/prefab-gestures.test.mjs'
       - '.github/workflows/editor-glb-tests.yml'
   workflow_dispatch:
 jobs:
@@ -25,6 +27,8 @@ jobs:
       - run: node --check editor.mjs
       - run: node --check prefab-library.mjs
       - run: node --check prefab-gallery.mjs
+      - run: node --check prefab-gestures.mjs
       - run: node --check prefab-catalog.mjs
       - run: node --test tests/editor-glb-integration.test.mjs
       - run: node --test tests/prefab-gallery.test.mjs
+      - run: node --test tests/prefab-gestures.test.mjs
