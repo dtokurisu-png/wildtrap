@@ -25,6 +25,7 @@ const surface=new THREE.Group();scene.add(surface);
 const interiors=new THREE.Group();scene.add(interiors);
 const cavePiecesLayer=new THREE.Group();scene.add(cavePiecesLayer);
 const selectedHighlights=new THREE.Group();scene.add(selectedHighlights);
+const hoverHighlights=new THREE.Group();scene.add(hoverHighlights);
 const renderedNodes=new Map();
 let prefabLibrary=null;
 const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasicMaterial({color:0xffdd7a,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));cursor.rotation.x=-Math.PI/2;cursor.renderOrder=20;scene.add(cursor);
@@ -35,6 +36,7 @@ let holesEditor=null;
 const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem('wildtrap-editor-draft-v1',JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
+let armedPrefabId=null,placementGhost=null,hoveredNodeId=null,dragSession=null;
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
 const temp=new THREE.Vector3();
 const pos=(x,z)=>({x:clamp(x,-SIZE/2,SIZE/2),z:clamp(z,-SIZE/2,SIZE/2)});
@@ -160,7 +162,7 @@ if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
  renderedNodes.set(n.id,roots);
 }
 surface.visible=true;terrain.visible=true;interiors.visible=false;
-updateSelectionHighlights();updateStatus();
+updateSelectionHighlights();updateHoverHighlight();updateStatus();
 }
 function updatePrefabLoadStatus(){
  if(!prefabLibrary)return;
@@ -185,13 +187,62 @@ function updateSelectionHighlights(){
   }
  }
 }
+function updateHoverHighlight(){
+ for(const item of [...hoverHighlights.children]){
+  hoverHighlights.remove(item);item.geometry?.dispose();item.material?.dispose();
+ }
+ if(hoveredNodeId===null)return;
+ const bounds=new THREE.Box3();
+ for(const root of renderedNodes.get(hoveredNodeId)||[])if(root.visible)bounds.expandByObject(root);
+ if(bounds.isEmpty())return;
+ const helper=new THREE.Box3Helper(bounds,0x00ffdf);
+ helper.userData.editorOnly=true;hoverHighlights.add(helper);
+}
+function clearPlacement(){
+ if(placementGhost){prefabLibrary?.disposePreview(placementGhost);placementGhost=null;}
+ armedPrefabId=null;
+ $('interactionHelp').style.display='none';cursor.visible=true;
+}
+function armPlacement(id){
+ clearPlacement();
+ if(!prefabById(id))return false;
+ armedPrefabId=id;
+ placementGhost=prefabLibrary?.createPreview(id)||null;
+ if(!placementGhost){armedPrefabId=null;toast('No se pudo preparar la vista del modelo');return false}
+ scene.add(placementGhost);
+ $('prefabType').value=id;
+ $('interactionHelp').textContent='✥ '+(prefabById(id)?.name||id)+' · Mueve el cursor sobre el terreno y haz clic para colocarlo · Esc: cancelar';
+ $('interactionHelp').style.display='block';cursor.visible=false;
+ return true;
+}
+function updatePlacementAt(point){
+ if(!placementGhost)return;
+ if(!point){placementGhost.visible=false;return}
+ placementGhost.position.set(point.x,heightAt(point.x,point.z),point.z);
+ placementGhost.visible=true;
+}
+function setHoverNode(node,event){
+ const next=node?.id??null;
+ if(next!==hoveredNodeId){hoveredNodeId=next;updateHoverHighlight();}
+ const indicator=$('modelHoverIndicator');
+ if(node&&!marqueeStart){
+  const noun=node.kind==='prefab'?(prefabById(node.prefabId)?.name||'Modelo'):'Elemento';
+  indicator.textContent=(event.shiftKey&&node.kind==='prefab'?'↕ Escalar ':'✥ ')+noun+' · '+(event.shiftKey&&node.kind==='prefab'?'Shift + arrastrar':'Clic y arrastrar');
+  indicator.style.left=Math.min(event.clientX+18,Math.max(0,innerWidth-220))+'px';
+  indicator.style.top=Math.min(event.clientY+18,Math.max(0,innerHeight-42))+'px';
+  indicator.style.display='block';
+  view.style.cursor=event.shiftKey&&node.kind==='prefab'?'ns-resize':'grab';
+ }else{
+  indicator.style.display='none';view.style.cursor='crosshair';
+ }
+}
 function updateStatus(){
  const n=live.nodes.length;
  $('status').textContent=n+' elementos · '+(live.holes||[]).length+' celdas antiguas · '+(live.cuts3d||[]).filter(x=>x.op==='cut').length+' cortes 3D · '+live.nodes.filter(x=>x.kind==='prefab').length+' modelos GLB';
  const picked=live.nodes.find(x=>x.id===selectedId);
  $('selected').textContent=selectedIds.size>1?selectedIds.size+' elementos seleccionados':(picked?'ID '+picked.id+' · '+(picked.kind==='prefab'?prefabById(picked.prefabId)?.name||picked.prefabId:picked.kind):'Nada seleccionado');
  if(picked?.kind==='prefab'){
-  $('prefabType').value=picked.prefabId;
+  if(!armedPrefabId)$('prefabType').value=picked.prefabId;
   $('prefabX').value=picked.x;
   $('prefabZ').value=picked.z;
   $('prefabRotation').value=((picked.rotation||0)*180/Math.PI).toFixed(1);
@@ -200,7 +251,13 @@ function updateStatus(){
  }
  $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
 }
-function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));$('openPrefabGallery').classList.toggle('active',v==='prefab');updateStatus()}
+function setMode(v){
+ if(v!=='prefab'&&armedPrefabId)clearPlacement();
+ mode=v;pending=null;
+ document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));
+ $('openPrefabGallery').classList.toggle('active',v==='prefab');
+ updateStatus();
+}
 const tools={raise:1,lower:1,flatten:1,smooth:1,holePaint:1,holeErase:1};
 function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
@@ -254,9 +311,11 @@ if(dd<d){d=dd;best=n}}
  return;
 }
 if(mode==='prefab'){
- const prefabId=$('prefabType').value;
- if(!prefabById(prefabId)){toast('Elige uno de los cuatro modelos GLB');return}
+ const prefabId=armedPrefabId||$('prefabType').value;
+ if(!armedPrefabId||!prefabById(prefabId)){toast('Primero elige un modelo en la galería');return}
  addNode({kind:'prefab',prefabId,x,z,rotation:0,scale:1,offsetY:0});
+ clearPlacement();setMode('move');
+ $('prefabChosen').textContent='Modelo colocado · Selecciónalo y arrástralo, o abre la galería para colocar otro';
 }else if(['tree','wallspawn','spawn','exit','anchor'].includes(mode))addNode({kind:mode,x,z});
 }
 function resize(){
@@ -274,8 +333,9 @@ const prefabGallery=createPrefabGallery({
  library:prefabLibrary,
  root:$('prefabModal'),
  onPick:id=>{
-  $('prefabType').value=id;
-  $('prefabChosen').textContent='Modelo elegido: '+(prefabById(id)?.name||id)+' · Haz clic en el escenario para colocarlo';
+  setNodeSelection([]);
+  if(!armPlacement(id))return;
+  $('prefabChosen').textContent='Modelo elegido: '+(prefabById(id)?.name||id)+' · Sigue el cursor · Haz clic sobre el terreno para colocarlo';
   setMode('prefab');
  }
 });
