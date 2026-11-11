@@ -1,0 +1,31 @@
+name: Probar rescate de mapa recortado en Chrome
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/browser-cut-recovery.mjs'
+      - '.github/workflows/browser-cut-recovery.yml'
+      - 'editor.mjs'
+      - 'terrain-holes.mjs'
+      - 'adaptive-terrain-cuts.mjs'
+      - 'adaptive-model-cuts.mjs'
+      - 'index.html'
+  workflow_dispatch:
+jobs:
+  recover-cut-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check tests/browser-cut-recovery.mjs
+      - name: Servidor local WILDTRAP
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-cut-http.log 2>&1 &
+          sleep 2
+      - name: Probar Chrome con borrador recortado y recuperación
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-cut-recovery.mjs
