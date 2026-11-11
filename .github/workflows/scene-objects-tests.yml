@@ -36,9 +36,10 @@ jobs:
         env:
           WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
         run: node tests/browser-scene-object-manager.mjs
-      - name: Regresión de tres paneles y arranque
+      - name: Regresión de tres paneles, arranque y rescate de escenario
         env:
           WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
         run: |
           node tests/browser-workspace.mjs
           node tests/browser-startup.mjs
+          node tests/browser-cut-recovery.mjs
