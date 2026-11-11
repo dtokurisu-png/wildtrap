@@ -98,7 +98,8 @@ test('el cuchillo poligonal tiene prioridad sobre selección y arrastre de GLB',
  assert.ok(editor.includes("holesEditor.hoverAt(p,[e.clientX,e.clientY])"));
  assert.ok(!editor.includes('holesEditor.paint('),'El pincel de corte fue eliminado');
  assert.ok(editor.includes("getModelRoots:()=>"));
- assert.ok(editor.includes("mode==='holePaint'||!e.ctrlKey"),'Ctrl no selecciona GLB durante el corte');
+ assert.ok(editor.includes("mode==='holePaint'||mode==='meshEdit'||!e.ctrlKey"),
+   'Ctrl no debe seleccionar GLB al cortar ni al elegir vértices en Malla');
 });
 test('los cortes de GLB se guardan por instancia, sin modificar archivos originales',()=>{
  const cutter=fs.readFileSync(new URL('../terrain-holes.mjs',import.meta.url),'utf8');
