@@ -4,6 +4,7 @@ import {createPlaytest} from './playtest.mjs';
 import {createTerrainHoles} from './terrain-holes.mjs';
 import {createCavePieceObject} from './cave-pieces-three.mjs';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -22,6 +23,9 @@ const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrai
 const surface=new THREE.Group();scene.add(surface);
 const interiors=new THREE.Group();scene.add(interiors);
 const cavePiecesLayer=new THREE.Group();scene.add(cavePiecesLayer);
+const selectedHighlights=new THREE.Group();scene.add(selectedHighlights);
+const renderedNodes=new Map();
+let prefabLibrary=null;
 const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasicMaterial({color:0xffdd7a,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));cursor.rotation.x=-Math.PI/2;cursor.renderOrder=20;scene.add(cursor);
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
@@ -29,6 +33,7 @@ const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:
 let holesEditor=null;
 const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem('wildtrap-editor-draft-v1',JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
+const selectedIds=new Set();let marqueeStart=null,moveBases=null;
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
 const temp=new THREE.Vector3();
 const pos=(x,z)=>({x:clamp(x,-SIZE/2,SIZE/2),z:clamp(z,-SIZE/2,SIZE/2)});
@@ -123,9 +128,17 @@ shape('',new THREE.BoxGeometry(5,6,2.2),0x10131c,radius*.25,height+3.5,1.5,group
 function resolvePoint(p){const a=p?.anchorId&&live.nodes.find(n=>n.id===p.anchorId&&n.kind==='anchor');return a?{x:a.x,z:a.z}:{x:p.x,z:p.z}}
 function snapPoint(x,z){let near=null,best=10;for(const n of live.nodes){if(n.kind!=='anchor')continue;const d=Math.hypot(n.x-x,n.z-z);if(d<best){best=d;near=n}}return near?{x:near.x,z:near.z,anchorId:near.id}:{x,z}}
 function draw(){
-for(const collection of [surface,interiors,cavePiecesLayer])while(collection.children.length){const g=collection.children[0];collection.remove(g);g.traverse(m=>{m.geometry?.dispose();const mats=Array.isArray(m.material)?m.material:(m.material?[m.material]:[]);for(const mat of mats)mat?.dispose?.()})}
+renderedNodes.clear();
+for(const collection of [surface,interiors,cavePiecesLayer])while(collection.children.length){
+ const g=collection.children[0];collection.remove(g);
+ // GLB instances share their immutable geometry and materials with the cache.
+ if(g.userData.sharedAsset)continue;
+ g.traverse(m=>{m.geometry?.dispose();const mats=Array.isArray(m.material)?m.material:(m.material?[m.material]:[]);for(const mat of mats)mat?.dispose?.()});
+}
 for(const n of live.nodes){
-if(n.kind==='anchor')marker(n.x,n.z,colours.anchor,1.4);
+ const layers=[surface,interiors,cavePiecesLayer];
+ const before=layers.map(layer=>layer.children.length);
+ if(n.kind==='anchor')marker(n.x,n.z,colours.anchor,1.4);
 if(n.kind==='tree')marker(n.x,n.z,colours.tree,2.2);
 if(n.kind==='wallspawn')marker(n.x,n.z,colours.wall,2.2);
 if(n.kind==='spawn')marker(n.x,n.z,colours.spawn,3);
@@ -133,33 +146,60 @@ if(n.kind==='exit')marker(n.x,n.z,colours.exit,3);
 if(n.kind==='cave')caveModel(n);
 if(n.kind==='mountain')mountainModel(n);
 if(n.kind==='cavePiece')cavePiecesLayer.add(createCavePieceObject(n,heightAt));
+if(n.kind==='prefab'){const object=prefabLibrary?.instance(n,heightAt);if(object)cavePiecesLayer.add(object);}
 if(n.kind==='path')routeMesh(resolvePoint(n.a),resolvePoint(n.b),'path');
 if(n.kind==='stairs')stairMesh(resolvePoint(n.a),resolvePoint(n.b),n.rise||8);
 if(n.kind==='wall')wallMesh(resolvePoint(n.a),resolvePoint(n.b),n.height||12);
 if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
+ const roots=[];
+ for(let i=0;i<layers.length;i++)for(const root of layers[i].children.slice(before[i])){
+  root.userData.wildtrapNodeId=n.id;
+  roots.push(root);
+ }
+ renderedNodes.set(n.id,roots);
 }
-surface.visible=!$('underground').checked;terrain.visible=!$('underground').checked;interiors.visible=$('underground').checked;
-updateStatus();
+surface.visible=true;terrain.visible=true;interiors.visible=false;
+updateSelectionHighlights();updateStatus();
+}
+function updatePrefabLoadStatus(){
+ if(!prefabLibrary)return;
+ const entries=prefabLibrary.status();
+ const done=entries.filter(x=>x.state==='listo').length;
+ const errors=entries.filter(x=>x.state==='error');
+ $('prefabStatus').textContent=done+'/4 GLB cargados'+(errors.length?' · Error: '+errors.map(e=>e.name).join(', '):'');
+}
+function updateSelectionHighlights(){
+ for(const obj of [...selectedHighlights.children]){
+  selectedHighlights.remove(obj);obj.geometry?.dispose();obj.material?.dispose();
+ }
+ scene.updateMatrixWorld(true);
+ for(const id of selectedIds){
+  const roots=renderedNodes.get(id)||[];
+  const bounds=new THREE.Box3();
+  for(const root of roots)if(root.visible)bounds.expandByObject(root);
+  if(!bounds.isEmpty()){
+   const outline=new THREE.Box3Helper(bounds,0xffdb74);
+   outline.userData.editorOnly=true;
+   selectedHighlights.add(outline);
+  }
+ }
 }
 function updateStatus(){
-$('status').textContent=live.nodes.length+' elementos · '+(live.holes||[]).length+' celdas antiguas · '+(live.cuts3d||[]).filter(x=>x.op==='cut').length+' cortes 3D · '+live.nodes.filter(n=>n.kind==='cave').length+' cuevas · '+live.nodes.filter(n=>n.kind==='mountain').length+' montañas';
-const picked=live.nodes.find(n=>n.id===selectedId);
-$('selected').textContent=selectedId===null?'Nada seleccionado':('ID '+selectedId+' · '+(picked?.kind||''));
-if(picked){$('moduleHeight').value=picked.height||35;$('moduleRadius').value=picked.radius||33;$('moduleScale').value=picked.scale||1}
-if(picked?.kind==='cavePiece'){
- $('cavePieceType').value=picked.piece;
- $('pieceWidth').value=picked.width;
- $('pieceLength').value=picked.length;
- $('pieceHeight').value=picked.height;
- $('pieceThickness').value=picked.thickness;
- $('pieceRotation').value=(picked.rotation||0)*180/Math.PI;
- $('pieceOffsetY').value=picked.offsetY||0;
- $('pieceScale').value=picked.scale||1;
- $('pieceVertexInfo').textContent='Pieza #'+picked.id+' · deformaciones guardadas: '+Object.keys(picked.vertexEdits||{}).length+' vértices';
-}else $('pieceVertexInfo').textContent='Selecciona una pieza para modificarla';
-$('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
+ const n=live.nodes.length;
+ $('status').textContent=n+' elementos · '+(live.holes||[]).length+' celdas antiguas · '+(live.cuts3d||[]).filter(x=>x.op==='cut').length+' cortes 3D · '+live.nodes.filter(x=>x.kind==='prefab').length+' modelos GLB';
+ const picked=live.nodes.find(x=>x.id===selectedId);
+ $('selected').textContent=selectedIds.size>1?selectedIds.size+' elementos seleccionados':(picked?'ID '+picked.id+' · '+(picked.kind==='prefab'?prefabById(picked.prefabId)?.name||picked.prefabId:picked.kind):'Nada seleccionado');
+ if(picked?.kind==='prefab'){
+  $('prefabType').value=picked.prefabId;
+  $('prefabX').value=picked.x;
+  $('prefabZ').value=picked.z;
+  $('prefabRotation').value=((picked.rotation||0)*180/Math.PI).toFixed(1);
+  $('prefabOffsetY').value=picked.offsetY||0;
+  $('prefabScale').value=picked.scale||1;
+ }
+ $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
 }
-function setMode(v){mode=v;pending=null;if(v==='cavePiece')selectedId=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
+function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
 const tools={raise:1,lower:1,flatten:1,smooth:1,holePaint:1,holeErase:1};
 function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
@@ -175,7 +215,7 @@ if(mode==='smooth'){let v=0,num=0;for(let yy=Math.max(0,j-1);yy<=Math.min(N-1,j+
 }
 refreshTerrain();draw();persist();
 }
-function addNode(node){snapshot();const n={id:live.nextId++,...node};live.nodes.push(n);selectedId=n.id;draw();persist()}
+function addNode(node){snapshot();const n={id:live.nextId++,...node};live.nodes.push(n);selectedId=n.id;selectedIds.clear();selectedIds.add(n.id);draw();persist()}
 function convertCoords(event){
 const rect=view.getBoundingClientRect();
 mouse.x=((event.clientX-rect.left)/rect.width)*2-1;mouse.y=-((event.clientY-rect.top)/rect.height)*2+1;
@@ -198,22 +238,25 @@ let dd=Infinity;
 if(n.x!==undefined)dd=Math.hypot(x-n.x,z-n.z);
 else if(n.a&&n.b){const a=resolvePoint(n.a),b=resolvePoint(n.b),vx=b.x-a.x,vz=b.z-a.z,len=vx*vx+vz*vz;const t=len?clamp(((x-a.x)*vx+(z-a.z)*vz)/len,0,1):0;dd=Math.hypot(x-(a.x+vx*t),z-(a.z+vz*t))}
 if(dd<d){d=dd;best=n}}
- if(best&&d<16){if(mode==='delete'){snapshot();live.nodes=live.nodes.filter(n=>n.id!==best.id);selectedId=null;draw();persist()}else{selectedId=best.id;if(mode==='move'){snapshot();dragId=best.id;best._drag={x,z,start:structuredClone(best)}}draw()}}return;
+ if(best&&d<Math.max(16,best.kind==='prefab'?34:16)){
+  if(mode==='delete'){snapshot();live.nodes=live.nodes.filter(n=>n.id!==best.id);selectedIds.delete(best.id);selectedId=null;draw();persist()}
+  else{
+   if(!selectedIds.has(best.id)){selectedIds.clear();selectedIds.add(best.id)}
+   selectedId=best.id;
+   if(mode==='move'){
+    snapshot();dragId=best.id;
+    moveBases={x,z,nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>({id:n.id,original:structuredClone(n)}))};
+   }
+   draw();
+  }
+ }
+ return;
 }
-if(mode==='cavePiece'){
- const piece=$('cavePieceType').value;
- const options=pieceOptions(piece,{
-  width:Number($('pieceWidth').value),length:Number($('pieceLength').value),
-  height:Number($('pieceHeight').value),thickness:Number($('pieceThickness').value)
- });
- addNode({kind:'cavePiece',piece,x,z,
-  width:options.width,length:options.length,height:options.height,thickness:options.thickness,
-  rotation:Number($('pieceRotation').value)*Math.PI/180,offsetY:Number($('pieceOffsetY').value)||0,
-  scale:Math.max(.2,Math.min(5,Number($('pieceScale').value)||1)),vertexEdits:{}});
-}
-else if(mode==='mountain')addNode({kind:'mountain',x,z,radius:33,height:35,prefab:'mountain_spiral_v1',independentTerrain:true,caveDoor:{localX:8.25,localY:38.5,localZ:1.5}});
-else if(mode==='cave')addNode({kind:'cave',x,z,scale:1,prefab:'cave_room_v1',portal:{shape:'box',width:5,height:8,depth:3.6,transition:'layer-swap',outsideLayer:'terrain',insideLayer:'cave',interiorFloorY:-15},interior:{width:34,length:38,height:8}});
-else if(['tree','wallspawn','spawn','exit','anchor'].includes(mode))addNode({kind:mode,x,z});
+if(mode==='prefab'){
+ const prefabId=$('prefabType').value;
+ if(!prefabById(prefabId)){toast('Elige uno de los cuatro modelos GLB');return}
+ addNode({kind:'prefab',prefabId,x,z,rotation:0,scale:1,offsetY:0});
+}else if(['tree','wallspawn','spawn','exit','anchor'].includes(mode))addNode({kind:mode,x,z});
 }
 function resize(){
 const w=view.clientWidth,h=view.clientHeight;renderer.setSize(w,h,false);
