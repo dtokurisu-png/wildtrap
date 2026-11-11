@@ -501,6 +501,21 @@ try{
  }
 }catch(e){toast('No se pudo recuperar el proyecto local')}
 updateMaxHeightControl();refreshTerrain();draw();setMode('raise');
-if(!recoveredDraft)void restoreSavedBase(false);
+async function loadPublishedWorld(){
+ try{
+  const response=await fetch('./assets/terrain/wildtrap-world.json',{cache:'no-cache'});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  const world=await response.json();
+  if(world.size!==SIZE||world.resolution!==N||world.heights?.length!==COUNT||!Array.isArray(world.nodes))throw Error('Escenario publicado incompatible');
+  Object.assign(live,world);
+  live.holes=Array.isArray(world.holes)?world.holes:[];
+  live.cuts3d=Array.isArray(world.cuts3d)?world.cuts3d:[];
+  selectedIds.clear();selectedId=null;
+  updateMaxHeightControl();refreshTerrain();draw();persist();
+  toast('Escenario oficial cargado desde el repositorio');
+ }catch(err){console.warn('No se pudo cargar mapa oficial',err);void restoreSavedBase(false)}
+}
+$('loadPublished').onclick=()=>{if(confirm('¿Abrir el mapa publicado en GitHub? El proyecto local será reemplazado. Exporta JSON antes si necesitas conservarlo.')){snapshot();void loadPublishedWorld()}};
+if(!recoveredDraft)void loadPublishedWorld();
 function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();renderer.render(scene,preview.frame()||camera)}animate();
 window.__editorReady?.();
