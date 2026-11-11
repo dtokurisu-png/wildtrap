@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {PREFABS,prefabById} from '../prefab-library.mjs';
+import {PREFABS,prefabById} from '../prefab-catalog.mjs';
 
 const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const code=fs.readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
