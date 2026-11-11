@@ -9,10 +9,14 @@ on:
       - 'prefab-library.mjs'
       - 'prefab-gallery.mjs'
       - 'prefab-gestures.mjs'
+      - 'adaptive-model-cuts.mjs'
+      - 'adaptive-terrain-cuts.mjs'
+      - 'terrain-holes.mjs'
       - 'assets/terrain/wildtrap-world.json'
       - 'tests/editor-glb-integration.test.mjs'
       - 'tests/prefab-gallery.test.mjs'
       - 'tests/prefab-gestures.test.mjs'
+      - 'tests/adaptive-model-cuts.test.mjs'
       - '.github/workflows/editor-glb-tests.yml'
   workflow_dispatch:
 jobs:
@@ -28,7 +32,10 @@ jobs:
       - run: node --check prefab-library.mjs
       - run: node --check prefab-gallery.mjs
       - run: node --check prefab-gestures.mjs
+      - run: node --check adaptive-model-cuts.mjs
+      - run: node --check terrain-holes.mjs
       - run: node --check prefab-catalog.mjs
       - run: node --test tests/editor-glb-integration.test.mjs
       - run: node --test tests/prefab-gallery.test.mjs
       - run: node --test tests/prefab-gestures.test.mjs
+      - run: node --test tests/adaptive-model-cuts.test.mjs
