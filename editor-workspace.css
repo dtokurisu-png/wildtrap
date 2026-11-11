@@ -1,0 +1,141 @@
+/* WILDTRAP v0.9.9 — fase 1: espacio de trabajo acoplable.
+   Solo distribución e interfaz: no altera la geometría ni los datos del mundo. */
+:root{
+ --workspace-top:52px;--workspace-rail:58px;--workspace-dock:370px;
+ --workspace-bg:#101c1b;--workspace-panel:#162823;--workspace-line:#3a6256;
+ --workspace-accent:#00c9ae;
+}
+#workspaceTopbar{
+ position:fixed;z-index:7;left:0;right:0;top:0;height:var(--workspace-top);
+ display:flex;align-items:center;gap:12px;padding:0 12px 0 16px;
+ background:linear-gradient(180deg,#1b322b,#14251f);border-bottom:1px solid #477261;
+ box-shadow:0 3px 12px #0006;
+}
+.workspace-brand{display:flex;flex-direction:column;flex:none;min-width:170px;max-width:218px}
+.workspace-brand h1{font-size:14px;line-height:1.15;letter-spacing:.5px;white-space:nowrap}
+.workspace-brand small{display:block;max-width:218px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+.workspace-top-actions{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:thin;min-width:0}
+#workspaceTopbar button,#workspaceTopbar .fileBtn{flex:none;margin:0!important;white-space:nowrap;padding:7px 10px;font-size:11px;border-radius:6px}
+#workspaceTopbar #reset{border-color:#896352;color:#f3d0bd}
+#workspaceTopbar #undo{background:#26554a;border-color:#5bba9e}
+.workspace-top-separator{width:1px;height:22px;background:#3b6658;flex:none;margin:0 4px}
+#workspaceRail{
+ position:fixed;z-index:6;top:var(--workspace-top);left:0;bottom:0;width:var(--workspace-rail);
+ display:flex;align-items:center;flex-direction:column;gap:7px;padding:11px 6px;
+ background:#142921;border-right:1px solid #426956;
+}
+.workspace-tool{
+ flex:none;width:46px;min-height:49px;padding:6px 2px!important;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+ font-size:10px!important;border:1px solid transparent!important;border-radius:9px!important;
+ background:transparent!important;color:#b8dbce!important;
+}
+.workspace-tool .tool-symbol{font-size:22px;line-height:1.1;font-weight:500}
+.workspace-tool .tool-label{font-size:9px;line-height:1.15;letter-spacing:-.2px}
+.workspace-tool:hover,.workspace-tool:focus-visible{background:#2b5043!important;border-color:#538a71!important}
+.workspace-tool[aria-pressed="true"]{background:#246454!important;border-color:#90ecce!important;color:#f1fffa!important}
+.workspace-toolplay{margin-top:auto;background:#1c644f!important;border:1px solid #78dab2!important;min-height:46px}
+.workspace-toolplay .tool-symbol{font-size:24px}
+#side{
+ position:fixed;top:var(--workspace-top);right:0;bottom:0;left:auto;
+ width:var(--workspace-dock);height:calc(100vh - var(--workspace-top));
+ display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden;
+ border-left:1px solid #467563;border-right:0;background:var(--workspace-bg);
+ scrollbar-color:#476c5e transparent;z-index:5;
+}
+#viewport{
+ position:fixed;top:var(--workspace-top);left:var(--workspace-rail);
+ right:var(--workspace-dock);bottom:0;
+ width:calc(100% - var(--workspace-rail) - var(--workspace-dock));
+ height:calc(100% - var(--workspace-top));min-width:0;
+}
+#overlay{left:calc(var(--workspace-rail) + 12px);top:calc(var(--workspace-top) + 12px);z-index:4;max-width:min(370px,calc(100vw - var(--workspace-rail) - var(--workspace-dock) - 24px));font-size:11px}
+#toast{left:calc(var(--workspace-rail) + 12px);bottom:14px;max-width:calc(100vw - var(--workspace-rail) - var(--workspace-dock) - 24px);z-index:6}
+#interactionHelp{right:calc(var(--workspace-dock) + 12px);top:calc(var(--workspace-top) + 12px)}
+.workspace-dock-grip{
+ position:absolute;left:-1px;top:0;bottom:0;width:7px;z-index:7;
+ cursor:ew-resize;background:transparent;touch-action:none;
+}
+.workspace-dock-grip:hover,.workspace-dock-grip.dragging{background:#78cbaa55}
+.dock-pane{display:flex;flex-direction:column;flex:none;min-height:110px;min-width:0;overflow:hidden;background:#14261f}
+.dock-tabs{
+ display:flex;gap:3px;align-items:stretch;padding:5px 7px 0 8px;min-height:36px;
+ background:#10241e;border-bottom:1px solid #3a6256;overflow-x:auto;scrollbar-width:thin;
+}
+.dock-tab{
+ padding:6px 12px!important;margin:0!important;font-size:11px!important;min-width:0;
+ white-space:nowrap;border-radius:6px 6px 0 0!important;cursor:grab;
+ background:#223a31!important;border:1px solid #3f6658!important;border-bottom:0!important;
+ color:#b4d6c6!important;
+}
+.dock-tab.active{background:#315f4f!important;border-color:#7aceaf!important;color:#fff!important}
+.dock-tabs.drag-over{background:#275545}
+.dock-content{flex:1;min-height:0;position:relative;overflow:hidden}
+.dock-view{height:100%;overflow:auto;padding:10px 12px 18px;scrollbar-color:#497b66 transparent}
+.dock-view[hidden]{display:none!important}
+.dock-view h2{margin-top:3px;font-size:13px}
+.dock-view>section{padding:3px 0 9px}
+.dock-view section section{padding:8px;margin-top:8px}
+.dock-view .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.dock-view .grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.dock-view label{overflow-wrap:anywhere}
+.dock-view .fileBtn{display:block}
+.dock-splitter{
+ flex:0 0 7px;cursor:ns-resize;background:#0c1c17;border-top:1px solid #315343;
+ border-bottom:1px solid #3b5f51;touch-action:none;position:relative;
+}
+.dock-splitter:after{
+ content:"";position:absolute;left:calc(50% - 22px);top:2px;width:44px;height:2px;
+ border-top:1px dotted #7aa48e;border-bottom:1px dotted #7aa48e;
+}
+.dock-splitter:hover,.dock-splitter.dragging{background:#4d8f73}
+.workspace-section[hidden]{display:none!important}
+.workspace-section .hint{font-size:11px}
+.workspace-section #testPanel{padding:8px;margin-top:4px}
+.workspace-section #testPanel > h2{display:none}
+.workspace-section #testPanel .hint{margin-top:4px}
+.workspace-inline-note{font-size:11px;line-height:1.5;color:#b2d1c2;padding:9px 10px;background:#20392f;border:1px solid #385e4e;border-radius:8px}
+.workspace-empty{padding:12px;background:#20382f;border:1px dashed #5c8875;border-radius:9px;color:#b0d1be;font-size:12px;line-height:1.6}
+.workspace-empty strong{display:block;color:#e0fbea;margin-bottom:4px}
+#workspaceObjectProperties.is-empty .object-editor-fields{display:none}
+#workspaceObjectProperties .workspace-empty{display:none}
+#workspaceObjectProperties.is-empty .workspace-empty{display:block}
+#workspaceObjectProperties #selected{display:block;margin:5px 0;font-size:12px}
+#workspaceObjectProperties #cavePiecesPanel{display:none}
+.workspace-help{font-size:12px;line-height:1.55;color:#d0e8db}
+.workspace-help p{margin:8px 0}
+.workspace-help kbd{padding:1px 4px;background:#2a5241;border-radius:4px;border:1px solid #54856f;color:white}
+.workspace-toolbar-actions{display:flex;gap:5px;align-items:center}
+.workspace-flyout{
+ position:fixed;z-index:19;left:calc(var(--workspace-rail) + 4px);top:calc(var(--workspace-top) + 10px);
+ background:#172d26;border:1px solid #69a58b;border-radius:10px;box-shadow:0 10px 35px #000a;
+ padding:8px;min-width:164px;
+}
+.workspace-flyout[hidden]{display:none!important}
+.workspace-flyout button{display:block;text-align:left;width:100%;margin:2px 0}
+.dock-tab[draggable="true"]:active{cursor:grabbing}
+body.testing #workspaceTopbar,body.testing #workspaceRail,body.testing #side,body.testing .workspace-flyout{display:none!important}
+body.testing #viewport{left:0;right:0;top:0;width:100%;height:100%}
+body.testing #overlay{display:none!important}
+body.testing #toast{left:16px;max-width:calc(100vw - 32px)}
+@media(max-width:900px){
+ :root{--workspace-dock:295px;--workspace-rail:49px}
+ .workspace-tool{width:39px;min-height:44px}
+ #workspaceTopbar{gap:7px;padding-left:8px}
+ .workspace-brand{min-width:116px;max-width:155px}
+ .workspace-brand h1{font-size:12px}
+ #workspaceTopbar button,#workspaceTopbar .fileBtn{font-size:10px;padding:6px}
+}
+@media(max-width:590px){
+ :root{--workspace-top:46px;--workspace-dock:225px;--workspace-rail:43px}
+ .workspace-brand{min-width:88px;max-width:91px}
+ .workspace-brand h1{font-size:10px;letter-spacing:0}
+ .workspace-brand small{display:none}
+ .workspace-tool{width:34px;min-height:42px}
+ .workspace-tool .tool-symbol{font-size:19px}
+ .workspace-tool .tool-label{font-size:8px}
+ .dock-view{padding:8px}
+ .dock-view .grid2,.dock-view .grid{grid-template-columns:1fr}
+ .dock-tab{padding:5px 7px!important;font-size:10px!important}
+ #overlay{font-size:10px}
+}
