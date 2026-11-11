@@ -1,7 +1,7 @@
 name: Validar gestor de objetos de escena
 on:
   push:
-    branches: [main, feat/scene-object-manager-v0.9.10]
+    branches: [main]
     paths:
       - 'scene-object-catalog.mjs'
       - 'scene-object-manager.mjs'
