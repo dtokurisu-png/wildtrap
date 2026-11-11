@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {buildAdaptiveModel} from '../adaptive-model-cuts.mjs';
 import {prepareCutStamp,pointInStamp} from '../adaptive-terrain-cuts.mjs';
 
@@ -81,4 +82,30 @@ test('el cortador recibe coordenadas del modelo local, independiente de su posic
 test('sin intersección espacial, no reconstruye mallas lejanas',()=>{
  const stampFar={...stamp(),center:[900,0,0]};
  assert.equal(buildAdaptiveModel(plane(),[stampFar]),null);
+});
+
+test('Pintar corte 3D tiene prioridad sobre clic, selección y arrastre de modelos',()=>{
+ const editor=fs.readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
+ const selectionGuard=editor.indexOf("if(v==='holePaint'||v==='holeErase'){");
+ const modelPicking=editor.indexOf('const hovered=pickedNodeAt(e);',editor.indexOf("view.addEventListener('pointerdown',e=>{",editor.indexOf("function completeModelDrag")));
+ const paintBranch=editor.indexOf("if(mode==='holePaint'||mode==='holeErase'){",editor.indexOf("view.addEventListener('pointerdown',e=>{",editor.indexOf("function completeModelDrag")));
+ assert.ok(selectionGuard>=0);
+ assert.ok(editor.includes('selectedIds.clear();selectedId=null;'));
+ assert.ok(editor.includes("hoveredNodeId=null;updateHoverHighlight()"));
+ assert.ok(paintBranch>=0&&paintBranch<modelPicking,'Debe pintar ANTES de seleccionar el modelo');
+ assert.ok(editor.includes("holesEditor.paint(hit,mode==='holeErase')"));
+ assert.ok(editor.includes("getModelRoots:()=>"));
+ assert.ok(editor.includes("mode==='holePaint'||mode==='holeErase'||!e.ctrlKey"),'Ctrl debe ignorar selección en corte');
+});
+test('los cortes de GLB se guardan por instancia, sin modificar archivos originales',()=>{
+ const cutter=fs.readFileSync(new URL('../terrain-holes.mjs',import.meta.url),'utf8');
+ const loader=fs.readFileSync(new URL('../prefab-library.mjs',import.meta.url),'utf8');
+ assert.ok(cutter.includes('sourceGeometry=mesh.userData.wildtrapSourceGeometry||displayGeometry'));
+ assert.ok(cutter.includes('root.worldToLocal('));
+ assert.ok(cutter.includes('node.cuts3d.push(cutData)'));
+ assert.ok(cutter.includes('snapshot()'));
+ assert.ok(loader.includes('const rootCuts=Array.isArray(node.cuts3d)?node.cuts3d:[]'));
+ assert.ok(loader.includes('child.userData.wildtrapSourceGeometry=sourceGeometry'));
+ assert.ok(loader.includes('child.userData.wildtrapGeneratedCutGeometry=geometry'));
+ assert.ok(loader.includes('function disposeInstance(root)'));
 });
