@@ -167,3 +167,14 @@ Las miniaturas **no son imágenes genéricas**: `prefab-gallery.mjs` las renderi
 La galería se cierra con el botón de cerrar, Escape o clic fuera del panel; no modifica los GLB originales ni los datos del escenario hasta colocar un modelo. Las herramientas de terreno, cortes, selección múltiple, guardado y modo Probar quedan intactas.
 
 Pruebas: `node --test tests/prefab-gallery.test.mjs`, incluidas en el flujo de GitHub Actions del editor.
+
+
+## v0.9.4 — Pincel de corte 3D también sobre los GLB
+
+Las herramientas **Pintar corte 3D** y **Borrar trazo pendiente** entran en un modo de edición exclusivo que deshabilita temporalmente la selección, el movimiento y los gestos de escala/rotación de los modelos. El raycast compara la geometría original del terreno y las superficies originales de los GLB colocados, y elige la superficie 3D visible más cercana.
+
+**Cómo utilizar:** activa Pintar corte 3D, haz clic o arrastra por una pared de una cueva GLB o la montaña, revisa el contorno ámbar y pulsa **Crear agujero**. El recorte elimina únicamente las caras de la superficie tocadas por el prisma del pincel y añade vértices locales en el borde. Para reparar parte de la abertura, pinta esa región y pulsa **Restaurar región**. Los cortes del terreno continúan en `live.cuts3d`; los de modelos se guardan en `live.nodes[i].cuts3d`, expresados en coordenadas locales de su instancia, por lo que siguen al modelo cuando se mueve, rota o escala. El GLB fuente en `assets/terrain/` nunca se modifica; cada instancia se reconstruye a partir del original al restaurar, deshacer o importar un JSON.
+
+El núcleo [adaptive-model-cuts.mjs](adaptive-model-cuts.mjs) recorta triángulos con interpolación de UV/normales/colores y conserva los grupos de materiales. No altera la cuadrícula del terreno ni genera automáticamente paredes de espesor, interiores de cuevas o colisiones físicas completas de los GLB; se trata de **cortes reales de superficie**, no de un booleano volumétrico cerrado. Hay límites de 80 trazos por instancia para evitar crecimiento excesivo de la malla. Las mallas animadas/skinned no se recortan por este método.
+
+Verificación: [tests/adaptive-model-cuts.test.mjs](tests/adaptive-model-cuts.test.mjs) comprueba agujeros parciales, restauración, UV, grupos de materiales, geometrías indexadas/no indexadas y la prioridad del pincel frente a selección y arrastre.
