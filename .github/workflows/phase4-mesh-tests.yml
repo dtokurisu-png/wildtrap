@@ -1,0 +1,63 @@
+name: Validar edición de malla e Intangible · Fase 4
+on:
+  push:
+    branches: [main, feat/mesh-editor-intangible-v0.9.12]
+    paths:
+      - 'mesh-deform.mjs'
+      - 'mesh-vertex-editor.mjs'
+      - 'scene-object-catalog.mjs'
+      - 'scene-object-manager.mjs'
+      - 'prefab-library.mjs'
+      - 'prefab-gestures.mjs'
+      - 'playtest.mjs'
+      - 'editor.mjs'
+      - 'editor-workspace.js'
+      - 'editor-workspace.css'
+      - 'index.html'
+      - 'tests/mesh-deform.test.mjs'
+      - 'tests/browser-phase4-mesh.mjs'
+      - 'tests/phase4-mesh-smoke.html'
+      - 'tests/browser-workspace.mjs'
+      - '.github/workflows/phase4-mesh-tests.yml'
+  workflow_dispatch:
+jobs:
+  phase4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Revisar sintaxis
+        run: |
+          node --check editor.mjs
+          node --check mesh-deform.mjs
+          node --check mesh-vertex-editor.mjs
+          node --check prefab-library.mjs
+          node --check scene-object-manager.mjs
+          node --check editor-workspace.js
+          node --check playtest.mjs
+      - name: Probar geometría y restricciones XYZ
+        run: |
+          node --test tests/mesh-deform.test.mjs
+          node --test tests/scene-object-catalog.test.mjs
+          node --test tests/prefab-gallery.test.mjs
+          node --test tests/polygon-knife.test.mjs
+      - name: Servidor local para Chrome
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-phase4-http.log 2>&1 &
+          sleep 2
+      - name: Edición de malla real, intangibilidad y persistencia en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-phase4-mesh.mjs
+      - name: Regresión de fases previas, arranque y rescate
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-workspace.mjs
+          node tests/browser-scene-object-manager.mjs
+          node tests/browser-phase3-tool-controls.mjs
+          node tests/browser-startup.mjs
+          node tests/browser-cut-recovery.mjs
