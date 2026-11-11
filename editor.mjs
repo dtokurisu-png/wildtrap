@@ -943,6 +943,12 @@ $('anchorScaleY').addEventListener('change',e=>{
 $('applyPrefab').onclick=()=>{
  const targets=[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(n=>n?.kind==='prefab');
  if(!targets.length){toast('Selecciona un modelo GLB con Ctrl + clic');return}
+ const oldBottoms=new Map();
+ for(const n of targets){
+  if(n.anchorScaleY!==true)continue;
+  const root=(renderedNodes.get(n.id)||[]).find(x=>x.userData.sharedAsset);
+  if(root){const b=new THREE.Box3().setFromObject(root);if(!b.isEmpty())oldBottoms.set(n.id,b.min.y)}
+ }
  snapshot();
  const primary=targets.find(n=>n.id===selectedId)||targets[0];
  const dx=(Number($('prefabX').value)||0)-primary.x;
@@ -971,7 +977,18 @@ $('applyPrefab').onclick=()=>{
   n.offsetY=0;
   n.scale=clamp((n.scale||1)*scaleRatio,.05,15);
  }
- draw();persist();toast(targets.length+' modelo(s) actualizado(s)');
+ draw();
+ for(const n of targets){
+  if(!oldBottoms.has(n.id))continue;
+  const root=(renderedNodes.get(n.id)||[]).find(x=>x.userData.sharedAsset);
+  if(!root)continue;
+  const box=new THREE.Box3().setFromObject(root);
+  if(box.isEmpty())continue;
+  const delta=oldBottoms.get(n.id)-box.min.y;
+  if(Math.abs(delta)>.000001)n.scaleAnchorOffsetY=(Number(n.scaleAnchorOffsetY)||0)+delta;
+ }
+ if(oldBottoms.size)draw();
+ persist();toast(targets.length+' modelo(s) actualizado(s)');
 };
 $('duplicatePrefab').onclick=()=>{
  const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
