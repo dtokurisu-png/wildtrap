@@ -249,7 +249,8 @@ if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
   if(n.editorIntangible&&!testingScene&&n.kind!=='prefab'){
    root.traverse(child=>{
     if(!child.isMesh)return;
-    const fade=m=>{m.transparent=true;m.opacity=Math.min(.26,m.opacity??1);m.depthWrite=false;m.side=THREE.DoubleSide;return m};
+    const fade=m=>{m.transparent=true;m.opacity=Math.min(.26,m.opacity??1);m.depthWrite=false;m.depthTest=false;m.side=THREE.DoubleSide;return m};
+    child.renderOrder=12;
     child.material=Array.isArray(child.material)?child.material.map(fade):fade(child.material);
    });
   }
