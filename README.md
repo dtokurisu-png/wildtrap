@@ -200,3 +200,15 @@ Reorganización exclusivamente visual de WILDTRAP. El motor, la cámara inicial,
 - **Pendientes de Fases 3 y 4:** gesto Alt + clic derecho de pincel, Ctrl+Z contextual por punto, catálogo GLB integrado en el dock, visualización transparente de vértices, bloqueo de vértices, anclaje de base y restricciones de rotación XYZ.
 
 El módulo `editor-workspace.js` reorganiza los controles originales antes de que se importe `editor.mjs`; `editor-workspace.css` implementa la disposición. `tests/browser-workspace.mjs` valida el layout y los controles en Chrome. El modo Play oculta las barras para mantener la experiencia a pantalla completa, y el modo `?recover=1` conserva su panel de rescate.
+
+## v0.9.10 — Fase 2: gestor real de objetos y jerarquía
+
+La pestaña **Objetos** del dock derecho ahora enumera los objetos persistentes de `live.nodes`, con grupos desplegables por tipo: **Cuevas**, **Montañas**, **Piezas de cueva** y **Modelos colocados**. El gestor no muestra los elementos generados por lógica o solo marcadores: `tree`, `wallspawn`, `spawn`, `exit`, `anchor`, `path`, `wall`, `stairs` y `gate`. El contador corresponde únicamente a los modelos físicos de la escena; los cambios de colocación, duplicado, eliminación, importación, deshacer o reset se reflejan directamente.
+
+- **Seleccionar:** clic en una fila selecciona la misma instancia que un clic en el escenario y muestra su pestaña de propiedades; Ctrl+clic permite selección múltiple y Shift+clic selecciona un rango dentro del grupo.
+- **Visibilidad:** los iconos ◉/◌ de un modelo o de un grupo lo muestran u ocultan en el editor; los ocultos no se seleccionan desde el escenario. La operación es reversible con Deshacer. La fila especial **Escenario · Terreno** permite ocultar el relieve sin borrar sus alturas; el cuchillo deja de detectar la malla oculta, pero el modo Play puede volver a mostrarla temporalmente.
+- **Grupos manuales:** selecciona dos o más objetos y pulsa **Agrupar**, asigna un nombre; Desagrupar devuelve los objetos a sus tipos automáticos. Los nombres individuales pueden cambiarse con **Renombrar**. Los grupos creados permanecen en la jerarquía y se guardan con el escenario.
+- **Persistencia:** cada objeto puede tener los campos opcionales `name`, `editorHidden` y `groupId`; los grupos se guardan en `live.objectGroups`, y el ocultamiento del terreno en `live.settings.hideTerrainEditor`. Los mapas antiguos sin estos campos siguen cargando. Las operaciones usan el mismo `snapshot()`, `persist()` y Ctrl+Z del editor y se incluyen en el JSON exportado.
+- **Interfaz:** las tres áreas redimensionables de la Fase 1 no cambian. La pestaña **Jerarquía** ahora resume las categorías y grupos existentes, y la pestaña **Objetos** administra las instancias.
+
+Pruebas: `tests/scene-object-catalog.test.mjs` valida categorías y grupos sin Three.js; `tests/browser-scene-object-manager.mjs` comprueba en Chromium el listado de modelos, exclusión de spawns, selección múltiple, ojos de visibilidad (incluyendo terreno), deshacer, crear/deshacer grupos y renombrar. Las pruebas existentes de arranque, recuperación y espacio de trabajo siguen vigentes.
