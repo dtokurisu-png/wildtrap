@@ -31,7 +31,7 @@ export function createSceneObjectManager({
  for(const button of [groupButton,ungroupButton,renameButton]){
   button.type='button';actionBar.append(button);
  }
- const note=create('p','hint scene-manager-note','◉ Visible · ◌ Oculto · ◈ Intangible (transparente, sin selección ni corte). Los spawns no aparecen.');
+ const note=create('p','hint scene-manager-note','◉ Visible · ◌ Oculto · INT Intangible (transparente, sin selección ni corte). Los spawns no aparecen.');
  header.append(heading,actionBar,note);
  const terrainSection=create('section','scene-group scene-terrain-group');
  const terrainRow=create('div','scene-group-header');
@@ -131,7 +131,7 @@ export function createSceneObjectManager({
    eye.setAttribute('aria-label',eye.title);
    eye.addEventListener('click',()=>setVisibility(bucket.objects.map(obj=>obj.id),allHidden));
    const intangibleAll=bucket.objects.every(obj=>obj.intangible);
-   const ghost=create('button','scene-group-intangible',intangibleAll?'◈':'◇');
+   const ghost=create('button','scene-group-intangible','INT');
    ghost.type='button';ghost.dataset.groupIntangible=bucket.id;
    ghost.classList.toggle('is-intangible',intangibleAll);
    ghost.title=intangibleAll?'Volver tangibles todos los objetos del grupo':'Hacer intangibles todos los objetos del grupo';
@@ -159,7 +159,7 @@ export function createSceneObjectManager({
      visible.dataset.visibilityId=String(obj.id);
      visible.classList.toggle('is-hidden',obj.hidden);
      visible.addEventListener('click',()=>setVisibility([obj.id],obj.hidden));
-     const ghost=create('button','scene-object-intangible',obj.intangible?'◈':'◇');
+     const ghost=create('button','scene-object-intangible','INT');
      ghost.type='button';ghost.dataset.intangibleId=String(obj.id);
      ghost.classList.toggle('is-intangible',obj.intangible);
      ghost.setAttribute('aria-label',(obj.intangible?'Volver tangible ':'Hacer intangible ')+obj.label);
