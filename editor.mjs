@@ -374,23 +374,28 @@ function pickedNodeAt(e){
    if(node)return node;
   }
  }
- // Fallback for imported GLBs whose faces point away from the camera:
- // intersect the visible model's bounding box without changing GLB materials.
- let nearest=null,distance=Infinity;
- for(const [id,roots] of renderedNodes){
-  const node=live.nodes.find(n=>n.id===id);
-  if(node?.kind!=='prefab')continue;
-  for(const root of roots){
-   if(!root.visible)continue;
-   const bounds=new THREE.Box3().setFromObject(root);
-   if(bounds.isEmpty())continue;
-   const intersection=ray.ray.intersectBox(bounds,new THREE.Vector3());
-   if(!intersection)continue;
-   const d=ray.ray.origin.distanceTo(intersection);
-   if(d<distance){distance=d;nearest=node}
+ // Some imported GLBs have inward-facing normals. Test both sides only
+ // for picking, then restore shared materials. Never select an empty cave opening
+ // just because its bounding box contains the ray.
+ const originals=new Map();
+ cavePiecesLayer.traverse(obj=>{
+  if(!obj.isMesh)return;
+  for(const mat of (Array.isArray(obj.material)?obj.material:[obj.material])){
+   if(mat&&!originals.has(mat)){originals.set(mat,mat.side);mat.side=THREE.DoubleSide}
+  }
+ });
+ let doubleHits=[];
+ try{doubleHits=ray.intersectObjects(cavePiecesLayer.children,true)}
+ finally{for(const [mat,side] of originals)mat.side=side}
+ for(const hit of doubleHits){
+  let obj=hit.object;
+  while(obj&&!Number.isInteger(obj.userData?.wildtrapNodeId))obj=obj.parent;
+  if(obj){
+   const node=live.nodes.find(n=>n.id===obj.userData.wildtrapNodeId);
+   if(node)return node;
   }
  }
- return nearest;
+ return null;
 }
 function updateMarquee(x,y){
  if(!marqueeStart)return;
