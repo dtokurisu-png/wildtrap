@@ -1,7 +1,7 @@
 name: Validar edición de malla e Intangible · Fase 4
 on:
   push:
-    branches: [main, feat/mesh-editor-intangible-v0.9.12]
+    branches: [main]
     paths:
       - 'mesh-deform.mjs'
       - 'mesh-vertex-editor.mjs'
