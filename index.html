@@ -53,11 +53,11 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 #prefabDialog .modal-foot{margin-top:12px;font-size:12px;color:#bbd9ca}
 @media(max-width:560px){#prefabDialog{padding:11px}#prefabCards{grid-template-columns:1fr}.prefab-card img{aspect-ratio:2}#prefabModal{padding:7px}}
 </style>
-<link rel="stylesheet" href="./editor-workspace.css?v=0.9.10">
+<link rel="stylesheet" href="./editor-workspace.css?v=0.9.11">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.10 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.11 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -86,8 +86,9 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="grid">
 <button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Nivelar</button><button data-tool="smooth">Suavizar</button><button data-tool="move">Mover</button>
 </div>
-<label>Radio del pincel <input id="brushRadius" type="range" min="1" max="65" step=".5" value="12"></label>
-<label>Intensidad <input id="strength" type="range" min="1" max="30" value="12"></label>
+<label>Radio del pincel <output id="brushRadiusValue">12</output><input id="brushRadius" type="range" min="1" max="65" step=".5" value="12"></label>
+<label>Intensidad <output id="brushStrengthValue">12</output><input id="strength" type="range" min="1" max="30" value="12"></label>
+<p class="hint"><b>Alt + clic derecho + arrastrar:</b> derecha/izquierda modifica radio; arriba/abajo cambia intensidad. Sin pintar ni rotar la cámara.</p>
 <div class="grid2"><label>Altura de nivelación<input id="flatHeight" type="number" min="0" max="100" value="14"></label>
 <label>Altura máxima<input id="maxHeight" type="number" min="1" max="150" value="120"></label></div>
 </section>
@@ -123,7 +124,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <h2>Estructuras / Cuevas · Modelos GLB</h2>
 <p class="hint">Elige una estructura en la galería: aparecerá semitransparente siguiendo el cursor hasta que hagas clic en el terreno. Después puedes seleccionarla y arrastrarla directamente.</p>
 <input type="hidden" id="prefabType" value="mountain">
-<button id="openPrefabGallery" type="button" style="width:100%;font-weight:700">+ Colocar modelo GLB · Ver modelos</button>
+<button id="openPrefabGallery" type="button" style="width:100%;font-weight:700">▦ Mostrar catálogo de modelos</button>
 <small id="prefabChosen">Elige una estructura en la galería.</small>
 <small id="prefabStatus">Preparando los cuatro modelos…</small>
 <div class="grid2">
@@ -148,11 +149,10 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 <div class="hint">Clic: seleccionar · Arrastrar: mover X/Z · Shift + arrastrar: escalar · Alt + arrastrar: rotar · Cuevas: Alt + rueda antes de colocar, Alt + Shift + arrastrar para elevar/enterrar · Ctrl + clic: selección múltiple · Ctrl + clic derecho arrastrando: selección rectangular · Rueda: zoom · Botón derecho: orbitar · Ctrl+Z: deshacer · Esc: cancelar colocación.</div>
 </aside>
-<script src="./editor-workspace.js?v=0.9.9"></script>
 <canvas id="viewport"></canvas><div id="selectionMarquee"></div>
-<div id="prefabModal" hidden role="dialog" aria-modal="true" aria-labelledby="prefabGalleryTitle">
+<div id="prefabModal" hidden role="region" aria-labelledby="prefabGalleryTitle" data-inline-gallery="true">
  <div id="prefabDialog">
-  <div class="modal-head"><h2 id="prefabGalleryTitle">Estructuras / Cuevas · Galería 3D</h2><button type="button" id="closePrefabGallery" aria-label="Cerrar galería">✕ Cerrar</button></div>
+  <div class="modal-head"><h2 id="prefabGalleryTitle">Catálogo de estructuras GLB</h2><button type="button" id="closePrefabGallery" aria-label="Contraer catálogo">− Ocultar</button></div>
   <p class="hint">Estas vistas previas provienen de los cuatro archivos GLB del repositorio, no de imágenes inventadas. Selecciona el ángulo y después toca el modelo que quieras colocar.</p>
   <div class="modal-view-tabs" role="group" aria-label="Ángulo de vista previa">
    <button type="button" data-preview-view="iso" aria-pressed="true">Perspectiva 3D</button>
@@ -167,11 +167,13 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
    <button type="button" class="prefab-card" data-prefab-choice="stone-cave"><img data-prefab-preview="stone-cave" alt="Vista previa 3D de cueva de piedra"><strong>Cueva de piedra</strong><span data-prefab-message="stone-cave">Preparando vista previa…</span></button>
    <button type="button" class="prefab-card" data-prefab-choice="stylized-cave"><img data-prefab-preview="stylized-cave" alt="Vista previa 3D de cueva estilizada"><strong>Cueva estilizada</strong><span data-prefab-message="stylized-cave">Preparando vista previa…</span></button>
   </div>
-  <div class="modal-foot">Al seleccionar un modelo, se cierra esta ventana. Luego haz clic en el terreno para colocarlo; puedes abrir la galería otra vez para cambiar de modelo.</div>
+  <div class="modal-foot">Haz clic en una estructura para prepararla y después colócala sobre el escenario. Las vistas previas son de los GLB reales.</div>
  </div>
 </div>
+<script src="./editor-workspace.js?v=0.9.11"></script>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
 <div id="overlay"><b id="viewType">Vista cenital</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div></div>
+<div id="brushGestureHint" hidden aria-live="off"></div>
 <div id="toast"></div>
 <div id="playHud">
   <div id="playTop"><strong>WILDTRAP · Prueba de terreno</strong>
@@ -203,5 +205,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.10').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.11').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
