@@ -720,7 +720,9 @@ function beginModelDrag(e,node){
   nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>{
    const original=structuredClone(n);
    if(n.kind==='prefab'&&isFreeCave(n.prefabId))original.y=prefabWorldY(n,heightAt);
-   return {id:n.id,original};
+   const root=(renderedNodes.get(n.id)||[])[0];
+   const box=root?new THREE.Box3().setFromObject(root):null;
+   return {id:n.id,original,bottomY:box&&!box.isEmpty()?box.min.y:null};
   }),
   changed:false
  };
@@ -736,8 +738,8 @@ function updateMovedPrefabs(){
   if(n.kind!=='prefab'){hasNonPrefab=true;continue}
   for(const root of renderedNodes.get(id)||[]){
    if(!root.userData.sharedAsset)continue;
-   root.position.set(n.x,prefabWorldY(n,heightAt),n.z);
-   root.rotation.set(n.rotationX||0,n.rotation||0,0,'YXZ');
+   root.position.set(n.x,prefabWorldY(n,heightAt)+(Number(n.scaleAnchorOffsetY)||0),n.z);
+   root.rotation.set(n.rotationX||0,n.rotation||0,n.rotationZ||0,'YXZ');
    root.scale.setScalar(n.scale||1);
   }
  }
@@ -765,10 +767,10 @@ function moveModelDrag(e){
   for(const item of session.nodes){
    const n=live.nodes.find(x=>x.id===item.id);
    if(n?.kind!=='prefab')continue;
-   const result=rotateFromPointerDrag(item.original.rotation||0,item.original.rotationX||0,
-    session.startX,session.startY,e.clientX,e.clientY);
-   n.rotation=result.rotation;
-   n.rotationX=result.rotationX;
+   const rotation=constrainedRotation(
+    {x:item.original.rotationX||0,y:item.original.rotation||0,z:item.original.rotationZ||0},
+    e.clientX-session.startX,session.startY-e.clientY,n.rotationLocks||{});
+   n.rotation=rotation.y;n.rotationX=rotation.x;n.rotationZ=rotation.z;
   }
  }else{
   const p=convertCoords(e);
@@ -784,6 +786,22 @@ function moveModelDrag(e){
   }
  }
  updateMovedPrefabs();
+ if(session.action==='scale'){
+  for(const item of session.nodes){
+   const n=live.nodes.find(x=>x.id===item.id);
+   if(n?.kind!=='prefab'||n.anchorScaleY!==true||!Number.isFinite(item.bottomY))continue;
+   const root=(renderedNodes.get(n.id)||[]).find(x=>x.userData.sharedAsset);
+   if(!root)continue;
+   const box=new THREE.Box3().setFromObject(root);
+   if(box.isEmpty())continue;
+   const delta=item.bottomY-box.min.y;
+   if(Math.abs(delta)>.000001){
+    n.scaleAnchorOffsetY=(Number(n.scaleAnchorOffsetY)||0)+delta;
+    root.position.y+=delta;root.updateMatrixWorld(true);
+   }
+  }
+  updateSelectionHighlights();
+ }
  view.style.cursor=session.action==='height'||session.action==='scale'?'ns-resize':session.action==='rotate'?'crosshair':'grabbing';
  const current=live.nodes.find(x=>x.id===session.nodes[0]?.id);
  if(current)setHoverNode(current,e);
@@ -904,6 +922,19 @@ $('undo').onclick=()=>{
  refreshTerrain();draw();persist();
 };
 $('prefabType').addEventListener('change',()=>{if(mode==='prefab')updateStatus()});
+for(const btn of document.querySelectorAll('[data-rotation-lock]')){
+ btn.addEventListener('click',()=>{
+  const n=live.nodes.find(x=>x.id===selectedId&&x.kind==='prefab');
+  if(!n)return;
+  const axis=btn.dataset.rotationLock;
+  snapshot();n.rotationLocks={...n.rotationLocks,[axis]:n.rotationLocks?.[axis]!==true};
+  updateStatus();persist();
+ });
+}
+$('anchorScaleY').addEventListener('change',e=>{
+ const n=live.nodes.find(x=>x.id===selectedId&&x.kind==='prefab');if(!n)return;
+ snapshot();n.anchorScaleY=e.target.checked;updateStatus();persist();
+});
 $('applyPrefab').onclick=()=>{
  const targets=[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(n=>n?.kind==='prefab');
  if(!targets.length){toast('Selecciona un modelo GLB con Ctrl + clic');return}
@@ -913,6 +944,8 @@ $('applyPrefab').onclick=()=>{
  const dz=(Number($('prefabZ').value)||0)-primary.z;
  const rot=(Number($('prefabRotation').value)||0)*Math.PI/180;
  const rotX=(Number($('prefabRotationX').value)||0)*Math.PI/180;
+ const rotZ=(Number($('prefabRotationZ').value)||0)*Math.PI/180;
+ const rollDelta=rotZ-(primary.rotationZ||0);
  const rotationDelta=rot-(primary.rotation||0);
  const tiltDelta=rotX-(primary.rotationX||0);
  const inputY=Number($('prefabOffsetY').value);
@@ -927,6 +960,7 @@ $('applyPrefab').onclick=()=>{
   n.z=clamp(n.z+dz,-SIZE/2,SIZE/2);
   n.rotation=(n.rotation||0)+rotationDelta;
   n.rotationX=(n.rotationX||0)+tiltDelta;
+  n.rotationZ=(n.rotationZ||0)+rollDelta;
   if(isFreeCave(n.prefabId))n.y=worldY+heightDelta;
   else delete n.y; // Mountains and non-cave structures cannot float.
   n.offsetY=0;
