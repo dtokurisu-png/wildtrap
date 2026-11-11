@@ -1,0 +1,24 @@
+name: Comprobar inicio real en navegador
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/browser-startup.mjs'
+      - '.github/workflows/browser-startup.yml'
+      - 'editor.mjs'
+      - 'index.html'
+      - 'prefab-library.mjs'
+      - 'terrain-holes.mjs'
+      - 'adaptive-model-cuts.mjs'
+  workflow_dispatch:
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: command -v google-chrome || command -v chromium
+      - run: node tests/browser-startup.mjs
