@@ -4,7 +4,7 @@ const chrome=['google-chrome','google-chrome-stable','chromium'].find(cmd=>{
  const r=spawnSync('which',[cmd],{encoding:'utf8'});return r.status===0;
 });
 if(!chrome)throw Error('Chrome no está instalado en el runner de prueba.');
-const site='https://dtokurisu-png.github.io/wildtrap/';
+const site=process.env.WILDTRAP_SMOKE_URL||'https://dtokurisu-png.github.io/wildtrap/';
 for(const [mode,url] of [
  ['normal',site],
  ['seguro',site+'?safe=1']
