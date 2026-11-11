@@ -6,6 +6,7 @@ import {createCavePieceObject} from './cave-pieces-three.mjs';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs';
 import {createPrefabGallery} from './prefab-gallery.mjs';
+import {scaleFromVerticalDrag,translateNodeOnTerrain} from './prefab-gestures.mjs';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -503,10 +504,9 @@ function moveModelDrag(e){
  if(Math.hypot(e.clientX-session.startX,e.clientY-session.startY)<3&&!session.changed)return;
  if(!session.changed){snapshot();session.changed=true;}
  if(session.action==='scale'){
-  const multiplier=Math.exp((session.startY-e.clientY)*.008);
   for(const item of session.nodes){
    const n=live.nodes.find(x=>x.id===item.id);
-   if(n?.kind==='prefab')n.scale=clamp((item.original.scale||1)*multiplier,.05,15);
+   if(n?.kind==='prefab')n.scale=scaleFromVerticalDrag(item.original.scale||1,session.startY,e.clientY);
   }
  }else{
   const p=convertCoords(e);
@@ -515,13 +515,7 @@ function moveModelDrag(e){
   for(const item of session.nodes){
    const n=live.nodes.find(x=>x.id===item.id),orig=item.original;
    if(!n)continue;
-   if(orig.a&&orig.b){
-    n.a={x:orig.a.x+dx,z:orig.a.z+dz};
-    n.b={x:orig.b.x+dx,z:orig.b.z+dz};
-   }else if(orig.x!==undefined){
-    n.x=clamp(orig.x+dx,-SIZE/2+1,SIZE/2-1);
-    n.z=clamp(orig.z+dz,-SIZE/2+1,SIZE/2-1);
-   }
+   Object.assign(n,translateNodeOnTerrain(orig,dx,dz,SIZE));
   }
  }
  updateMovedPrefabs();
