@@ -105,5 +105,7 @@ try{
 }finally{
  try{ws?.close()}catch(_){}
  try{proc.kill('SIGTERM')}catch(_){}
- rmSync(dir,{force:true,recursive:true});
+ await delay(250);
+ try{rmSync(dir,{force:true,recursive:true,maxRetries:8,retryDelay:250})}
+ catch(error){console.warn('Directorio temporal de Chrome pendiente de limpiar:',error.message)}
 }
