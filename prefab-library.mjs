@@ -4,7 +4,7 @@ import {buildAdaptiveModel} from './adaptive-model-cuts.mjs?v=0.9.6';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
-import {PREFABS,prefabById} from './prefab-catalog.mjs?v=0.9.6';
+import {PREFABS,prefabById,isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 export {PREFABS,prefabById};
 export function createPrefabLibrary(onChange=()=>{}){
  const loader=new GLTFLoader();
@@ -44,7 +44,7 @@ export function createPrefabLibrary(onChange=()=>{}){
   model.position.x-=ctr.x;model.position.y-=box.min.y;model.position.z-=ctr.z;
   model.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;}});
   root.add(model);
-  root.position.set(node.x,heightAt(node.x,node.z)+(Number(node.offsetY)||0),node.z);
+  root.position.set(node.x,prefabWorldY(node,heightAt),node.z);
   // YXZ: horizontal yaw around world Y and vertical tilt around local X.
   root.rotation.set(Number(node.rotationX)||0,Number(node.rotation)||0,0,'YXZ');
   root.scale.setScalar(Math.max(.01,Number(node.scale)||1));
@@ -113,6 +113,9 @@ export function createPrefabLibrary(onChange=()=>{}){
     m.transparent=true;
     m.opacity=Math.max(.08,Math.min(.55,(material.opacity??1)*.48));
     m.depthWrite=false;
+    // Preview caves even when partly inside the terrain; the placed model
+    // retains its normal depth-testing and intersection behaviour.
+    if(isFreeCave(id))m.depthTest=false;
     m.side=THREE.DoubleSide;
     return m;
    };
@@ -121,6 +124,7 @@ export function createPrefabLibrary(onChange=()=>{}){
    child.receiveShadow=false;
    child.raycast=()=>{}; // Ghost can NEVER be selected by the model raycaster.
   });
+  if(isFreeCave(id))model.renderOrder=25;
   model.visible=false;
   return model;
  }
