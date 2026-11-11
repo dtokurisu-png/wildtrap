@@ -3,7 +3,7 @@ import {objectTree,sceneObjectCount,categoryForNode} from './scene-object-catalo
 // Editor-only outliner. This component NEVER mutates live world data directly:
 // its host callbacks use the normal snapshot / draw / persist pipeline.
 export function createSceneObjectManager({
- root,hierarchyRoot,getNodes,getGroups,getSelection,lookup,select,setVisibility,group,ungroup,rename,
+ root,hierarchyRoot,getNodes,getGroups,getSelection,lookup,select,setVisibility,setIntangible=()=>{},group,ungroup,rename,
  terrainIsVisible=()=>true,setTerrainVisibility=()=>{}
 }){
  if(!root||!hierarchyRoot)throw new Error('No se encontraron las ventanas Objetos y Jerarquía');
@@ -31,7 +31,7 @@ export function createSceneObjectManager({
  for(const button of [groupButton,ungroupButton,renameButton]){
   button.type='button';actionBar.append(button);
  }
- const note=create('p','hint scene-manager-note','Solo modelos colocados: spawns y marcadores lógicos no aparecen.');
+ const note=create('p','hint scene-manager-note','◉ Visible · ◌ Oculto · ◈ Intangible (transparente, sin selección ni corte). Los spawns no aparecen.');
  header.append(heading,actionBar,note);
  const terrainSection=create('section','scene-group scene-terrain-group');
  const terrainRow=create('div','scene-group-header');
@@ -130,7 +130,15 @@ export function createSceneObjectManager({
    eye.title=allHidden?'Mostrar todos los objetos del grupo':'Ocultar todos los objetos del grupo';
    eye.setAttribute('aria-label',eye.title);
    eye.addEventListener('click',()=>setVisibility(bucket.objects.map(obj=>obj.id),allHidden));
-   heading.append(expand,eye);section.append(heading);
+   const intangibleAll=bucket.objects.every(obj=>obj.intangible);
+   const ghost=create('button','scene-group-intangible',intangibleAll?'◈':'◇');
+   ghost.type='button';ghost.dataset.groupIntangible=bucket.id;
+   ghost.classList.toggle('is-intangible',intangibleAll);
+   ghost.title=intangibleAll?'Volver tangibles todos los objetos del grupo':'Hacer intangibles todos los objetos del grupo';
+   ghost.setAttribute('aria-label',ghost.title);
+   ghost.setAttribute('aria-pressed',String(intangibleAll));
+   ghost.addEventListener('click',()=>setIntangible(bucket.objects.map(obj=>obj.id),!intangibleAll));
+   heading.append(expand,eye,ghost);section.append(heading);
    if(!collapsed[bucket.id]){
     const list=create('div','scene-group-items');
     for(const obj of bucket.objects){
@@ -151,7 +159,14 @@ export function createSceneObjectManager({
      visible.dataset.visibilityId=String(obj.id);
      visible.classList.toggle('is-hidden',obj.hidden);
      visible.addEventListener('click',()=>setVisibility([obj.id],obj.hidden));
-     item.append(pick,visible);list.append(item);
+     const ghost=create('button','scene-object-intangible',obj.intangible?'◈':'◇');
+     ghost.type='button';ghost.dataset.intangibleId=String(obj.id);
+     ghost.classList.toggle('is-intangible',obj.intangible);
+     ghost.setAttribute('aria-label',(obj.intangible?'Volver tangible ':'Hacer intangible ')+obj.label);
+     ghost.title=(obj.intangible?'Volver tangible ':'Intangible: mostrar transparente e ignorar herramientas en ')+obj.label;
+     ghost.setAttribute('aria-pressed',String(obj.intangible));
+     ghost.addEventListener('click',()=>setIntangible([obj.id],!obj.intangible));
+     item.append(pick,visible,ghost);list.append(item);
     }
     section.append(list);
    }
