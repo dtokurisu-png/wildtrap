@@ -4,6 +4,9 @@
 import {prepareCutStamp,overlapsTriangle} from './adaptive-terrain-cuts.mjs?v=0.9.5';
 
 const EPS=1e-7;
+const MAX_STAMPS_PER_MESH=48,MAX_FRAGMENTS_PER_TRIANGLE=60;
+const MAX_OUTPUT_TRIANGLES=140000;
+
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vecDist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 const lerp=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
@@ -85,13 +88,14 @@ export function buildAdaptiveModel(base,rawStamps=[],transformPoint=identity){
   const v=transformPoint([p[i*3],p[i*3+1],p[i*3+2]]);
   for(let k=0;k<3;k++){meshMin[k]=Math.min(meshMin[k],v[k]);meshMax[k]=Math.max(meshMax[k],v[k]);}
  }
- const affecting=stamps.filter(s=>intersectBounds(s,meshMin,meshMax));
+ // Keep latest edits when legacy scenes contain hundreds of overlapping stamps.
+ const affecting=stamps.filter(s=>intersectBounds(s,meshMin,meshMax)).slice(-MAX_STAMPS_PER_MESH);
  if(!affecting.length)return null;
  const output=Object.fromEntries(names.map(k=>[k,Array.from(attrs[k].array)]));
  const indices=base.indices||Array.from({length:vertexCount},(_,i)=>i);
  const groups=base.groups?.length?base.groups:[{start:0,count:indices.length,materialIndex:0}];
  const outputIndices=[],outputGroups=[];
- let touched=0,newTriangles=0;
+ let touched=0,newTriangles=0,limitedTriangles=0,limitedFragments=0;
  function makeVertex(id,worldPoint){
   const values=Object.fromEntries(names.map(k=>[k,getAttr(k,id)]));
   return {p:worldPoint,values,id};
@@ -118,6 +122,9 @@ export function buildAdaptiveModel(base,rawStamps=[],transformPoint=identity){
   const end=Math.min(indices.length,group.start+group.count);
   for(let offset=group.start;offset+2<end;offset+=3){
    const a=indices[offset],b=indices[offset+1],c=indices[offset+2];
+   if(outputIndices.length/3>=MAX_OUTPUT_TRIANGLES){
+    outputIndices.push(a,b,c);limitedTriangles++;continue;
+   }
    // Most triangles are untouched: do not allocate per-vertex attributes for
    // them, particularly important for Tripo GLBs with tens of thousands of faces.
    const pa=worldVertex(a),pb=worldVertex(b),pc=worldVertex(c);
@@ -127,6 +134,7 @@ export function buildAdaptiveModel(base,rawStamps=[],transformPoint=identity){
    touched++;
    let fragments=[{poly:[va,vb,vc],removed:false}];
    for(const stamp of relevant){
+    if(fragments.length>MAX_FRAGMENTS_PER_TRIANGLE){limitedFragments++;break;}
     const next=[];
     for(const frag of fragments){
      const pieces=subtract(frag.poly,stamp,names);
@@ -144,5 +152,6 @@ export function buildAdaptiveModel(base,rawStamps=[],transformPoint=identity){
  return {attributes:Object.fromEntries(names.map(k=>[k,{array:output[k],itemSize:attrs[k].itemSize,normalized:!!attrs[k].normalized}])),
   indices:outputIndices,groups:outputGroups,
   stats:{originalTriangles:Math.floor(indices.length/3),finalTriangles:outputIndices.length/3,
-   generatedVertices:output.position.length/3-vertexCount,touchedTriangles:touched,generatedTriangles:newTriangles}};
+   generatedVertices:output.position.length/3-vertexCount,touchedTriangles:touched,generatedTriangles:newTriangles,
+   limitedTriangles,limitedFragments}};
 }
