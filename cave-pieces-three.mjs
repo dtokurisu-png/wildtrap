@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {createCavePieceData,verifyCavePieceData,deformCavePieceData,pieceOptions} from './cave-pieces.mjs';
+import {createCavePieceData,verifyCavePieceData,deformCavePieceData,pieceOptions} from './cave-pieces.mjs?v=0.9.5';
 
 // Converts the phase-1 editable data structure into an independent scene object.
 // No DoubleSide: inner and outer faces have their own triangles and UVs.
