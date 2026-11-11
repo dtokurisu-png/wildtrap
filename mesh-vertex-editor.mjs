@@ -95,7 +95,10 @@ export function createMeshVertexEditor({
    if(!mesh.isMesh||mesh.isSkinnedMesh||!mesh.geometry?.getAttribute('position'))return;
    const key=mesh.userData.wildtrapMeshKey;
    if(key===undefined)return;
-   const position=mesh.geometry.getAttribute('position');
+   // A cut GLB has newly triangulated indices. Edit its uncut source buffer,
+   // which preserves stable vertex IDs for saved locks and future cut rebuilds.
+   const original=mesh.userData.wildtrapSourceGeometry||mesh.geometry;
+   const position=original.getAttribute('position');
    const count=position.count;
    const left=maxPoints-painted;
    if(left<=0)return;
@@ -125,7 +128,7 @@ export function createMeshVertexEditor({
    cloud.userData.editorOnly=true;cloud.renderOrder=62;cloud.frustumCulled=false;
    mesh.add(cloud);disposables.push({object:cloud,geometry:cloudGeo,material:cloudMat,sampleRefs});
    if(count<=11000){
-    const wireGeo=new THREE.WireframeGeometry(mesh.geometry);
+    const wireGeo=new THREE.WireframeGeometry(original);
     const wireMat=new THREE.LineBasicMaterial({color:0x39ffd0,transparent:true,opacity:.25,
      depthTest:false,depthWrite:false});
     const lines=new THREE.LineSegments(wireGeo,wireMat);
@@ -253,7 +256,7 @@ export function createMeshVertexEditor({
   const invRoot=root.matrixWorld.clone().invert();
   root.traverse(mesh=>{
    if(!mesh.isMesh||mesh.isSkinnedMesh||mesh.userData.wildtrapMeshKey===undefined)return;
-   const pos=mesh.geometry?.getAttribute('position');
+   const pos=(mesh.userData.wildtrapSourceGeometry||mesh.geometry)?.getAttribute('position');
    if(!pos)return;
    const tr=invRoot.clone().multiply(mesh.matrixWorld);
    const v=new THREE.Vector3();
@@ -278,7 +281,7 @@ export function createMeshVertexEditor({
  }
  $('meshLockVertices').addEventListener('click',()=>mutateLocks(true));
  $('meshUnlockVertices').addEventListener('click',()=>mutateLocks(false));
- $('meshSelectAll').addEventListener('click',()=>selectChanged(samples.map(s=>s.id)));
+ $('meshSelectAll').addEventListener('click',()=>selectChanged([...vertexBuckets.values()].flat()));
  $('meshDeselect').addEventListener('click',()=>selectChanged([]));
  $('meshScaleApply').addEventListener('click',applyScale);
  $('meshResetDeform').addEventListener('click',resetDeformation);
