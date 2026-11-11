@@ -6,6 +6,7 @@ on:
       - 'editor.mjs'
       - 'index.html'
       - 'prefab-catalog.mjs'
+      - 'tests/cave-free-placement.test.mjs'
       - 'prefab-library.mjs'
       - 'prefab-gallery.mjs'
       - 'prefab-gestures.mjs'
@@ -41,3 +42,4 @@ jobs:
       - run: node --test tests/prefab-gestures.test.mjs
       - run: node --test tests/adaptive-model-cuts.test.mjs
       - run: node --test tests/cut-stress.test.mjs
+      - run: node --test tests/cave-free-placement.test.mjs
