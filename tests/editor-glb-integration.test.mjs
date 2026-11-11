@@ -36,7 +36,8 @@ test('selección rápida y múltiple, herramientas del terreno y GLB',()=>{
  assert.ok(code.includes("mode==='move'"));
  assert.ok(code.includes("mode==='holePaint'"));
  assert.ok(code.includes("function brush(x,z)"));
- assert.ok(code.includes("prefabLibrary?.instance(n,heightAt"));
+ assert.ok(code.includes("prefabLibrary?.instance(appearance,heightAt"),
+  'El editor debe crear instancias independientes, con INT solo como apariencia del editor');
  assert.ok(html.includes('id="selectionMarquee"'));
  assert.ok(html.includes('id="applyPrefab"'));
  assert.ok(html.includes('id="duplicatePrefab"'));
