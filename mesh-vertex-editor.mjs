@@ -67,12 +67,13 @@ export function createMeshVertexEditor({
  }
  function refreshColors(){
   const node=getSelectedNode(),locks=normalizedLocks(node?.vertexLocks);
+  const lockedSets=new Map(Object.entries(locks).map(([k,v])=>[k,new Set(v)]));
   for(const {geometry,sampleRefs} of disposables.filter(x=>x.sampleRefs)){
    const colors=geometry.getAttribute('color');
    for(const item of sampleRefs){
     const key=pointKey(item.key,item.index);
     const picked=selected.has(key);
-    const locked=(locks[item.key]||[]).includes(item.index);
+    const locked=lockedSets.get(item.key)?.has(item.index)===true;
     colors.setXYZ(item.paintIndex,...(picked?[1,.82,.24]:locked?[1,.3,.38]:[.1,1,.86]));
    }
    colors.needsUpdate=true;
@@ -222,17 +223,19 @@ export function createMeshVertexEditor({
   const node=getSelectedNode();
   if(!active||!node||node.kind!=='prefab'||!selected.size)return;
   const current=normalizedLocks(node.vertexLocks);
+  const buckets=new Map(Object.entries(current).map(([k,ids])=>[k,new Set(ids)]));
   let changed=false;
-  for(const key of selected){
-   const sep=key.lastIndexOf(':'),part=key.slice(0,sep),idx=Number(key.slice(sep+1));
+  for(const token of selected){
+   const sep=token.lastIndexOf(':'),part=token.slice(0,sep),idx=Number(token.slice(sep+1));
    if(!Number.isInteger(idx))continue;
-   const ids=new Set(current[part]||[]);
+   const ids=buckets.get(part)||new Set();
    if(ids.has(idx)!==locked){changed=true;if(locked)ids.add(idx);else ids.delete(idx)}
-   if(ids.size)current[part]=[...ids].sort((a,b)=>a-b);
-   else delete current[part];
+   buckets.set(part,ids);
   }
   if(!changed)return;
-  snapshot();node.vertexLocks=current;persist();refreshColors();
+  const updated={};
+  for(const [key,ids] of buckets)if(ids.size)updated[key]=[...ids].sort((a,b)=>a-b);
+  snapshot();node.vertexLocks=updated;persist();refreshColors();
  }
  function applyScale(){
   const target=getTarget();
