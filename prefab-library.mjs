@@ -24,7 +24,7 @@ export function createPrefabLibrary(onChange=()=>{}){
     .finally(()=>pending.delete(id));
   pending.set(id,promise);return promise;
  }
- function instance(node,heightAt){
+ function instance(node,heightAt,{applyCuts=true}={}){
   const entry=prefabById(node.prefabId);
   if(!entry)return null;
   const source=cache.get(entry.id);
@@ -50,7 +50,7 @@ export function createPrefabLibrary(onChange=()=>{}){
   root.scale.setScalar(Math.max(.01,Number(node.scale)||1));
   // Cut against the untouched GLB mesh and keep its original geometry for
   // future restoration and picking inside an already-open aperture.
-  const rootCuts=Array.isArray(node.cuts3d)?node.cuts3d:[];
+  const rootCuts=applyCuts&&Array.isArray(node.cuts3d)?node.cuts3d:[];
   if(rootCuts.length){
    root.updateMatrixWorld(true);
    const inverseRoot=root.matrixWorld.clone().invert();
