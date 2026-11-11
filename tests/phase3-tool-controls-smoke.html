@@ -1,0 +1,108 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP fase 3</title></head>
+<body data-result="PENDING"><div id="result">Preparando prueba</div>
+<script>
+(async()=>{
+ const output=document.getElementById('result');
+ function fail(stage,error){document.body.dataset.result='FAIL';output.textContent='FAIL '+stage+': '+error.message}
+ function assert(ok,msg){if(!ok)throw Error(msg)}
+ try{
+  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify({
+   version:3,size:630,resolution:129,heights:Array(129*129).fill(0),
+   nodes:[{id:901,kind:'cave',x:30,z:20,radius:18},{id:902,kind:'mountain',x:80,z:0,radius:20}],
+   objectGroups:[],holes:[],cuts3d:[],nextId:903,settings:{heightMax:120}
+  }));
+  const frame=document.createElement('iframe');frame.width=1440;frame.height=900;
+  frame.src='../?safe=1';document.body.append(frame);
+  const started=Date.now();let checking=false;
+  const timer=setInterval(async()=>{
+   if(document.body.dataset.result!=='PENDING'){clearInterval(timer);return}
+   const d=frame.contentDocument,w=frame.contentWindow;
+   if(!d?.querySelector('#boot[hidden]')||!w.__workspaceLayout||!d.getElementById('viewport')||
+     !d.querySelector('[data-object-id="901"]')){
+    if(Date.now()-started>22000){clearInterval(timer);fail('arranque',Error('No cargó el editor'))}
+    return;
+   }
+   if(checking)return;checking=true;clearInterval(timer);
+   let stage='estructura';
+   try{
+    const view=d.getElementById('viewport'),rect=view.getBoundingClientRect();
+    const clientX=rect.left+rect.width*.55,clientY=rect.top+rect.height*.53;
+    const pointer=(type,x,y,options={})=>view.dispatchEvent(new w.PointerEvent(type,{
+     bubbles:true,cancelable:true,composed:true,pointerId:71,pointerType:'mouse',
+     button:options.button??0,buttons:options.buttons??(type==='pointerup'?0:1),
+     clientX:x,clientY:y,altKey:!!options.altKey,ctrlKey:!!options.ctrlKey
+    }));
+    const ctrlZ=()=>d.body.dispatchEvent(new w.KeyboardEvent('keydown',{
+     bubbles:true,cancelable:true,key:'z',ctrlKey:true
+    }));
+    const workspace=key=>d.querySelector('[data-workspace="'+key+'"]').click();
+    stage='galería en propiedades';
+    workspace('structures');
+    assert(d.querySelector('#prefabModal').closest('#side'),'Catálogo GLB fuera del dock');
+    assert(!d.getElementById('prefabModal').hidden,'Catálogo no se abrió con Estructuras');
+    assert(d.getElementById('prefabModal').getAttribute('role')==='region','Sigue siendo modal');
+    assert(!d.getElementById('prefabModal').hasAttribute('aria-modal'),'El catálogo bloquea la escena');
+    assert(d.querySelectorAll('[data-preview-view]').length===5,'Faltan vistas GLB');
+    assert(d.querySelectorAll('[data-prefab-choice]').length===4,'Faltan los cuatro GLB');
+    assert(d.getElementById('viewport').getBoundingClientRect().width>300,'Catálogo ocultó la escena');
+    d.querySelector('[data-preview-view="side"]').click();
+    assert(d.querySelector('[data-preview-view="side"]').getAttribute('aria-pressed')==='true','No seleccionó vista lateral');
+    workspace('project');
+    assert(d.getElementById('prefabModal').hidden,'No se contrajo el catálogo al cambiar herramienta');
+    stage='Alt+clic derecho';
+    workspace('sculpt');
+    const radius=d.getElementById('brushRadius'),strength=d.getElementById('strength');
+    radius.value='12';strength.value='12';
+    const before=d.getElementById('status').textContent;
+    pointer('pointerdown',clientX,clientY,{button:2,buttons:2,altKey:true});
+    pointer('pointermove',clientX+72,clientY-50,{button:2,buttons:2,altKey:true});
+    assert(Number(radius.value)>12,'Arrastrar derecha no aumenta radio');
+    assert(Number(strength.value)>12,'Arrastrar arriba no aumenta intensidad');
+    assert(!d.getElementById('brushGestureHint').hidden,'No aparece el indicador flotante');
+    pointer('pointermove',clientX-120,clientY+100,{button:2,buttons:2,altKey:true});
+    assert(Number(radius.value)<12,'Arrastrar izquierda no disminuye radio');
+    assert(Number(strength.value)<12,'Arrastrar abajo no disminuye intensidad');
+    pointer('pointerup',clientX-120,clientY+100,{button:2,buttons:0,altKey:true});
+    assert(d.getElementById('brushGestureHint').hidden,'Indicador no desaparece al soltar');
+    assert(d.getElementById('status').textContent===before,'Alt+clic derecho alteró la escena');
+    stage='cuchillo y Ctrl+Z';
+    workspace('knife');
+    function click(x,y){
+     pointer('pointerdown',x,y,{button:0,buttons:1});
+     pointer('pointerup',x,y,{button:0,buttons:0});
+    }
+    click(clientX-65,clientY-36);
+    click(clientX+64,clientY-36);
+    click(clientX+50,clientY+54);
+    assert(d.getElementById('holeSelectionCount').textContent.startsWith('3 vértices'),
+     'El cuchillo no agregó tres vértices');
+    ctrlZ();
+    assert(d.getElementById('holeSelectionCount').textContent.startsWith('2 vértices'),
+     'Ctrl+Z no eliminó el último vértice');
+    click(clientX+50,clientY+54);
+    d.getElementById('closeHoleContour').click();
+    assert(d.getElementById('holeSelectionCount').textContent.includes('Contorno cerrado'),
+     'No cerró la figura');
+    ctrlZ();
+    assert(d.getElementById('holeSelectionCount').textContent.startsWith('3 vértices'),
+     'Ctrl+Z debería deshacer el cierre sin eliminar puntos');
+    stage='deshacer cronológico';
+    workspace('project');
+    w.__workspaceLayout.activateTab('objects');
+    const terrain=d.querySelector('.scene-terrain-group .scene-group-eye');
+    terrain.click();
+    assert(terrain.getAttribute('aria-label').startsWith('Mostrar'),'El terreno no se ocultó');
+    ctrlZ();
+    assert(terrain.getAttribute('aria-label').startsWith('Ocultar'),
+     'Ctrl+Z no restauró el terreno, que era la última acción');
+    ctrlZ();
+    assert(d.getElementById('holeSelectionCount').textContent.startsWith('2 vértices'),
+     'Ctrl+Z no retomó la última acción pendiente del cuchillo');
+    stage='resultado';
+    document.body.dataset.result='PASS';
+    output.textContent='PASS: catálogo acoplado, 5 vistas, ajuste Alt+dcha, Ctrl+Z contextual y cronológico';
+   }catch(err){fail(stage,err)}
+  },170);
+ }catch(err){fail('configuración',err)}
+})();
+</script></body></html>
