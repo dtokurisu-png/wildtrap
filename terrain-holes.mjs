@@ -40,7 +40,7 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
     normal:normal.toArray(),modelNodeId};
   };
   originalMesh.updateMatrixWorld(true);
-  record(ray.intersectObject(originalMesh,false)[0]);
+  if(terrain.visible)record(ray.intersectObject(originalMesh,false)[0]);
   const materialSides=new Map();
   for(const entry of getModelRoots()){
    const root=entry.root;
