@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.10';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
-import {createPlaytest} from './playtest.mjs?v=0.9.6';
+import {createPlaytest} from './playtest.mjs?v=0.9.12';
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.11';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
@@ -538,7 +538,12 @@ holesEditor=createTerrainHoles({
    roots.filter(root=>root.userData.sharedAsset).map(root=>({id,root})):[]),
  renderCuts:!recoveryMode,nextUndoSerial
 });
-const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y)});
+const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
+ resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
+ onStop:()=>{
+  testingScene=false;draw();vertexEditor?.setActive(mode==='meshEdit');
+ }
+});
 vertexEditor=createMeshVertexEditor({
  scene,camera,view,marquee:$('selectionMarquee'),$,
  getSelectedNode:()=>live.nodes.find(n=>n.id===selectedId),
@@ -567,17 +572,17 @@ function refreshAxisGizmo(){
 }
 refreshAxisGizmo();
 $('test').onclick=()=>{
- testingScene=true;vertexEditor.setActive(false);draw();preview.start();
+ testingScene=true;vertexEditor.setActive(false);draw();
+ void preview.start().then(()=>{
+  if(!preview.active){testingScene=false;draw();vertexEditor?.setActive(mode==='meshEdit');}
+ });
 };
 $('createHole').onclick=()=>{holesEditor.apply(true);draw()};
 $('restoreHole').onclick=()=>{holesEditor.apply(false);draw()};
 $('clearHoleSelection').onclick=()=>holesEditor.clearSelection();
 $('undoHolePoint').onclick=()=>holesEditor.removeLastPoint();
 $('closeHoleContour').onclick=()=>holesEditor.closePolygon();
-$('stopTest').onclick=()=>{
- preview.stop();testingScene=false;draw();
- vertexEditor.setActive(mode==='meshEdit');
-};
+$('stopTest').onclick=()=>preview.stop();
 $('localFarolera').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview.fromFile(file);e.target.value=''});
 function setNodeSelection(ids){
  selectedIds.clear();
