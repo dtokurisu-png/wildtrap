@@ -3,7 +3,7 @@ import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-te
 
 // Selection happens against the uncut mesh: we can also restore a hole by
 // painting where the surface USED TO BE. The sculptor remains heightmap-based.
-export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$}){
+export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,getModelRoots=()=>[]}){
  const originalMesh=new THREE.Mesh(terrainGeo,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
  originalMesh.name='Base heightmap for accurate 3D raycast';
  originalMesh.updateMatrixWorld(true); // Not added to scene or visible in renderer.
@@ -19,12 +19,44 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
  const vec=(a)=>new THREE.Vector3(...a);
  function pick(ray){
-  // Raycast against the ORIGINAL mesh, including areas already cut away.
-  const hits=ray.intersectObject(originalMesh,false);
-  if(!hits.length)return null;
-  const h=hits[0],normal=h.face.normal.clone().normalize();
-  if(ray.ray.direction.dot(normal)>0)normal.negate();
-  return {x:h.point.x,y:h.point.y,z:h.point.z,normal:normal.toArray()};
+  // Compare the ORIGINAL terrain and ORIGINAL GLB surfaces by real camera depth.
+  // Once a hole is cut, the invisible source faces remain available to restore it.
+  let nearest=null;
+  const record=(h,modelNodeId=null)=>{
+   if(!h?.face||nearest&&nearest.distance<=h.distance)return;
+   const normal=h.face.normal.clone()
+    .applyMatrix3(new THREE.Matrix3().getNormalMatrix(h.object.matrixWorld)).normalize();
+   if(ray.ray.direction.dot(normal)>0)normal.negate();
+   nearest={distance:h.distance,x:h.point.x,y:h.point.y,z:h.point.z,
+    normal:normal.toArray(),modelNodeId};
+  };
+  originalMesh.updateMatrixWorld(true);
+  record(ray.intersectObject(originalMesh,false)[0]);
+  const materialSides=new Map();
+  for(const entry of getModelRoots()){
+   const root=entry.root;
+   if(!root||!root.visible)continue;
+   root.updateMatrixWorld(true);
+   root.traverse(mesh=>{
+    if(!mesh.isMesh||mesh.isSkinnedMesh||!mesh.visible)return;
+    const displayGeometry=mesh.geometry;
+    const sourceGeometry=mesh.userData.wildtrapSourceGeometry||displayGeometry;
+    mesh.geometry=sourceGeometry;
+    try{
+     for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material]){
+      if(material&&!materialSides.has(material))materialSides.set(material,material.side);
+      if(material)material.side=THREE.DoubleSide;
+     }
+     record(ray.intersectObject(mesh,false)[0],entry.id);
+    }finally{
+     mesh.geometry=displayGeometry;
+    }
+   });
+  }
+  for(const [material,side] of materialSides)material.side=side;
+  if(!nearest)return null;
+  const {distance,...hit}=nearest;
+  return hit;
  }
  function syncGeometry(){
   const n=live.resolution;
@@ -54,7 +86,7 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   terrain.geometry=replacement;
   generated=result?replacement:null;
   if(old&&old!==replacement)old.dispose();
-  $('holeCounter').textContent=(legacy.size)+' celdas antiguas · '+prepared.filter(s=>s.op==='cut').length+' cortes 3D · '+prepared.filter(s=>s.op==='restore').length+' restauraciones';
+  $('holeCounter').textContent=(legacy.size)+' celdas antiguas · '+prepared.filter(s=>s.op==='cut').length+' cortes 3D · '+prepared.filter(s=>s.op==='restore').length+' restauraciones · '+live.nodes.reduce((sum,node)=>sum+(node.cuts3d?.length||0),0)+' trazos GLB';
   renderSelection();
  }
  function isHoleAt(x,z,y=heightAt(x,z)){
@@ -63,7 +95,7 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
  function renderSelection(){
   const vertices=[];
   for(const input of selected){
-   const s=prepareCutStamp(input);
+   const s=prepareCutStamp(input.worldPreview||input);
    if(!s)continue;
    const c=vec(s.center),u=vec(s.u),v=vec(s.v),n=vec(s.normal);
    c.addScaledVector(n,.22);
@@ -84,12 +116,13 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
  function paint(hit,remove=false){
   if(!hit||!Array.isArray(hit.normal))return;
   const position=[hit.x,hit.y,hit.z];
+  const modelNodeId=Number.isInteger(hit.modelNodeId)?hit.modelNodeId:null;
   const radius=clamp(Number($('brushRadius').value)||4,.4,65);
   if(remove){
    const n=selected.length;
    for(let i=selected.length-1;i>=0;i--){
-    const p=selected[i].center;
-    if(Math.hypot(position[0]-p[0],position[1]-p[1],position[2]-p[2])<=radius)selected.splice(i,1);
+    const entry=selected[i],p=(entry.worldPreview||entry).center;
+    if((entry.modelNodeId??null)===modelNodeId&&Math.hypot(position[0]-p[0],position[1]-p[1],position[2]-p[2])<=radius)selected.splice(i,1);
    }
    previous=null;
    if(n!==selected.length)renderSelection();
@@ -98,7 +131,7 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   const depth=clamp(Number($('holeDepth')?.value)||2,.25,20);
   const shape=$('holeShape').value,dir=$('holeDirection').value;
   const minGap=Math.max(.6,radius*.33);
-  const last=previous;
+  const last=previous?.modelNodeId===modelNodeId?previous:null;
   const distance=last?Math.hypot(...position.map((x,i)=>x-last.center[i])):Infinity;
   if(last&&distance<minGap)return;
   // Interpolate fast mouse strokes, no gaps between neighbouring brushes.
@@ -110,28 +143,72 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
    const t=i/steps;
    const center=last?last.center.map((x,k)=>x+(position[k]-x)*t):position.slice();
    const normal=last?last.normal.map((x,k)=>x+(hit.normal[k]-x)*t):hit.normal.slice();
-   const s={center,normal,radius,depth,shape,dir};
+   const worldPreview={center,normal,radius,depth,shape,dir};
+   let s=worldPreview;
+   if(modelNodeId!==null){
+    const root=getModelRoots().find(item=>item.id===modelNodeId)?.root;
+    if(!root)continue;
+    root.updateMatrixWorld(true);
+    const centerVec=vec(center);
+    const localPoint=root.worldToLocal(centerVec.clone());
+    const localNext=root.worldToLocal(centerVec.clone().add(vec(normal)));
+    const localNormal=localNext.sub(localPoint).normalize();
+    const rootScale=root.getWorldScale(new THREE.Vector3());
+    const factor=Math.max(.01,Math.abs(rootScale.x));
+    s={center:localPoint.toArray(),normal:localNormal.toArray(),
+     radius:radius/factor,depth:depth/factor,shape,dir,modelNodeId,worldPreview};
+   }
    if(prepareCutStamp(s))selected.push(s);
   }
   if(count<steps)toast('Selección completa: aplica el corte y continúa con otra pasada');
   const tail=selected[selected.length-1];
-  previous=tail?{center:tail.center.slice(),normal:tail.normal.slice()}:last;
+  const world=tail?.worldPreview||tail;
+  previous=tail&&((tail.modelNodeId??null)===modelNodeId)?
+   {center:world.center.slice(),normal:world.normal.slice(),modelNodeId}:last;
   if(count)renderSelection();
  }
  function clearSelection(){selected.length=0;previous=null;renderSelection()}
  function endStroke(){previous=null}
  function apply(cut){
-  if(!selected.length){toast('Primero pinta una zona directamente sobre la superficie 3D');return}
-  if((live.cuts3d?.length||0)+selected.length>700){toast('Límite de 700 trazos. Exporta el proyecto y reduce cortes superpuestos.');return}
+  if(!selected.length){toast('Primero pinta una zona directamente sobre una superficie 3D');return}
+  const perModel=new Map();
+  let terrainCount=0;
+  for(const stamp of selected){
+   if(Number.isInteger(stamp.modelNodeId)){
+    const node=live.nodes.find(n=>n.id===stamp.modelNodeId&&n.kind==='prefab');
+    if(!node)continue;
+    perModel.set(node.id,(perModel.get(node.id)||0)+1);
+   }else terrainCount++;
+  }
+  if((live.cuts3d?.length||0)+terrainCount>700||
+   [...perModel].some(([id,n])=>n+(live.nodes.find(node=>node.id===id)?.cuts3d?.length||0)>80)){
+   toast('Límite: 700 cortes de terreno o 80 trazos por modelo. Aplica cortes más grandes.');
+   return;
+  }
   snapshot();
   if(!Array.isArray(live.cuts3d))live.cuts3d=[];
-  for(const s of selected)live.cuts3d.push({...s,op:cut?'cut':'restore'});
-  const count=selected.length;
+  let terrainChanged=false,modelChanged=false,applied=0;
+  for(const s of selected){
+   const {modelNodeId,worldPreview,...cutData}=s;
+   cutData.op=cut?'cut':'restore';
+   if(Number.isInteger(modelNodeId)){
+    const node=live.nodes.find(n=>n.id===modelNodeId&&n.kind==='prefab');
+    if(!node)continue;
+    if(!Array.isArray(node.cuts3d))node.cuts3d=[];
+    node.cuts3d.push(cutData);
+    modelChanged=true;
+   }else{
+    live.cuts3d.push(cutData);
+    terrainChanged=true;
+   }
+   applied++;
+  }
   clearSelection();
-  refreshTerrain();
+  if(terrainChanged)refreshTerrain();
   persist();
-  toast(cut?'Abertura 3D creada con '+count+' secciones locales':'Región de la malla restaurada con '+count+' secciones locales');
+  toast((cut?'Recorte':'Restauración')+' 3D aplicado: '+applied+
+   ' trazo(s)'+(modelChanged?' · mallas GLB actualizadas':''));
  }
- function count(){return legacy.size+prepared.length}
+ function count(){return legacy.size+prepared.length+live.nodes.reduce((sum,node)=>sum+(node.cuts3d?.length||0),0)}
  return {pick,paint,endStroke,clearSelection,apply,syncGeometry,isHoleAt,count,overlay};
 }
