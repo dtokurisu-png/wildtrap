@@ -5,6 +5,7 @@ import {createTerrainHoles} from './terrain-holes.mjs';
 import {createCavePieceObject} from './cave-pieces-three.mjs';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs';
+import {createPrefabGallery} from './prefab-gallery.mjs';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -199,7 +200,7 @@ function updateStatus(){
  }
  $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
 }
-function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));updateStatus()}
+function setMode(v){mode=v;pending=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));$('openPrefabGallery').classList.toggle('active',v==='prefab');updateStatus()}
 const tools={raise:1,lower:1,flatten:1,smooth:1,holePaint:1,holeErase:1};
 function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
@@ -269,6 +270,16 @@ setTop();
 prefabLibrary=createPrefabLibrary(()=>{draw();updatePrefabLoadStatus()});
 void prefabLibrary.preload().then(()=>{draw();updatePrefabLoadStatus()});
 updatePrefabLoadStatus();
+const prefabGallery=createPrefabGallery({
+ library:prefabLibrary,
+ root:$('prefabModal'),
+ onPick:id=>{
+  $('prefabType').value=id;
+  $('prefabChosen').textContent='Modelo elegido: '+(prefabById(id)?.name||id)+' · Haz clic en el escenario para colocarlo';
+  setMode('prefab');
+ }
+});
+$('openPrefabGallery').onclick=()=>prefabGallery.open();
 holesEditor=createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$});
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y)});
 $('test').onclick=()=>preview.start();
