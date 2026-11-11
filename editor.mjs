@@ -52,6 +52,13 @@ function pruneUnusedSceneGroups(){
  const active=new Set(live.nodes.filter(n=>categoryForNode(n)).map(n=>n.groupId));
  live.objectGroups=sceneGroups().filter(g=>active.has(g.id));
 }
+function commitTerrainVisibility(show){
+ if((live.settings?.hideTerrainEditor!==true)===show)return;
+ snapshot();
+ if(!live.settings||typeof live.settings!=='object')live.settings={heightMax:120};
+ live.settings.hideTerrainEditor=!show;
+ draw();persist();
+}
 function commitObjectVisibility(ids,show){
  const targets=live.nodes.filter(n=>ids.includes(n.id)&&categoryForNode(n)&&Boolean(n.editorHidden)!==!show);
  if(!targets.length)return;
@@ -92,7 +99,9 @@ sceneObjectManager=createSceneObjectManager({
  getSelection:()=>[...selectedIds],lookup:prefabById,
  select:ids=>{if(mode==='holePaint')setMode('move');setNodeSelection(ids)},
  setVisibility:commitObjectVisibility,group:commitObjectGroup,
- ungroup:commitObjectUngroup,rename:commitObjectRename
+ ungroup:commitObjectUngroup,rename:commitObjectRename,
+ terrainIsVisible:()=>live.settings?.hideTerrainEditor!==true,
+ setTerrainVisibility:commitTerrainVisibility
 });
 window.__sceneObjectManager=sceneObjectManager;
 let armedPrefabId=null,placementGhost=null,placementWorldY=null,hoveredNodeId=null,dragSession=null;
@@ -221,7 +230,7 @@ if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
  for(const root of roots)root.visible=n.editorHidden!==true;
  renderedNodes.set(n.id,roots);
 }
-surface.visible=true;terrain.visible=true;interiors.visible=false;
+surface.visible=true;terrain.visible=live.settings?.hideTerrainEditor!==true;interiors.visible=false;
 updateSelectionHighlights();updateHoverHighlight();updateStatus();
 }
 function updatePrefabLoadStatus(){
