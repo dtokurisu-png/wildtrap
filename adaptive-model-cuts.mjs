@@ -1,7 +1,7 @@
 // WILDTRAP · Recorte local y reversible de mallas GLB ya colocadas.
 // Operación pura sin Three.js: trabaja sobre triángulos indexados o no indexados,
 // conserva grupos de materiales y atributos interpolables (UV/normales/colores).
-import {prepareCutStamp,overlapsTriangle} from './adaptive-terrain-cuts.mjs';
+import {prepareCutStamp,overlapsTriangle} from './adaptive-terrain-cuts.mjs?v=0.9.5';
 
 const EPS=1e-7;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
