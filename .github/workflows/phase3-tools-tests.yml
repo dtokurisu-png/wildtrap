@@ -10,6 +10,7 @@ on:
       - 'prefab-gallery.mjs'
       - 'terrain-holes.mjs'
       - 'tests/browser-workspace.mjs'
+      - 'tests/workspace-smoke.html'
       - 'tests/prefab-gallery.test.mjs'
       - 'tests/browser-phase3-tool-controls.mjs'
       - 'tests/phase3-tool-controls-smoke.html'
