@@ -15,7 +15,7 @@ test('biblioteca contiene exactamente una montaña y tres cuevas GLB existentes'
   assert.equal(prefabById(p.id),p);
   assert.ok(fs.existsSync(new URL('../assets/terrain/'+p.file,import.meta.url)),p.file);
   assert.ok(fs.statSync(new URL('../assets/terrain/'+p.file,import.meta.url)).size>1024,p.file);
-  assert.ok(html.includes('value="'+p.id+'"'));
+  assert.ok(html.includes('data-prefab-choice="'+p.id+'"'));
  }
 });
 test('sin control roto, botones duplicados ni paneles antiguos',()=>{
