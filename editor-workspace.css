@@ -139,3 +139,36 @@ body.testing #toast{left:16px;max-width:calc(100vw - 32px)}
  .dock-tab{padding:5px 7px!important;font-size:10px!important}
  #overlay{font-size:10px}
 }
+
+/* Fase 2 · Gestor de objetos permanentes. */
+.scene-manager-header{display:flex;flex-direction:column;gap:8px;margin:0 0 11px}
+.scene-manager-title{font-weight:750;color:#d2fbe9;display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.scene-manager-count{font-size:11px;font-variant-numeric:tabular-nums;color:#8fc9b2;background:#24493b;border-radius:6px;padding:2px 7px}
+.scene-manager-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.scene-manager-action{padding:6px 3px;font-size:10px;white-space:nowrap}
+.scene-manager-action:disabled{opacity:.38;cursor:not-allowed}
+.scene-manager-note{margin:0;font-size:10px}
+.scene-tree{display:flex;flex-direction:column;gap:7px}
+.scene-group{margin:0;padding:0;border:1px solid #3b6554;border-radius:8px;background:#1b332a;min-width:0}
+.scene-group-header{display:flex;gap:2px;align-items:stretch;min-height:32px;background:#25463a}
+.scene-group-toggle{background:transparent;border:0;padding:4px 5px;display:flex;min-width:0;flex:1;gap:6px;align-items:center;text-align:left}
+.scene-group-toggle:hover{background:#2b5847}
+.scene-group-symbol{font-size:14px;color:#89e6bc}
+.scene-group-chevron{color:#c5e8d8;width:12px;flex:none}
+.scene-group-name{font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.scene-group-number{margin-left:auto;color:#a5d2bd;background:#1a3229;border-radius:5px;padding:2px 6px;font-size:10px;flex:none}
+.scene-group-eye,.scene-object-eye{color:#abd2bf;background:transparent;border:0;border-radius:5px;padding:4px 8px;flex:none;font-size:17px}
+.scene-group-eye:hover,.scene-object-eye:hover{background:#356854}
+.scene-group-items{padding:3px}
+.scene-object-item{display:flex;gap:2px;align-items:center;min-width:0}
+.scene-object-pick{flex:1;min-width:0;display:flex;gap:6px;align-items:center;padding:5px 6px;text-align:left;background:transparent;border:1px solid transparent;border-radius:5px;font-size:11px}
+.scene-object-pick:hover{background:#2c4f41}
+.scene-object-pick.selected{background:#145e4e;border-color:#40b68e;color:#fff;font-weight:700}
+.scene-object-marker{font-size:13px;color:#98d6bb;flex:none}
+.scene-object-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.scene-object-index{flex:none;color:#8aaf9e;font-size:10px}
+.scene-object-eye.is-hidden{color:#778f84}
+.scene-object-eye:focus-visible,.scene-group-eye:focus-visible{outline:2px solid #9cf4d6}
+.scene-manager-empty{padding:12px;color:#abc6ba;background:#20392f;border:1px dashed #5d826f;border-radius:8px;font-size:11px;line-height:1.6}
+.scene-hierarchy-body{display:flex;flex-direction:column;gap:5px}
+.scene-hierarchy-group{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px;background:#1c382d;border:1px solid #406e58;border-radius:6px;font-size:12px}
