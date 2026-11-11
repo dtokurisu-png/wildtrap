@@ -539,13 +539,45 @@ holesEditor=createTerrainHoles({
  renderCuts:!recoveryMode,nextUndoSerial
 });
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y)});
-$('test').onclick=()=>preview.start();
+vertexEditor=createMeshVertexEditor({
+ scene,camera,view,marquee:$('selectionMarquee'),$,
+ getSelectedNode:()=>live.nodes.find(n=>n.id===selectedId),
+ getRoot:id=>(renderedNodes.get(id)||[]).find(root=>root.userData.sharedAsset),
+ getMode:()=>mode,snapshot,draw,persist,toast
+});
+window.__meshEditor=vertexEditor;
+// The 3D gizmo is camera-relative, keeping Y visibly vertical in the world.
+const axesSvg=$('axisGizmoSvg');let axisTick=0;
+function refreshAxisGizmo(){
+ const inverse=camera.quaternion.clone().invert();
+ const directions=[
+  {v:new THREE.Vector3(1,0,0),name:'X',color:'#ff7777'},
+  {v:new THREE.Vector3(0,1,0),name:'Y',color:'#7ff4a4'},
+  {v:new THREE.Vector3(0,0,1),name:'Z',color:'#78b7ff'}
+ ];
+ const center=56;
+ const lines=directions.map(axis=>{
+  const v=axis.v.applyQuaternion(inverse);
+  const x=center+v.x*37,y=center-v.y*37;
+  return '<line x1="56" y1="56" x2="'+x.toFixed(2)+'" y2="'+y.toFixed(2)+'" stroke="'+axis.color+'" stroke-width="3.4" stroke-linecap="round"/>'+
+   '<circle cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="9" fill="'+axis.color+'"/>'+
+   '<text x="'+x.toFixed(2)+'" y="'+(y+4).toFixed(2)+'" font-size="12" text-anchor="middle" fill="#132b24" font-weight="bold">'+axis.name+'</text>';
+ }).join('');
+ axesSvg.innerHTML='<circle cx="56" cy="56" r="3" fill="#effff6"/>'+lines;
+}
+refreshAxisGizmo();
+$('test').onclick=()=>{
+ testingScene=true;vertexEditor.setActive(false);draw();preview.start();
+};
 $('createHole').onclick=()=>{holesEditor.apply(true);draw()};
 $('restoreHole').onclick=()=>{holesEditor.apply(false);draw()};
 $('clearHoleSelection').onclick=()=>holesEditor.clearSelection();
 $('undoHolePoint').onclick=()=>holesEditor.removeLastPoint();
 $('closeHoleContour').onclick=()=>holesEditor.closePolygon();
-$('stopTest').onclick=()=>preview.stop();
+$('stopTest').onclick=()=>{
+ preview.stop();testingScene=false;draw();
+ vertexEditor.setActive(mode==='meshEdit');
+};
 $('localFarolera').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview.fromFile(file);e.target.value=''});
 function setNodeSelection(ids){
  selectedIds.clear();
@@ -985,7 +1017,7 @@ async function loadPublishedWorld(){
  }catch(err){console.warn('No se pudo cargar mapa oficial',err);void restoreSavedBase(false)}
 }
 $('loadPublished').onclick=()=>{if(confirm('¿Abrir el mapa publicado en GitHub? El proyecto local será reemplazado. Exporta JSON antes si necesitas conservarlo.')){snapshot();void loadPublishedWorld()}};
-function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();renderer.render(scene,preview.frame()||camera)}
+function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();if(++axisTick%5===0)refreshAxisGizmo();renderer.render(scene,preview.frame()||camera)}
 animate();
 window.__editorReady?.();
 if(safeMode)toast('Modo seguro: el borrador habitual queda intacto. Tus cambios se guardan aparte.');
