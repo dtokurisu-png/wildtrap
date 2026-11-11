@@ -1,11 +1,12 @@
-name: Validar pincel de corte 3D
+name: Validar cuchillo poligonal 3D
 on:
   push:
-    branches: [main]
+    branches: [main, feat/polygon-knife-v0.9.8]
     paths:
       - 'adaptive-terrain-cuts.mjs'
       - 'terrain-holes.mjs'
       - 'tests/adaptive-terrain-cuts.test.mjs'
+      - 'tests/polygon-knife.test.mjs'
       - '.github/workflows/terrain-cuts-tests.yml'
   workflow_dispatch:
 jobs:
@@ -21,3 +22,4 @@ jobs:
       - run: node --check terrain-holes.mjs
       - run: node --check editor.mjs
       - run: node --test tests/adaptive-terrain-cuts.test.mjs
+      - run: node --test tests/polygon-knife.test.mjs
