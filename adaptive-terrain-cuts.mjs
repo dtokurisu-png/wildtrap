@@ -2,6 +2,8 @@
 // Geometría pura: no depende de Three.js ni aumenta la cuadrícula global.
 // Un corte es un prisma convexo orientado según la cara tocada.
 const EPS=1e-7;
+// Hard limits keep malformed or densely overlapping cuts from freezing the UI.
+const MAX_STAMPS_PER_CELL=18,MAX_FRAGMENTS_PER_TRIANGLE=72,MAX_CLIPPED_TRIANGLES=5000;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -131,7 +133,9 @@ function spatialStamps(stamps,size,resolution){
   for(let j=minZ;j<=maxZ;j++)for(let i=minX;i<=maxX;i++){
    const id=j*side+i;
    if(!map.has(id))map.set(id,[]);
-   map.get(id).push(s);
+   const cellStamps=map.get(id);
+   cellStamps.push(s);
+   if(cellStamps.length>MAX_STAMPS_PER_CELL)cellStamps.shift();
   }
  }
  return map;
@@ -146,7 +150,7 @@ export function buildAdaptiveTerrain(base,legacyList=[],rawStamps=[],size=630,re
  const positions=Array.from(base.positions),colors=Array.from(base.colors),uvs=Array.from(base.uvs);
  const normals=Array.from(base.normals),indices=[],original=base.indices;
  const extra=new Map(),vertexCount=base.positions.length/3;
- let clippedTriangles=0,addedFaces=0;
+ let clippedTriangles=0,addedFaces=0,limitedTriangles=0,limitedFragments=0;
  function vertex(i){return {p:Array.from(base.positions.slice(i*3,i*3+3)),
   uv:Array.from(base.uvs.slice(i*2,i*2+2)),
   color:Array.from(base.colors.slice(i*3,i*3+3)),
@@ -176,10 +180,17 @@ export function buildAdaptiveTerrain(base,legacyList=[],rawStamps=[],size=630,re
    continue;
   }
   for(let tri=0;tri<2;tri++){
+   if(clippedTriangles>=MAX_CLIPPED_TRIANGLES){
+    limitedTriangles++;
+    for(let j=0;j<3;j++)indices.push(original[start+tri*3+j]);
+    continue;
+   }
    const a=vertex(original[start+tri*3]),b=vertex(original[start+tri*3+1]),c=vertex(original[start+tri*3+2]);
    let fragments=[{poly:[a,b,c],removed}];
    let touched=false;
    for(const s of cuts){
+    // Do not let pathological overlapping strokes multiply fragments without bound.
+    if(fragments.length>MAX_FRAGMENTS_PER_TRIANGLE){limitedFragments++;break;}
     if(!overlapsTriangle(s,a.p,b.p,c.p))continue;
     touched=true;
     const next=[];
@@ -196,5 +207,6 @@ export function buildAdaptiveTerrain(base,legacyList=[],rawStamps=[],size=630,re
   }
  }
  return {positions,colors,uvs,normals,indices,stats:{originalTriangles:original.length/3,
-  finalTriangles:indices.length/3,newVertices:positions.length/3-vertexCount,clippedTriangles,addedFaces}};
+  finalTriangles:indices.length/3,newVertices:positions.length/3-vertexCount,clippedTriangles,addedFaces,
+  limitedTriangles,limitedFragments}};
 }
