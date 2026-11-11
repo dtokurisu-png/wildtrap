@@ -136,7 +136,7 @@ renderedNodes.clear();
 for(const collection of [surface,interiors,cavePiecesLayer])while(collection.children.length){
  const g=collection.children[0];collection.remove(g);
  // GLB instances share their immutable geometry and materials with the cache.
- if(g.userData.sharedAsset)continue;
+ if(g.userData.sharedAsset){prefabLibrary?.disposeInstance(g);continue;}
  g.traverse(m=>{m.geometry?.dispose();const mats=Array.isArray(m.material)?m.material:(m.material?[m.material]:[]);for(const mat of mats)mat?.dispose?.()});
 }
 for(const n of live.nodes){
@@ -256,6 +256,16 @@ function updateStatus(){
 }
 function setMode(v){
  if(v!=='prefab'&&armedPrefabId)clearPlacement();
+ if(v==='holePaint'||v==='holeErase'){
+  // The cut brush is exclusive: no picking, selection, moving or scaling GLBs.
+  if(dragSession)completeModelDrag({pointerId:dragSession.pointerId});
+  pointerDown=false;marqueeStart=null;
+  $('selectionMarquee').style.display='none';
+  selectedIds.clear();selectedId=null;
+  hoveredNodeId=null;updateHoverHighlight();
+  $('modelHoverIndicator').style.display='none';
+  updateSelectionHighlights();
+ }
  mode=v;pending=null;
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));
  $('openPrefabGallery').classList.toggle('active',v==='prefab');
@@ -343,7 +353,11 @@ const prefabGallery=createPrefabGallery({
  }
 });
 $('openPrefabGallery').onclick=()=>prefabGallery.open();
-holesEditor=createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$});
+holesEditor=createTerrainHoles({
+ scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,
+ getModelRoots:()=>[...renderedNodes].flatMap(([id,roots])=>
+  roots.filter(root=>root.userData.sharedAsset).map(root=>({id,root})))
+});
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y)});
 $('test').onclick=()=>preview.start();
 $('createHole').onclick=()=>{holesEditor.apply(true);draw()};
@@ -437,7 +451,7 @@ function marqueeHits(x,y){
 }
 let previousOrbitEnabled=true;
 view.addEventListener('pointerdown',e=>{
- if(preview.active||preview.busy||!e.ctrlKey||(e.button!==0&&e.button!==2))return;
+ if(preview.active||preview.busy||mode==='holePaint'||mode==='holeErase'||!e.ctrlKey||(e.button!==0&&e.button!==2))return;
  e.preventDefault();e.stopImmediatePropagation();
  if(e.button===0){
   const picked=pickedNodeAt(e);
@@ -544,6 +558,15 @@ function completeModelDrag(e){
 }
 view.addEventListener('pointerdown',e=>{
  if(preview.active||preview.busy||marqueeStart||prefabGallery.isOpen()||e.ctrlKey||e.button!==0)return;
+ if(mode==='holePaint'||mode==='holeErase'){
+  // Painting always wins over model interaction; cut on nearest true surface.
+  const hit=convertCoords(e);
+  if(!hit)return;
+  e.preventDefault();
+  pointerDown=true;changed=true;
+  holesEditor.paint(hit,mode==='holeErase');
+  return;
+ }
  // First raycast the actual GLB/scene meshes, so clicking any visible rock selects it.
  const hovered=pickedNodeAt(e);
  if(hovered){
@@ -575,15 +598,20 @@ view.addEventListener('pointerdown',e=>{
 view.addEventListener('pointermove',e=>{
  if(preview.active||preview.busy||prefabGallery.isOpen()||marqueeStart)return;
  if(dragSession){moveModelDrag(e);return}
- // Keep hover picking independent of edit mode. Ghosts and selection outlines
- // are outside these raycast layers and never intercept a model click.
- const hovered=pickedNodeAt(e);
- setHoverNode(hovered,e);
+ const holeMode=mode==='holePaint'||mode==='holeErase';
+ // No GLB selection or hover in cutting mode: only the cutter raycast runs.
+ if(holeMode){
+  if(hoveredNodeId!==null){hoveredNodeId=null;updateHoverHighlight();}
+  $('modelHoverIndicator').style.display='none';
+  view.style.cursor='crosshair';
+ }else{
+  const hovered=pickedNodeAt(e);
+  setHoverNode(hovered,e);
+ }
  const p=convertCoords(e);
  if(!p){updatePlacementAt(null);return}
  $('coords').textContent='X '+p.x.toFixed(1)+' · Z '+p.z.toFixed(1)+' · altura '+heightAt(p.x,p.z).toFixed(1);
  if(armedPrefabId&&mode==='prefab'){updatePlacementAt(p);return}
- const holeMode=mode==='holePaint'||mode==='holeErase';
  if(holeMode&&p.normal){
   const normal=new THREE.Vector3(...p.normal);
   cursor.position.set(p.x+.22*normal.x,p.y+.22*normal.y,p.z+.22*normal.z);
