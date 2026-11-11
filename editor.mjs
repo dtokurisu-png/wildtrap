@@ -815,7 +815,8 @@ $('undo').onclick=()=>{
  if(!Array.isArray(live.holes))live.holes=[];
  if(!Array.isArray(v.cuts3d))live.cuts3d=[];
  live.objectGroups=cleanObjectGroups(v.objectGroups);
- selectedIds.clear();selectedId=null;holesEditor.clearSelection();
+ selectedIds.clear();selectedId=null;
+ if(holesEditor.pendingUndoSerial()<0)holesEditor.clearSelection();
  refreshTerrain();draw();persist();
 };
 $('prefabType').addEventListener('change',()=>{if(mode==='prefab')updateStatus()});
