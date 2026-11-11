@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {createPlaytest} from './playtest.mjs';
-import {createTerrainHoles} from './terrain-holes.mjs';
-import {createCavePieceObject} from './cave-pieces-three.mjs';
-import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs';
-import {createPrefabGallery} from './prefab-gallery.mjs';
-import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag} from './prefab-gestures.mjs';
+import {createPlaytest} from './playtest.mjs?v=0.9.5';
+import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.5';
+import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.5';
+import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.5';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.5';
+import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.5';
+import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag} from './prefab-gestures.mjs?v=0.9.5';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -34,7 +34,10 @@ const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
 const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],holes:[],cuts3d:[],nextId:1,settings:{heightMax:120}};
 let holesEditor=null;
-const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem('wildtrap-editor-draft-v1',JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
+// Modo seguro usa otro espacio local: nunca sobreescribe el proyecto habitual.
+const safeMode=new URLSearchParams(location.search).has('safe');
+const draftKey=safeMode?'wildtrap-editor-draft-safe-v1':'wildtrap-editor-draft-v1';
+const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
 let armedPrefabId=null,placementGhost=null,hoveredNodeId=null,dragSession=null;
@@ -708,7 +711,7 @@ async function restoreSavedBase(confirmOverwrite=false){
 $('restoreBase').onclick=()=>restoreSavedBase(true);
 let recoveredDraft=false;
 try{
- const saved=localStorage.getItem('wildtrap-editor-draft-v1');
+ const saved=localStorage.getItem(draftKey);
  if(saved){
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
@@ -718,7 +721,8 @@ try{
   }
  }
 }catch(e){toast('No se pudo recuperar el proyecto local')}
-updateMaxHeightControl();refreshTerrain();draw();setMode('raise');
+// Completar primero un frame: datos grandes del proyecto no deben impedir
+// que desaparezca la pantalla de inicio. La recuperación ocurre después.
 async function loadPublishedWorld(){
  try{
   const response=await fetch('./assets/terrain/wildtrap-world.json',{cache:'no-cache'});
@@ -734,6 +738,19 @@ async function loadPublishedWorld(){
  }catch(err){console.warn('No se pudo cargar mapa oficial',err);void restoreSavedBase(false)}
 }
 $('loadPublished').onclick=()=>{if(confirm('¿Abrir el mapa publicado en GitHub? El proyecto local será reemplazado. Exporta JSON antes si necesitas conservarlo.')){snapshot();void loadPublishedWorld()}};
-if(!recoveredDraft)void loadPublishedWorld();
-function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();renderer.render(scene,preview.frame()||camera)}animate();
+function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();renderer.render(scene,preview.frame()||camera)}
+animate();
 window.__editorReady?.();
+if(safeMode)toast('Modo seguro: el borrador habitual queda intacto. Tus cambios se guardan aparte.');
+// Deferir la carga del escenario deja que Chrome presente la interfaz.
+// El código preserva el borrador del usuario y no borra el almacenamiento local.
+setTimeout(()=>{
+ try{
+  updateMaxHeightControl();refreshTerrain();draw();setMode('raise');
+  if(!recoveredDraft)void loadPublishedWorld();
+ }catch(error){
+  console.error('Error al recuperar escenario WILDTRAP:',error);
+  $('toast').textContent='Error recuperando el escenario: '+error.message+
+   '. Abre el modo seguro para usar el editor sin alterar tu borrador.';
+ }
+},40);
