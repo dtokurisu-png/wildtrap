@@ -35,8 +35,10 @@ const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true
 const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],holes:[],cuts3d:[],nextId:1,settings:{heightMax:120}};
 let holesEditor=null;
 // Modo seguro usa otro espacio local: nunca sobreescribe el proyecto habitual.
-const safeMode=new URLSearchParams(location.search).has('safe');
-const draftKey=safeMode?'wildtrap-editor-draft-safe-v1':'wildtrap-editor-draft-v1';
+const flags=new URLSearchParams(location.search);
+const safeMode=flags.has('safe'),recoveryMode=flags.has('recover');
+const draftKey=recoveryMode?'wildtrap-editor-draft-recovered-v1':
+ safeMode?'wildtrap-editor-draft-safe-v1':'wildtrap-editor-draft-v1';
 const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
@@ -153,7 +155,7 @@ if(n.kind==='exit')marker(n.x,n.z,colours.exit,3);
 if(n.kind==='cave')caveModel(n);
 if(n.kind==='mountain')mountainModel(n);
 if(n.kind==='cavePiece')cavePiecesLayer.add(createCavePieceObject(n,heightAt));
-if(n.kind==='prefab'){const object=prefabLibrary?.instance(n,heightAt);if(object)cavePiecesLayer.add(object);}
+if(n.kind==='prefab'){const object=prefabLibrary?.instance(n,heightAt,{applyCuts:!recoveryMode});if(object)cavePiecesLayer.add(object);}
 if(n.kind==='path')routeMesh(resolvePoint(n.a),resolvePoint(n.b),'path');
 if(n.kind==='stairs')stairMesh(resolvePoint(n.a),resolvePoint(n.b),n.rise||8);
 if(n.kind==='wall')wallMesh(resolvePoint(n.a),resolvePoint(n.b),n.height||12);
@@ -359,7 +361,8 @@ $('openPrefabGallery').onclick=()=>prefabGallery.open();
 holesEditor=createTerrainHoles({
  scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,
  getModelRoots:()=>[...renderedNodes].flatMap(([id,roots])=>
-  roots.filter(root=>root.userData.sharedAsset).map(root=>({id,root})))
+  roots.filter(root=>root.userData.sharedAsset).map(root=>({id,root}))),
+ renderCuts:!recoveryMode
 });
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y)});
 $('test').onclick=()=>preview.start();
@@ -675,6 +678,15 @@ $('duplicatePrefab').onclick=()=>{
  addNode(copy);toast('Modelo duplicado');
 };
 $('clearNodeSelection').onclick=()=>setNodeSelection([]);
+$('removeRecoveryCuts').onclick=()=>{
+ if(!recoveryMode)return;
+ if(!confirm('¿Quitar los recortes SOLO de la copia de recuperación? El borrador original no se modifica.'))return;
+ snapshot();
+ live.cuts3d=[];
+ for(const node of live.nodes)if(node.cuts3d)node.cuts3d=[];
+ holesEditor.clearSelection();refreshTerrain();draw();persist();
+ toast('Recortes retirados de la copia. Exporta JSON para recuperar el escenario.');
+};
 $('remove').onclick=()=>{if(!selectedIds.size)return;snapshot();live.nodes=live.nodes.filter(n=>!selectedIds.has(n.id));selectedIds.clear();selectedId=null;draw();persist()};
 $('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
 $('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];selectedIds.clear();selectedId=null;holesEditor.clearSelection();updateMaxHeightControl();refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
@@ -711,7 +723,8 @@ async function restoreSavedBase(confirmOverwrite=false){
 $('restoreBase').onclick=()=>restoreSavedBase(true);
 let recoveredDraft=false;
 try{
- const saved=localStorage.getItem(draftKey);
+ const saved=localStorage.getItem(draftKey)||
+  (recoveryMode?localStorage.getItem('wildtrap-editor-draft-v1'):null);
  if(saved){
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
@@ -742,6 +755,11 @@ function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.updat
 animate();
 window.__editorReady?.();
 if(safeMode)toast('Modo seguro: el borrador habitual queda intacto. Tus cambios se guardan aparte.');
+if(recoveryMode){
+ const warning=$('recoveryPanel');
+ if(warning)warning.hidden=false;
+ toast('Recuperación: recortes suspendidos, borrador original protegido.');
+}
 // Deferir la carga del escenario deja que Chrome presente la interfaz.
 // El código preserva el borrador del usuario y no borra el almacenamiento local.
 setTimeout(()=>{
