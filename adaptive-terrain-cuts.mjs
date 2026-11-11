@@ -103,7 +103,7 @@ function area(poly){
  }
  return a;
 }
-function subtractPrism(poly,stamp){
+export function subtractPrism(poly,stamp){
  // A minus convex B = disjoint outside slices plus intersection (inside).
  let inside=poly;
  const outside=[];
@@ -115,7 +115,7 @@ function subtractPrism(poly,stamp){
  }
  return {outside,inside:inside.length&&area(inside)>1e-7?inside:[]};
 }
-function overlapsTriangle(stamp,a,b,c){
+export function overlapsTriangle(stamp,a,b,c){
  const min=[Math.min(a[0],b[0],c[0]),Math.min(a[1],b[1],c[1]),Math.min(a[2],b[2],c[2])];
  const max=[Math.max(a[0],b[0],c[0]),Math.max(a[1],b[1],c[1]),Math.max(a[2],b[2],c[2])];
  for(let i=0;i<3;i++)if(max[i]<stamp.bounds.min[i]||min[i]>stamp.bounds.max[i])return false;
