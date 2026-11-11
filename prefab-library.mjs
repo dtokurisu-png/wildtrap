@@ -3,13 +3,8 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
-export const PREFABS=Object.freeze([
- {id:'mountain',name:'Montaña',file:'montañá.glb',span:65},
- {id:'rocky-cave',name:'Cueva rocosa',file:'rocky ring 3d model.glb',span:46},
- {id:'stone-cave',name:'Cueva de piedra',file:'stone ruin 3d model.glb',span:46},
- {id:'stylized-cave',name:'Cueva estilizada',file:'stylized rock ring 3d model.glb',span:46}
-]);
-export const prefabById=id=>PREFABS.find(p=>p.id===id);
+import {PREFABS,prefabById} from './prefab-catalog.mjs';
+export {PREFABS,prefabById};
 export function createPrefabLibrary(onChange=()=>{}){
  const loader=new GLTFLoader();
  const cache=new Map(),errors=new Map(),pending=new Map();
