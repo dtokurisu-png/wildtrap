@@ -1,0 +1,83 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Scene Object Manager Smoke</title></head>
+<body data-result="PENDING"><div id="result">INICIANDO</div>
+<script>
+(async function(){
+ const result=document.querySelector('#result');
+ let stage='preparar';
+ function fail(error){document.body.dataset.result='FAIL';result.textContent='FAIL '+stage+': '+error.message}
+ function assert(cond,message){if(!cond)throw Error(message)}
+ try{
+  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify({
+   version:3,size:630,resolution:129,heights:Array(129*129).fill(0),
+   nodes:[
+    {id:901,kind:'prefab',prefabId:'rocky-cave',x:0,z:0,rotation:0,scale:1},
+    {id:902,kind:'prefab',prefabId:'stone-cave',x:40,z:15,rotation:0,scale:1},
+    {id:903,kind:'prefab',prefabId:'mountain',x:80,z:10,rotation:0,scale:1},
+    {id:904,kind:'tree',x:-15,z:-15},
+    {id:905,kind:'path',a:{x:0,z:0},b:{x:5,z:8}},
+    {id:906,kind:'spawn',x:-30,z:-30}
+   ],objectGroups:[],holes:[],cuts3d:[],nextId:907,settings:{heightMax:120}
+  }));
+  const frame=document.createElement('iframe');
+  frame.id='editor';frame.width=1350;frame.height=900;
+  frame.src='../?safe=1';document.body.append(frame);
+  const start=Date.now();
+  const check=()=>{
+   if(document.body.dataset.result!=='PENDING')return;
+   try{
+    const d=frame.contentDocument,w=frame.contentWindow;
+    if(!d?.querySelector('#boot[hidden]')||!w.__sceneObjectManager||
+      !d.querySelector('[data-object-id="901"]')){
+     if(Date.now()-start<20000)return;
+     throw Error('No terminó de cargar el árbol de objetos reales');
+    }
+    stage='lista real';
+    w.__workspaceLayout.activateTab('objects');
+    assert(w.__sceneObjectManager.getState().count===3,'Solo deben contarse tres modelos persistentes');
+    assert(d.querySelectorAll('[data-object-id]').length===3,'Se muestran marcadores lógicos');
+    for(const id of ['904','905','906'])assert(!d.querySelector('[data-object-id="'+id+'"]'),'Marcador lógico aparece: '+id);
+    const groups=w.__sceneObjectManager.getState().groups;
+    assert(groups.some(g=>g.name==='Cuevas'&&g.ids.length===2),'No se agruparon las dos cuevas');
+    assert(groups.some(g=>g.name==='Montañas'&&g.ids.length===1),'No se agrupó montaña');
+    stage='selección sincronizada';
+    d.querySelector('[data-object-id="901"]').click();
+    assert(d.querySelector('#selected').textContent.includes('ID 901'),'La selección desde el panel no llegó al editor');
+    assert(d.querySelector('[data-object-id="901"]').classList.contains('selected'),'Falta resaltar la fila');
+    w.__workspaceLayout.activateTab('objects');
+    d.querySelector('[data-object-id="902"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}));
+    assert(d.querySelector('#selected').textContent.includes('2 elementos seleccionados'),'Ctrl+clic no hace selección múltiple');
+    stage='ocultar y deshacer';
+    const eye=d.querySelector('[data-visibility-id="901"]');
+    eye.click();
+    assert(d.querySelector('[data-visibility-id="901"]').getAttribute('aria-label').startsWith('Mostrar'),
+      'El ojo no cambió la visibilidad');
+    assert(!d.querySelector('#selected').textContent.includes('Nada seleccionado'),'Se perdió la selección al ocultar');
+    d.getElementById('undo').click();
+    assert(d.querySelector('[data-visibility-id="901"]').getAttribute('aria-label').startsWith('Ocultar'),
+      'Ctrl+Z no restauró la visibilidad');
+    stage='crear grupo';
+    w.__workspaceLayout.activateTab('objects');
+    d.querySelector('[data-object-id="901"]').click();
+    d.querySelector('[data-object-id="902"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}));
+    w.prompt=()=> 'Mis tres cuevas';
+    d.querySelector('.scene-manager-action').click();
+    assert(w.__sceneObjectManager.getState().groups.some(g=>g.name==='Mis tres cuevas'&&g.ids.length===2),
+      'No se creó grupo manual');
+    assert(d.querySelector('[data-object-id="903"]'),'Se perdió el modelo fuera del grupo');
+    stage='desagrupar';
+    d.querySelectorAll('.scene-manager-action')[1].click();
+    assert(!w.__sceneObjectManager.getState().groups.some(g=>g.name==='Mis tres cuevas'),'No se eliminó el grupo');
+    stage='renombrar';
+    d.querySelector('[data-object-id="901"]').click();
+    w.prompt=()=> 'Entrada al jefe';
+    d.querySelectorAll('.scene-manager-action')[2].click();
+    assert(d.querySelector('[data-object-id="901"]').textContent.includes('Entrada al jefe'),
+      'No guardó el nombre del modelo');
+    assert(d.querySelector('#viewport')?.width>0,'La edición del gestor afectó el viewport');
+    document.body.dataset.result='PASS';result.textContent='PASS · lista, grupos, ojo, selección, undo y rename';
+   }catch(error){fail(error)}
+  };
+  const handle=setInterval(()=>{if(document.body.dataset.result==='PENDING')check();else clearInterval(handle)},180);
+ }catch(error){fail(error)}
+})();
+</script></body></html>
