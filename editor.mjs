@@ -3,7 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.10';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
 import {createPlaytest} from './playtest.mjs?v=0.9.6';
-import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.8';
+import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.10';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.8';
