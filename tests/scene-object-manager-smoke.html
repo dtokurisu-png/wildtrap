@@ -55,6 +55,7 @@
     d.getElementById('undo').click();
     assert(d.querySelector('.scene-terrain-group .scene-group-eye').getAttribute('aria-label').startsWith('Ocultar'),
       'No se restauró el terreno al deshacer');
+    d.querySelector('[data-object-id="901"]').click();
     const eye=d.querySelector('[data-visibility-id="901"]');
     eye.click();
     assert(d.querySelector('[data-visibility-id="901"]').getAttribute('aria-label').startsWith('Mostrar'),
