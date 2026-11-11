@@ -47,6 +47,14 @@
     d.querySelector('[data-object-id="902"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}));
     assert(d.querySelector('#selected').textContent.includes('2 elementos seleccionados'),'Ctrl+clic no hace selección múltiple');
     stage='ocultar y deshacer';
+    const terrainEye=d.querySelector('.scene-terrain-group .scene-group-eye');
+    assert(terrainEye&&terrainEye.getAttribute('aria-label').startsWith('Ocultar'),'Falta terreno en el gestor');
+    terrainEye.click();
+    assert(d.querySelector('.scene-terrain-group .scene-group-eye').getAttribute('aria-label').startsWith('Mostrar'),
+      'No se ocultó el terreno');
+    d.getElementById('undo').click();
+    assert(d.querySelector('.scene-terrain-group .scene-group-eye').getAttribute('aria-label').startsWith('Ocultar'),
+      'No se restauró el terreno al deshacer');
     const eye=d.querySelector('[data-visibility-id="901"]');
     eye.click();
     assert(d.querySelector('[data-visibility-id="901"]').getAttribute('aria-label').startsWith('Mostrar'),
