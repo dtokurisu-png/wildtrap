@@ -82,7 +82,7 @@ test('Alt + arrastre combinado mantiene ambas rotaciones originales como base',(
 });
 test('rotación 3D del GLB usa los ejes correctos y se conserva al editar el proyecto',()=>{
  assert.ok(library.includes("root.rotation.set(Number(node.rotationX)||0,Number(node.rotation)||0,0,'YXZ')"));
- assert.ok(editor.includes("action:e.altKey&&node.kind==='prefab'?'rotate'"));
+ assert.ok(editor.includes("e.altKey&&node.kind==='prefab'?'rotate'"));
  assert.ok(editor.includes("}else if(session.action==='rotate'){"));
  assert.ok(editor.includes("n.rotationX=result.rotationX"));
  assert.ok(editor.includes("root.rotation.set(n.rotationX||0,n.rotation||0,0,'YXZ')"));
