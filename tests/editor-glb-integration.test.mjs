@@ -32,7 +32,7 @@ test('selección rápida y múltiple, herramientas del terreno y GLB',()=>{
  assert.ok(code.includes('selectedIds'));
  assert.ok(code.includes("e.ctrlKey"));
  assert.ok(code.includes('marqueeHits('));
- assert.ok(code.includes("e.button===2"));
+ assert.ok(code.includes("e.button!==2"));
  assert.ok(code.includes("mode==='move'"));
  assert.ok(code.includes("mode==='holePaint'"));
  assert.ok(code.includes("function brush(x,z)"));
