@@ -35,7 +35,8 @@ const check=()=>{
   const structures=rail.querySelector('[data-workspace="structures"]');
   structures.click();
   assert(!d.getElementById('cavePiecesPanel').closest('.workspace-section').hidden,'No muestra herramientas de estructuras');
-  assert(d.getElementById('prefabModal').hidden,'La herramienta estructuras abrió modal inesperado');
+  assert(d.getElementById('prefabModal').closest('#side')&&!d.getElementById('prefabModal').hasAttribute('aria-modal'),
+    'El catálogo de estructuras debe estar acoplado, no abrir un modal');
   const sculpt=rail.querySelector('[data-workspace="sculpt"]');
   sculpt.click();
   assert(!d.querySelector('[data-workspace-content="sculpt"]').hidden,'No muestra esculpir');
