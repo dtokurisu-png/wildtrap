@@ -187,3 +187,16 @@ Cada contorno cerrado se guarda como **un único objeto** con `shape:"polygon"`,
 
 Los contornos guardados en el terreno siguen en `cuts3d`, y los de GLB se almacenan en `nodes[].cuts3d` en las coordenadas locales de esa instancia. Se conserva la compatibilidad de lectura con cortes antiguos tipo pincel, el historial de deshacer, los JSON exportables y la URL `?recover=1` para rescatar un borrador que no arranque. El recorte es de **superficies**, no produce automáticamente paredes interiores ni sólidos herméticos.
 
+## v0.9.9 — Fase 1: espacio de trabajo con tres paneles
+
+Reorganización exclusivamente visual de WILDTRAP. El motor, la cámara inicial, los modos de selección, el contenido de los JSON de escenarios, el almacenamiento del borrador y la lógica de las herramientas continúan intactos.
+
+- **Barra superior:** Deshacer, Vaciar todo, Restaurar relieve original, Abrir mapa publicado, Exportar JSON e Importar JSON. Los botones originales se reubican, no se duplican.
+- **Barra izquierda:** Vista/proyecto, Esculpir, Cuchillo, Estructuras y botón compacto Play. Mantener presionado Vista abre un menú pequeño de las vistas actuales; abrir Estructuras muestra sus opciones en Propiedades sin invocar de inmediato la galería.
+- **Dock derecho:** tres paneles apilados con separadores de altura ajustable, pestañas que se pueden arrastrar entre paneles, y un borde izquierdo para cambiar el ancho del dock. La distribución personal se guarda en `wildtrap-workspace-ui-v1`, independiente de los datos de la escena.
+- **Propiedades de herramienta:** las secciones originales de Proyecto, Esculpir, Cuchillo y Estructuras se muestran de manera contextual, sin cambiar identificadores de botones o campos.
+- **Propiedades de objeto:** los campos originales de posición, rotación, altura y escala se muestran en la pestaña Objeto cuando hay selección. El botón de movimiento redundante desaparece de Esculpir, pero el modo interno sigue disponible.
+- **Ventanas Objetos y Jerarquía:** reservadas para la Fase 2, cuando se conectarán a la escena con agrupación automática y exclusión de spawns y otros marcadores lógicos. La Fase 1 no crea un gestor ficticio ni altera las listas de objetos.
+- **Pendientes de Fases 3 y 4:** gesto Alt + clic derecho de pincel, Ctrl+Z contextual por punto, catálogo GLB integrado en el dock, visualización transparente de vértices, bloqueo de vértices, anclaje de base y restricciones de rotación XYZ.
+
+El módulo `editor-workspace.js` reorganiza los controles originales antes de que se importe `editor.mjs`; `editor-workspace.css` implementa la disposición. `tests/browser-workspace.mjs` valida el layout y los controles en Chrome. El modo Play oculta las barras para mantener la experiencia a pantalla completa, y el modo `?recover=1` conserva su panel de rescate.
