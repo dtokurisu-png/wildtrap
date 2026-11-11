@@ -56,7 +56,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.3 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.4 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -85,8 +85,8 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 
 <section id="holesPanel">
-<h2>✂ Pincel de corte 3D (cuevas y acantilados)</h2>
-<p class="hint"><b>Activa Vista 3D</b> para pintar directamente sobre la pared de un acantilado. Se registra el punto exacto X/Y/Z y su orientación. Al cortar, aparecen vértices solo alrededor del contorno, sin aumentar toda la cuadrícula. La selección de color ámbar es una vista previa: nada se borra hasta pulsar Crear agujero.</p>
+<h2>✂ Pincel de corte 3D · Terreno y modelos GLB</h2>
+<p class="hint"><b>Activa Vista 3D</b> para pintar directamente sobre la pared de un acantilado. Puedes pintar tanto sobre el terreno como directamente sobre la montaña y las cuevas GLB. Al activar Pintar corte 3D o Borrar trazo pendiente se desactivan selección, movimiento, rotación y escala: los clics pintan, no manipulan modelos. La malla se abre de verdad solo al pulsar Crear agujero; la selección ámbar es una vista previa.</p>
 <div class="grid2"><button data-tool="holePaint">Pintar corte 3D</button><button data-tool="holeErase">Borrar trazo pendiente</button></div>
 <div class="grid2">
 <label>Forma del pincel
@@ -105,7 +105,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="grid2"><button id="createHole" style="background:#755533">✂ Crear agujero</button><button id="restoreHole">Restaurar región</button></div>
 <button id="clearHoleSelection" style="width:100%;margin-top:6px">Limpiar selección</button>
 <div class="hint"><span id="holeSelectionCount">0 trazos 3D seleccionados</span> · <span id="holeCounter">0 celdas antiguas · 0 cortes 3D · 0 restauraciones</span></div><div class="hint" id="holeMeshStats">Malla base sin recortes adicionales</div>
-<p class="hint"><b>Radio del pincel:</b> arriba, desde 1 unidad. <b>Profundidad:</b> limita el corte alrededor de la cara elegida; súbela solo si la pared lo necesita. Para cerrar una parte del agujero, pinta sobre ella (también se puede seleccionar una superficie que ya no existe) y pulsa <b>Restaurar región</b>. Los cortes se guardan en el proyecto JSON, con Ctrl+Z disponible. Luego coloca la cueva o el arco como pieza independiente.</p>
+<p class="hint"><b>Radio del pincel:</b> arriba, desde 1 unidad. <b>Profundidad:</b> limita el corte alrededor de la cara elegida; súbela solo si la pared lo necesita. Para cerrar una parte del agujero, pinta sobre ella (también se puede seleccionar una superficie que ya no existe) y pulsa <b>Restaurar región</b>. Los recortes del terreno se guardan en el proyecto, y los de cada GLB quedan vinculados a ese modelo aunque lo muevas o gires. También puedes restaurar regiones de modelos pintando encima de ellas. Ctrl+Z permite deshacer.</p>
 </section>
 <section>
 <h2>3. Anclajes, caminos y estructuras</h2>
