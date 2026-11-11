@@ -104,7 +104,7 @@ test('los cortes de GLB se guardan por instancia, sin modificar archivos origina
  assert.ok(cutter.includes('root.worldToLocal('));
  assert.ok(cutter.includes('node.cuts3d.push(cutData)'));
  assert.ok(cutter.includes('snapshot()'));
- assert.ok(loader.includes('const rootCuts=Array.isArray(node.cuts3d)?node.cuts3d:[]'));
+ assert.ok(loader.includes('const rootCuts=applyCuts&&Array.isArray(node.cuts3d)?node.cuts3d:[]'));
  assert.ok(loader.includes('child.userData.wildtrapSourceGeometry=sourceGeometry'));
  assert.ok(loader.includes('child.userData.wildtrapGeneratedCutGeometry=geometry'));
  assert.ok(loader.includes('function disposeInstance(root)'));
