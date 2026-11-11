@@ -20,6 +20,9 @@
  };
  const storeKey='wildtrap-workspace-ui-v1';let saved=null;
  try{saved=JSON.parse(localStorage.getItem(storeKey)||'null')}catch(_){}
+ let sizes=Array.isArray(saved?.sizes)&&saved.sizes.length===3&&saved.sizes.every(x=>Number.isFinite(x)&&x>.05)?saved.sizes.slice():[.28,.49,.23];
+ const sizeTotal=sizes.reduce((a,b)=>a+b,0);sizes=sizes.map(x=>x/sizeTotal);
+ let currentWorkspace='project';
  function saveLayout(){
   const tabPanes={};
   for(const tab of side.querySelectorAll('.dock-tab'))tabPanes[tab.dataset.tab]=Number(tab.closest('.dock-pane').dataset.pane);
@@ -180,7 +183,6 @@
   const button=wished&&tabs.get(wished)?.closest('.dock-pane')===panes[i]?tabs.get(wished):panes[i].querySelector('.dock-tab');
   if(button)activateTab(button.dataset.tab);
  }
- let currentWorkspace='project';
  const selectWorkspace=(key,triggerTool=true)=>{
   if(!workspaceButtons.has(key))return;
   currentWorkspace=key;
@@ -225,8 +227,6 @@
  }
  new MutationObserver(syncSelection).observe(selectedLabel,{childList:true,subtree:true,characterData:true});
  // Tamaños independientes; el separador solo afecta a los dos paneles vecinos.
- let sizes=Array.isArray(saved?.sizes)&&saved.sizes.length===3&&saved.sizes.every(x=>Number.isFinite(x)&&x>.05)?saved.sizes.slice():[.28,.49,.23];
- const sum=sizes.reduce((a,b)=>a+b,0);sizes=sizes.map(x=>x/sum);
  function applySizes(){
   const usable=Math.max(330,side.clientHeight-14);
   for(let i=0;i<3;i++)panes[i].style.height=Math.round(usable*sizes[i])+'px';
