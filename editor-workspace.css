@@ -57,7 +57,7 @@
  cursor:ew-resize;background:transparent;touch-action:none;
 }
 .workspace-dock-grip:hover,.workspace-dock-grip.dragging{background:#78cbaa55}
-.dock-pane{display:flex;flex-direction:column;flex:none;min-height:110px;min-width:0;overflow:hidden;background:#14261f}
+.dock-pane{display:flex;flex-direction:column;flex:none;min-height:110px;min-width:0;overflow:hidden;background:#14261f;padding:0;border:0}
 .dock-tabs{
  display:flex;gap:3px;align-items:stretch;padding:5px 7px 0 8px;min-height:36px;
  background:#10241e;border-bottom:1px solid #3a6256;overflow-x:auto;scrollbar-width:thin;
