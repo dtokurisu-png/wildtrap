@@ -1,0 +1,42 @@
+name: Validar gestor de objetos de escena
+on:
+  push:
+    branches: [main, feat/scene-object-manager-v0.9.10]
+    paths:
+      - 'scene-object-catalog.mjs'
+      - 'scene-object-manager.mjs'
+      - 'editor.mjs'
+      - 'editor-workspace.css'
+      - 'index.html'
+      - 'tests/scene-object-catalog.test.mjs'
+      - 'tests/scene-object-manager-smoke.html'
+      - 'tests/browser-scene-object-manager.mjs'
+      - '.github/workflows/scene-objects-tests.yml'
+  workflow_dispatch:
+jobs:
+  scene-objects:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check scene-object-catalog.mjs
+      - run: node --check scene-object-manager.mjs
+      - run: node --check editor.mjs
+      - run: node --test tests/scene-object-catalog.test.mjs
+      - name: Levantar servidor de edición 3D
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-scene-objects-http.log 2>&1 &
+          sleep 2
+      - name: Validación interactiva del árbol real en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-scene-object-manager.mjs
+      - name: Regresión de tres paneles y arranque
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-workspace.mjs
+          node tests/browser-startup.mjs
