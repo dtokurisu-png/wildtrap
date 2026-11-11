@@ -1,0 +1,48 @@
+name: Validar herramientas y galería integrada · Fase 3
+on:
+  push:
+    branches: [main, feat/tool-controls-v0.9.11]
+    paths:
+      - 'editor.mjs'
+      - 'editor-workspace.js'
+      - 'editor-workspace.css'
+      - 'index.html'
+      - 'prefab-gallery.mjs'
+      - 'terrain-holes.mjs'
+      - 'tests/browser-workspace.mjs'
+      - 'tests/prefab-gallery.test.mjs'
+      - 'tests/browser-phase3-tool-controls.mjs'
+      - 'tests/phase3-tool-controls-smoke.html'
+      - '.github/workflows/phase3-tools-tests.yml'
+  workflow_dispatch:
+jobs:
+  phase3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node --check editor.mjs
+          node --check terrain-holes.mjs
+          node --check prefab-gallery.mjs
+          node --check editor-workspace.js
+      - run: node --test tests/prefab-gallery.test.mjs tests/adaptive-terrain-cuts.test.mjs tests/adaptive-model-cuts.test.mjs
+      - name: Iniciar servidor local
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-phase3-http.log 2>&1 &
+          sleep 2
+      - name: Validar herramientas fase 3 en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-phase3-tool-controls.mjs
+      - name: Regresión del espacio de trabajo y recuperación
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-workspace.mjs
+          node tests/browser-scene-object-manager.mjs
+          node tests/browser-startup.mjs
+          node tests/browser-cut-recovery.mjs
