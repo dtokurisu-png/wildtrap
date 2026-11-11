@@ -172,3 +172,7 @@ body.testing #toast{left:16px;max-width:calc(100vw - 32px)}
 .scene-manager-empty{padding:12px;color:#abc6ba;background:#20392f;border:1px dashed #5d826f;border-radius:8px;font-size:11px;line-height:1.6}
 .scene-hierarchy-body{display:flex;flex-direction:column;gap:5px}
 .scene-hierarchy-group{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px;background:#1c382d;border:1px solid #406e58;border-radius:6px;font-size:12px}
+
+.scene-terrain-group{margin-bottom:10px;overflow:hidden}
+.scene-terrain-name{flex:1;padding:8px 9px;font-size:12px;color:#b5f0d7;font-weight:600}
+.scene-terrain-group .scene-group-eye.is-hidden{color:#839990}
