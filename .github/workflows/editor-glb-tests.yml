@@ -1,7 +1,7 @@
 name: Validar editor y biblioteca GLB
 on:
   push:
-    branches: [main, feat/polygon-knife-v0.9.8]
+    branches: [main]
     paths:
       - 'editor.mjs'
       - 'index.html'
