@@ -17,6 +17,7 @@ export function createPrefabGallery({library,root,onPick}){
  const views=[...root.querySelectorAll('[data-preview-view]')];
  const cached=new Map();
  let renderer=null,renderError='',currentView='iso',generation=0,open=false;
+ const inline=root.dataset.inlineGallery==='true';
  const closeButton=root.querySelector('#closePrefabGallery');
  let previouslyFocused=null;
 
@@ -112,17 +113,17 @@ export function createPrefabGallery({library,root,onPick}){
   if(open)void refresh();
  }
  function show(){
-  previouslyFocused=document.activeElement;
+  if(!inline)previouslyFocused=document.activeElement;
   open=true;
   root.hidden=false;
-  closeButton?.focus();
+  if(!inline)closeButton?.focus();
   void refresh();
  }
  function close(){
   if(!open)return;
   open=false;generation++;
   root.hidden=true;
-  previouslyFocused?.focus?.();
+  if(!inline)previouslyFocused?.focus?.();
  }
  for(const button of views)button.addEventListener('click',()=>setView(button.dataset.previewView));
  for(const button of buttons)button.addEventListener('click',async()=>{
@@ -142,7 +143,7 @@ export function createPrefabGallery({library,root,onPick}){
  closeButton?.addEventListener('click',close);
  root.addEventListener('click',event=>{if(event.target===root)close()});
  document.addEventListener('keydown',event=>{
-  if(!open)return;
+  if(!open||inline)return;
   if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();close()}
   if(event.key==='Tab'){
    const focusable=[...root.querySelectorAll('button:not(:disabled)')];
@@ -152,5 +153,5 @@ export function createPrefabGallery({library,root,onPick}){
    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
   }
  },true);
- return {open:show,close,setView,isOpen:()=>open};
+ return {open:show,close,setView,isOpen:()=>open,isBlocking:()=>open&&!inline};
 }
