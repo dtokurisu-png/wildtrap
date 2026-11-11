@@ -3,12 +3,12 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.10';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
 import {createPlaytest} from './playtest.mjs?v=0.9.6';
-import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.10';
+import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.11';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.8';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
-import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.6';
+import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag} from './prefab-gestures.mjs?v=0.9.7';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
@@ -42,7 +42,9 @@ const flags=new URLSearchParams(location.search);
 const safeMode=flags.has('safe'),recoveryMode=flags.has('recover');
 const draftKey=recoveryMode?'wildtrap-editor-draft-recovered-v1':
  safeMode?'wildtrap-editor-draft-safe-v1':'wildtrap-editor-draft-v1';
-const undo=[];let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
+const undo=[],undoSerials=[];let actionSerial=0;
+const nextUndoSerial=()=>++actionSerial;
+let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
 // El gestor usa el historial del editor: no modifica la escena por su cuenta.
@@ -113,7 +115,7 @@ const fx=clamp((x/SIZE+.5)*(N-1),0,N-1),fz=clamp((z/SIZE+.5)*(N-1),0,N-1),ix=Mat
 const a=live.heights[index(ix,iz)],b=live.heights[index(xx,iz)],c=live.heights[index(ix,zz)],d=live.heights[index(xx,zz)];
 return(a*(1-tx)+b*tx)*(1-tz)+(c*(1-tx)+d*tx)*tz;
 }
-function snapshot(){undo.push(JSON.stringify(live));if(undo.length>20)undo.shift();persist()}
+function snapshot(){undo.push(JSON.stringify(live));undoSerials.push(nextUndoSerial());if(undo.length>20){undo.shift();undoSerials.shift()}persist()}
 function refreshTerrain(){
 const p=terrainGeo.attributes.position;
 const rgb=new Float32Array(COUNT*3),color=new THREE.Color();
@@ -356,6 +358,52 @@ function setMode(v){
  updateStatus();
 }
 const tools={raise:1,lower:1,flatten:1,smooth:1};
+// Alt + clic derecho: horizontal cambia radio, vertical cambia intensidad.
+// Captura el puntero antes de OrbitControls, selección y esculpido.
+let brushGesture=null;
+const radiusInput=$('brushRadius'),strengthInput=$('strength'),brushHint=$('brushGestureHint');
+function updateBrushReadouts(){
+ $('brushRadiusValue').textContent=Number(radiusInput.value).toFixed(1).replace(/\.0$/,'');
+ $('brushStrengthValue').textContent=String(Number(strengthInput.value));
+}
+radiusInput.addEventListener('input',updateBrushReadouts);
+strengthInput.addEventListener('input',updateBrushReadouts);
+updateBrushReadouts();
+function brushAdjustValue(input,value){
+ const min=Number(input.min)||0,max=Number(input.max)||100,step=Number(input.step)||1;
+ const next=Math.min(max,Math.max(min,Math.round((value-min)/step)*step+min));
+ input.value=String(Number(next.toFixed(3)));
+ input.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function updateBrushGesture(e){
+ if(!brushGesture||e.pointerId!==brushGesture.pointerId)return;
+ brushAdjustValue(radiusInput,brushGesture.radius+(e.clientX-brushGesture.x)*.14);
+ brushAdjustValue(strengthInput,brushGesture.strength+(brushGesture.y-e.clientY)*.13);
+ cursor.scale.setScalar(Number(radiusInput.value));
+ brushHint.hidden=false;brushHint.style.left=e.clientX+'px';brushHint.style.top=e.clientY+'px';
+ brushHint.textContent='Radio '+$('brushRadiusValue').textContent+' · Intensidad '+$('brushStrengthValue').textContent;
+}
+function finishBrushGesture(e){
+ if(!brushGesture||e?.pointerId!==undefined&&e.pointerId!==brushGesture.pointerId)return;
+ const id=brushGesture.pointerId;
+ brushGesture=null;brushHint.hidden=true;
+ try{if(view.hasPointerCapture?.(id))view.releasePointerCapture(id)}catch(_){}
+}
+view.addEventListener('pointerdown',e=>{
+ if(!e.altKey||e.button!==2||e.ctrlKey||!tools[mode]||preview.active||preview.busy)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ brushGesture={pointerId:e.pointerId,x:e.clientX,y:e.clientY,radius:Number(radiusInput.value),strength:Number(strengthInput.value)};
+ try{view.setPointerCapture(e.pointerId)}catch(_){}
+ updateBrushGesture(e);
+},true);
+view.addEventListener('pointermove',e=>{
+ if(!brushGesture||e.pointerId!==brushGesture.pointerId)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ updateBrushGesture(e);
+},true);
+window.addEventListener('pointerup',finishBrushGesture,true);
+window.addEventListener('pointercancel',finishBrushGesture,true);
+window.addEventListener('blur',()=>finishBrushGesture());
 function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
 const cx=Math.round((x/SIZE+.5)*(N-1)),cz=Math.round((z/SIZE+.5)*(N-1));const r=Math.ceil(radius/cell);
@@ -437,12 +485,17 @@ const prefabGallery=createPrefabGallery({
   setMode('prefab');
  }
 });
+window.addEventListener('wildtrap:workspace-tool',event=>{
+ if(event.detail?.key==='structures')prefabGallery.open();
+ else prefabGallery.close();
+});
+if(window.__workspaceLayout?.getState().workspace==='structures')prefabGallery.open();
 $('openPrefabGallery').onclick=()=>prefabGallery.open();
 holesEditor=createTerrainHoles({
  scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,
  getModelRoots:()=>[...renderedNodes].flatMap(([id,roots])=>
   roots.filter(root=>root.userData.sharedAsset).map(root=>({id,root}))),
- renderCuts:!recoveryMode
+ renderCuts:!recoveryMode,nextUndoSerial
 });
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y)});
 $('test').onclick=()=>preview.start();
@@ -560,7 +613,7 @@ view.addEventListener('pointermove',e=>{
  e.preventDefault();e.stopImmediatePropagation();
  updateMarquee(e.clientX,e.clientY);
 },true);
-view.addEventListener('contextmenu',e=>{if(e.ctrlKey||marqueeStart)e.preventDefault()});
+view.addEventListener('contextmenu',e=>{if(e.ctrlKey||marqueeStart||brushGesture||e.altKey&&tools[mode])e.preventDefault()});
 window.addEventListener('pointerup',e=>{
  if(!marqueeStart)return;
  const start=marqueeStart,dx=e.clientX-start.x,dy=e.clientY-start.y;
@@ -660,7 +713,7 @@ function completeModelDrag(e){
  view.style.cursor='crosshair';
 }
 view.addEventListener('pointerdown',e=>{
- if(preview.active||preview.busy||marqueeStart||prefabGallery.isOpen()||e.ctrlKey||e.button!==0)return;
+ if(preview.active||preview.busy||marqueeStart||prefabGallery.isBlocking()||e.ctrlKey||e.button!==0)return;
  if(mode==='holePaint'){
   // Each click adds one corner; dragging does not create triangles.
   const hit=convertCoords(e);
@@ -697,7 +750,7 @@ view.addEventListener('pointerdown',e=>{
  }else act(p);
 });
 view.addEventListener('pointermove',e=>{
- if(preview.active||preview.busy||prefabGallery.isOpen()||marqueeStart)return;
+ if(preview.active||preview.busy||prefabGallery.isBlocking()||marqueeStart)return;
  if(dragSession){moveModelDrag(e);return}
  const holeMode=mode==='holePaint';
  // No GLB selection or hover in cutting mode: only the cutter raycast runs.
@@ -750,7 +803,21 @@ document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',(
 $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
 $('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.objectGroups=[];live.holes=[];live.cuts3d=[];live.nextId=1;selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
-$('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);if(!Array.isArray(live.holes))live.holes=[];if(!Array.isArray(v.cuts3d))live.cuts3d=[];live.objectGroups=cleanObjectGroups(v.objectGroups);selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('undo').onclick=()=>{
+ // Deshace la última acción entre los vértices pendientes y el historial
+ // persistente, incluso si el usuario cambió de herramienta.
+ if(holesEditor?.pendingUndoSerial()>(undoSerials.at(-1)||0)){
+  holesEditor.undoPending();return;
+ }
+ const data=undo.pop();if(!data)return;
+ undoSerials.pop();
+ const v=JSON.parse(data);Object.assign(live,v);
+ if(!Array.isArray(live.holes))live.holes=[];
+ if(!Array.isArray(v.cuts3d))live.cuts3d=[];
+ live.objectGroups=cleanObjectGroups(v.objectGroups);
+ selectedIds.clear();selectedId=null;holesEditor.clearSelection();
+ refreshTerrain();draw();persist();
+};
 $('prefabType').addEventListener('change',()=>{if(mode==='prefab')updateStatus()});
 $('applyPrefab').onclick=()=>{
  const targets=[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(n=>n?.kind==='prefab');
