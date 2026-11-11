@@ -362,7 +362,10 @@ function pointerRay(e){
  return ray;
 }
 function pickedNodeAt(e){
- const hits=pointerRay(e).intersectObjects([...surface.children,...cavePiecesLayer.children],true);
+ pointerRay(e);
+ // Ensure raycasting uses current positions even during a live drag.
+ scene.updateMatrixWorld(true);
+ const hits=ray.intersectObjects([...surface.children,...cavePiecesLayer.children],true);
  for(const hit of hits){
   let obj=hit.object;
   while(obj&&!Number.isInteger(obj.userData?.wildtrapNodeId))obj=obj.parent;
@@ -371,7 +374,23 @@ function pickedNodeAt(e){
    if(node)return node;
   }
  }
- return null;
+ // Fallback for imported GLBs whose faces point away from the camera:
+ // intersect the visible model's bounding box without changing GLB materials.
+ let nearest=null,distance=Infinity;
+ for(const [id,roots] of renderedNodes){
+  const node=live.nodes.find(n=>n.id===id);
+  if(node?.kind!=='prefab')continue;
+  for(const root of roots){
+   if(!root.visible)continue;
+   const bounds=new THREE.Box3().setFromObject(root);
+   if(bounds.isEmpty())continue;
+   const intersection=ray.ray.intersectBox(bounds,new THREE.Vector3());
+   if(!intersection)continue;
+   const d=ray.ray.origin.distanceTo(intersection);
+   if(d<distance){distance=d;nearest=node}
+  }
+ }
+ return nearest;
 }
 function updateMarquee(x,y){
  if(!marqueeStart)return;
