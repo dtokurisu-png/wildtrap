@@ -6,7 +6,9 @@ import {createPlaytest} from './playtest.mjs?v=0.9.6';
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.11';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.8';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.12';
+import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.12';
+import {constrainedRotation} from './mesh-deform.mjs?v=0.9.12';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag} from './prefab-gestures.mjs?v=0.9.7';
@@ -36,7 +38,7 @@ const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasi
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
 const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],objectGroups:[],holes:[],cuts3d:[],nextId:1,settings:{heightMax:120}};
-let holesEditor=null;
+let holesEditor=null,vertexEditor=null,testingScene=false;
 // Modo seguro usa otro espacio local: nunca sobreescribe el proyecto habitual.
 const flags=new URLSearchParams(location.search);
 const safeMode=flags.has('safe'),recoveryMode=flags.has('recover');
@@ -66,6 +68,14 @@ function commitObjectVisibility(ids,show){
  if(!targets.length)return;
  snapshot();
  for(const node of targets)node.editorHidden=!show;
+ draw();persist();
+}
+function commitObjectIntangible(ids,enabled){
+ const targets=live.nodes.filter(n=>ids.includes(n.id)&&categoryForNode(n)&&Boolean(n.editorIntangible)!==enabled);
+ if(!targets.length)return;
+ snapshot();
+ for(const n of targets)n.editorIntangible=enabled;
+ if(enabled&&targets.some(n=>n.id===hoveredNodeId))hoveredNodeId=null;
  draw();persist();
 }
 function commitObjectGroup(ids,name){
@@ -100,7 +110,7 @@ sceneObjectManager=createSceneObjectManager({
  getNodes:()=>live.nodes,getGroups:()=>live.objectGroups||[],
  getSelection:()=>[...selectedIds],lookup:prefabById,
  select:ids=>{if(mode==='holePaint')setMode('move');setNodeSelection(ids)},
- setVisibility:commitObjectVisibility,group:commitObjectGroup,
+ setVisibility:commitObjectVisibility,setIntangible:commitObjectIntangible,group:commitObjectGroup,
  ungroup:commitObjectUngroup,rename:commitObjectRename,
  terrainIsVisible:()=>live.settings?.hideTerrainEditor!==true,
  setTerrainVisibility:commitTerrainVisibility
@@ -201,6 +211,7 @@ shape('',new THREE.BoxGeometry(5,6,2.2),0x10131c,radius*.25,height+3.5,1.5,group
 function resolvePoint(p){const a=p?.anchorId&&live.nodes.find(n=>n.id===p.anchorId&&n.kind==='anchor');return a?{x:a.x,z:a.z}:{x:p.x,z:p.z}}
 function snapPoint(x,z){let near=null,best=10;for(const n of live.nodes){if(n.kind!=='anchor')continue;const d=Math.hypot(n.x-x,n.z-z);if(d<best){best=d;near=n}}return near?{x:near.x,z:near.z,anchorId:near.id}:{x,z}}
 function draw(){
+vertexEditor?.beforeDraw();
 renderedNodes.clear();
 for(const collection of [surface,interiors,cavePiecesLayer])while(collection.children.length){
  const g=collection.children[0];collection.remove(g);
@@ -219,7 +230,11 @@ if(n.kind==='exit')marker(n.x,n.z,colours.exit,3);
 if(n.kind==='cave')caveModel(n);
 if(n.kind==='mountain')mountainModel(n);
 if(n.kind==='cavePiece')cavePiecesLayer.add(createCavePieceObject(n,heightAt));
-if(n.kind==='prefab'){const object=prefabLibrary?.instance(n,heightAt,{applyCuts:!recoveryMode});if(object)cavePiecesLayer.add(object);}
+if(n.kind==='prefab'){
+ const appearance=testingScene&&n.editorIntangible?{...n,editorIntangible:false}:n;
+ const object=prefabLibrary?.instance(appearance,heightAt,{applyCuts:!recoveryMode});
+ if(object)cavePiecesLayer.add(object);
+}
 if(n.kind==='path')routeMesh(resolvePoint(n.a),resolvePoint(n.b),'path');
 if(n.kind==='stairs')stairMesh(resolvePoint(n.a),resolvePoint(n.b),n.rise||8);
 if(n.kind==='wall')wallMesh(resolvePoint(n.a),resolvePoint(n.b),n.height||12);
@@ -229,11 +244,21 @@ if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
   root.userData.wildtrapNodeId=n.id;
   roots.push(root);
  }
- for(const root of roots)root.visible=n.editorHidden!==true;
+ for(const root of roots){
+  root.visible=n.editorHidden!==true;
+  if(n.editorIntangible&&!testingScene&&n.kind!=='prefab'){
+   root.traverse(child=>{
+    if(!child.isMesh)return;
+    const fade=m=>{const c=m.clone();c.transparent=true;c.opacity=Math.min(.26,m.opacity??1);c.depthWrite=false;c.side=THREE.DoubleSide;return c};
+    child.material=Array.isArray(child.material)?child.material.map(fade):fade(child.material);
+   });
+  }
+ }
  renderedNodes.set(n.id,roots);
 }
 surface.visible=true;terrain.visible=live.settings?.hideTerrainEditor!==true;interiors.visible=false;
 updateSelectionHighlights();updateHoverHighlight();updateStatus();
+vertexEditor?.rebuild();
 }
 function updatePrefabLoadStatus(){
  if(!prefabLibrary)return;
@@ -437,6 +462,7 @@ if(link.includes(mode)){
 if(mode==='select'||mode==='move'||mode==='delete'){
  let best=null,d=Infinity;
  for(const n of live.nodes){
+if(n.editorHidden||n.editorIntangible)continue;
 let dd=Infinity;
 if(n.x!==undefined)dd=Math.hypot(x-n.x,z-n.z);
 else if(n.a&&n.b){const a=resolvePoint(n.a),b=resolvePoint(n.b),vx=b.x-a.x,vz=b.z-a.z,len=vx*vx+vz*vz;const t=len?clamp(((x-a.x)*vx+(z-a.z)*vz)/len,0,1):0;dd=Math.hypot(x-(a.x+vx*t),z-(a.z+vz*t))}
@@ -494,7 +520,8 @@ $('openPrefabGallery').onclick=()=>prefabGallery.open();
 holesEditor=createTerrainHoles({
  scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,
  getModelRoots:()=>[...renderedNodes].flatMap(([id,roots])=>
-  roots.filter(root=>root.userData.sharedAsset).map(root=>({id,root}))),
+  live.nodes.find(n=>n.id===id&&!n.editorHidden&&!n.editorIntangible)?
+   roots.filter(root=>root.userData.sharedAsset).map(root=>({id,root})):[]),
  renderCuts:!recoveryMode,nextUndoSerial
 });
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y)});
@@ -529,7 +556,7 @@ function pickedNodeAt(e){
   while(obj&&!Number.isInteger(obj.userData?.wildtrapNodeId))obj=obj.parent;
   if(obj){
    const node=live.nodes.find(n=>n.id===obj.userData.wildtrapNodeId);
-   if(node&&!node.editorHidden)return node;
+   if(node&&!node.editorHidden&&!node.editorIntangible)return node;
   }
  }
  // Some imported GLBs have inward-facing normals. Test both sides only
@@ -550,7 +577,7 @@ function pickedNodeAt(e){
   while(obj&&!Number.isInteger(obj.userData?.wildtrapNodeId))obj=obj.parent;
   if(obj){
    const node=live.nodes.find(n=>n.id===obj.userData.wildtrapNodeId);
-   if(node&&!node.editorHidden)return node;
+   if(node&&!node.editorHidden&&!node.editorIntangible)return node;
   }
  }
  return null;
@@ -570,7 +597,7 @@ function marqueeHits(x,y){
  scene.updateMatrixWorld(true);
  camera.updateMatrixWorld(true);
  for(const [id,roots] of renderedNodes){
-  if(live.nodes.find(n=>n.id===id)?.editorHidden)continue;
+  if(live.nodes.find(n=>n.id===id)?.editorHidden||live.nodes.find(n=>n.id===id)?.editorIntangible)continue;
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   for(const root of roots){
    if(!root.visible)continue;
