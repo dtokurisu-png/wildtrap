@@ -573,6 +573,9 @@ function moveModelDrag(e){
    const n=live.nodes.find(x=>x.id===item.id),orig=item.original;
    if(!n)continue;
    Object.assign(n,translateNodeOnTerrain(orig,dx,dz,SIZE));
+   // Migrar una cueva antigua a Y absoluta en el primer arrastre;
+   // nunca dejar que otra pendiente la vuelva a pegar al terreno.
+   if(n.kind==='prefab'&&isFreeCave(n.prefabId))n.y=orig.y;
   }
  }
  updateMovedPrefabs();
