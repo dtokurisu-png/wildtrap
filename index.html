@@ -33,11 +33,12 @@ body.testing #viewport{left:0;top:0;width:100%;height:100%;cursor:grab}
 body.testing #viewport:active{cursor:grabbing}
 body.testing #playHud{display:block}
 body.testing #toast{left:16px;bottom:75px;z-index:9}
+#selectionMarquee{position:fixed;display:none;pointer-events:none;border:1px dashed #f4db7c;background:#e6ce5c29;z-index:7}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Terreno modular v0.8 · 630 × 630 unidades · Sin criaturas · guardado automático local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -57,7 +58,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <section>
 <h2>1. Esculpir el terreno</h2>
 <div class="grid">
-<button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Nivelar</button><button data-tool="smooth">Suavizar</button><button data-tool="select">Seleccionar</button><button data-tool="move">Mover</button>
+<button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Nivelar</button><button data-tool="smooth">Suavizar</button><button data-tool="move">Mover</button>
 </div>
 <label>Radio del pincel <input id="brushRadius" type="range" min="1" max="65" step=".5" value="12"></label>
 <label>Intensidad <input id="strength" type="range" min="1" max="30" value="12"></label>
@@ -89,64 +90,49 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <p class="hint"><b>Radio del pincel:</b> arriba, desde 1 unidad. <b>Profundidad:</b> limita el corte alrededor de la cara elegida; súbela solo si la pared lo necesita. Para cerrar una parte del agujero, pinta sobre ella (también se puede seleccionar una superficie que ya no existe) y pulsa <b>Restaurar región</b>. Los cortes se guardan en el proyecto JSON, con Ctrl+Z disponible. Luego coloca la cueva o el arco como pieza independiente.</p>
 </section>
 <section>
-<h2>2. Importar mapa de alturas</h2>
-<p class="hint">Una imagen limpia con tonalidades verdes. <b>Verde oscuro = zona alta; verde claro = zona baja.</b> El editor convierte los tonos de luminosidad en una malla con relieve.</p>
-<label class="fileBtn">Importar PNG/JPG de alturas<input id="importHeight" type="file" accept="image/png,image/jpeg,image/webp"></label>
-<div class="grid2" style="margin-top:6px"><button id="exportHeight">Exportar alturas PNG</button><label><input id="invertHeight" type="checkbox"> Invertir alturas</label></div>
-</section>
-<section>
 <h2>3. Anclajes, caminos y estructuras</h2>
 <div class="grid">
 <button data-tool="anchor">Anclaje</button><button data-tool="path">Camino</button><button data-tool="wall">Muro</button>
-<button data-tool="stairs">Escalera</button><button data-tool="gate">Compuerta</button><button data-tool="cave">Cueva</button>
-<button data-tool="mountain">Montaña</button><button data-tool="tree">Spawn árbol</button><button data-tool="wallspawn">Spawn muro</button>
+<button data-tool="stairs">Escalera</button><button data-tool="gate">Compuerta</button>
+<button data-tool="tree">Spawn árbol</button><button data-tool="wallspawn">Spawn muro</button>
 <button data-tool="spawn">Respawn</button><button data-tool="exit">Salida</button><button data-tool="delete">Borrar</button>
 </div>
 <div class="grid2"><label>Altura de muros<input id="wallHeight" type="number" min="2" max="60" value="12"></label><label>Subida de escaleras<input id="stairRise" type="number" min="1" max="50" value="8"></label></div>
-<p class="hint">Camino, muro, escalera y compuerta: haz clic en el punto inicial y luego en el final. Si colocas un anclaje cerca, el extremo se ajusta automáticamente a él. Las escaleras generan peldaños reales. La montaña es un módulo autónomo con camino espiral y entrada de cueva. El punto de spawn de árboles es solo un marcador: no genera árboles definitivos.</p>
+<p class="hint">Camino, muro, escalera y compuerta: haz clic en el punto inicial y luego en el final. Si colocas un anclaje cerca, el extremo se ajusta automáticamente a él. Las escaleras generan peldaños reales. El punto de spawn de árboles es solo un marcador: no genera árboles definitivos.</p>
 </section>
 <section id="cavePiecesPanel">
-<h2>Estructuras / Cuevas · Fase 1</h2>
-<p class="hint">Seis modelos 3D independientes con mallas subdivididas, UV, normales e interiores reales. Selecciona una pieza, pulsa <b>Colocar pieza</b> y haz clic en el escenario. Puedes moverla con <b>Mover</b> y seleccionarla para cambiar sus dimensiones.</p>
-<label>Modelo de la biblioteca
-<select id="cavePieceType" style="width:100%;background:#1e4034;color:white;border:1px solid #598071;border-radius:6px;padding:8px">
-<option value="floor">1. Suelo deformable</option>
-<option value="wall">2. Pared rocosa deformable</option>
-<option value="vault">3. Techo arqueado hueco</option>
-<option value="tunnel">4. Túnel de extremos abiertos</option>
-<option value="ramp">5. Rampa transitable</option>
-<option value="chamber">6. Cámara abierta de jefe</option>
+<h2>Estructuras / Cuevas · Modelos GLB</h2>
+<p class="hint">Modelos originales del repositorio: una montaña y tres cuevas. Selecciona uno y pulsa <b>Colocar modelo</b>, después haz clic en el escenario. Los cuatro modelos quedan independientes para moverlos, rotarlos y escalarlos.</p>
+<label>Modelo 3D
+<select id="prefabType" style="width:100%;background:#1e4034;color:white;border:1px solid #598071;border-radius:6px;padding:8px">
+<option value="mountain">Montaña</option>
+<option value="rocky-cave">Cueva rocosa · Rocky Ring</option>
+<option value="stone-cave">Cueva de piedra · Stone Ruin</option>
+<option value="stylized-cave">Cueva estilizada · Stylized Rock Ring</option>
 </select></label>
-<button data-tool="cavePiece" style="width:100%;font-weight:700">+ Colocar pieza de cueva</button>
+<button data-tool="prefab" style="width:100%;font-weight:700">+ Colocar modelo GLB</button>
+<small id="prefabStatus">Preparando los cuatro modelos…</small>
 <div class="grid2">
-<label>Anchura<input id="pieceWidth" type="number" min="4" max="90" step=".5" value="18"></label>
-<label>Longitud<input id="pieceLength" type="number" min="4" max="90" step=".5" value="18"></label>
-<label>Altura<input id="pieceHeight" type="number" min=".3" max="50" step=".5" value="1"></label>
-<label>Grosor<input id="pieceThickness" type="number" min=".25" max="5" step=".25" value="1.25"></label>
-<label>Rotación Y (°)<input id="pieceRotation" type="number" min="-360" max="360" step="5" value="0"></label>
-<label>Desplazamiento Y<input id="pieceOffsetY" type="number" min="-150" max="150" step=".5" value="0"></label>
-<label>Escala<input id="pieceScale" type="number" min=".2" max="5" step=".1" value="1"></label>
+<label>Posición X<input id="prefabX" type="number" step=".5" value="0"></label>
+<label>Posición Z<input id="prefabZ" type="number" step=".5" value="0"></label>
+<label>Rotación Y (°)<input id="prefabRotation" type="number" step="5" value="0"></label>
+<label>Altura adicional Y<input id="prefabOffsetY" type="number" step=".5" value="0"></label>
+<label>Escala<input id="prefabScale" type="number" min=".05" max="15" step=".1" value="1"></label>
 </div>
 <div class="grid2">
-<button id="applyCavePiece">Aplicar dimensiones</button>
-<button id="duplicateCavePiece">Duplicar pieza</button>
+<button id="applyPrefab">Aplicar cambios</button>
+<button id="duplicatePrefab">Duplicar modelo</button>
 </div>
-<p class="hint" id="pieceVertexInfo">Selecciona una pieza para modificarla</p>
-<p class="hint">En esta fase puedes colocar, seleccionar, mover, rotar, escalar y dimensionar. Las mallas <b>ya admiten deformaciones por vértice</b> en su formato interno. El pincel de esculpido sobre ellas y la exportación GLB se incorporarán en las fases 2 y 3.</p>
+<p class="hint">Para seleccionar sin cambiar de herramienta: <b>Ctrl + clic izquierdo</b> sobre un objeto. Para varios: <b>Ctrl + clic derecho y arrastrar</b> un rectángulo. Mantén los modelos GLB originales en assets/terrain/.</p>
 </section>
 <section>
-<h2>4. Cueva bajo el terreno</h2>
-<label><input id="underground" type="checkbox"> Mostrar interiores subterráneos</label><div class="grid2"><button id="focusCave">Entrar a cueva elegida</button><button id="surfaceView">Volver a superficie</button></div>
-<p class="hint">Cada cueva tiene una entrada visible y una sala separada bajo la malla (Y = −15). Selecciona una cueva y pulsa «Entrar» para inspeccionarla en 3D. En el juego, el portal debe cambiar de capa de colisiones y activar solo los colliders del interior; no se desactivará todo el suelo.</p>
+<h2>Elementos seleccionados</h2>
+<small id="selected">Nada seleccionado</small>
+<div class="grid2" style="margin-top:8px"><button id="remove">Eliminar selección</button><button id="clearNodeSelection">Deseleccionar</button></div><small id="pending"></small>
 </section>
-<section>
-<h2>Selección y módulos</h2><small id="selected">Nada seleccionado</small>
-<div class="grid2"><label>Altura montaña<input id="moduleHeight" type="number" min="4" max="100" value="35"></label><label>Radio montaña<input id="moduleRadius" type="number" min="10" max="90" value="33"></label></div>
-<label>Escala de cueva<input id="moduleScale" type="number" min="0.3" max="3" step="0.1" value="1"></label><button id="applyModule">Aplicar dimensiones al módulo</button><div class="grid2" style="margin-top:8px"><button id="remove">Eliminar seleccionado</button></div><small id="pending"></small>
-</section>
-<div class="hint">Clic izquierdo: editar · Arrastrar: pintar o mover · Rueda: zoom · Botón central: desplazar · Vista 3D: botón derecho para orbitar · Ctrl+Z: deshacer · Supr: eliminar elemento · Escape: cancelar herramienta.</div>
+<div class="hint">Ctrl + clic: seleccionar · Ctrl + clic derecho arrastrando: selección múltiple · Arrastrar con Mover: desplazar selección · Rueda: zoom · Botón central: desplazar · Botón derecho: orbitar · Ctrl+Z: deshacer · Supr: eliminar selección · Esc: cancelar.</div>
 </aside>
-<canvas id="viewport"></canvas>
+<canvas id="viewport"></canvas><div id="selectionMarquee"></div>
 <div id="overlay"><b id="viewType">Vista cenital</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div></div>
 <div id="toast"></div>
 <div id="playHud">
