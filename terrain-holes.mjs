@@ -3,12 +3,31 @@ import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-te
 
 // The knife uses clicks, not a brush. Original surfaces remain raycastable
 // even after cutting, so a closed polygon can restore an older hole.
-export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,getModelRoots=()=>[],renderCuts=true}){
+export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,getModelRoots=()=>[],renderCuts=true,nextUndoSerial=()=>0}){
  const originalMesh=new THREE.Mesh(terrainGeo,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
  originalMesh.name='Base heightmap for accurate 3D raycast';
  originalMesh.updateMatrixWorld(true); // Not added to scene or visible in renderer.
  const selected=[]; // Exactly one prepared polygon per operation.
  const anchors=[]; // Clicked world-space corners; no mouse interpolation.
+ const pendingHistory=[]; // Undo history lives only until a cut is committed/cancelled.
+ function rememberPending(){
+  pendingHistory.push({
+   serial:nextUndoSerial(),
+   anchors:anchors.map(a=>({...a,position:a.position.slice(),normal:a.normal.slice(),screen:a.screen?.slice()||null})),
+   closed,
+   selected:structuredClone(selected)
+  });
+  if(pendingHistory.length>64)pendingHistory.shift();
+ }
+ function pendingUndoSerial(){return pendingHistory.at(-1)?.serial??-1;}
+ function undoPending(){
+  const previous=pendingHistory.pop();
+  if(!previous)return false;
+  anchors.splice(0,anchors.length,...previous.anchors);
+  selected.splice(0,selected.length,...previous.selected);
+  closed=previous.closed;hover=null;renderSelection();
+  return true;
+ }
  let closed=false,hover=null,prepared=[],legacy=new Set(),generated=null;
  const overlay=new THREE.Group();
  overlay.name='Polygon knife · vertices and edges';
@@ -224,6 +243,7 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
    const last=anchors.at(-1).position;
    if(Math.hypot(...position.map((v,i)=>v-last[i]))<.05)return;
   }
+  rememberPending();
   anchors.push({position,normal:hit.normal.slice(),modelNodeId:id,screen:screen||null});
   hover=null;renderSelection();
  }
@@ -237,15 +257,18 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   if(closed||anchors.length<3){toast('Coloca al menos tres puntos para cerrar el contorno');return false;}
   const stamp=selectedStamp();
   if(!stamp){toast('Contorno inválido: evita líneas cruzadas, puntos repetidos o una forma sin área');return false;}
+  rememberPending();
   selected.splice(0,selected.length,stamp);
   closed=true;hover=null;renderSelection();return true;
  }
  function removeLastPoint(){
+  if(!anchors.length)return;
+  rememberPending();
   if(closed){closed=false;selected.length=0;}
   anchors.pop();hover=null;renderSelection();
  }
  function clearSelection(){
-  anchors.length=0;selected.length=0;closed=false;hover=null;renderSelection();
+  anchors.length=0;selected.length=0;pendingHistory.length=0;closed=false;hover=null;renderSelection();
  }
  function endStroke(){} // Pointer release does not change a click-based knife.
  function apply(cut){
@@ -290,5 +313,5 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
    ' polígono(s)'+(modelChanged?' · mallas GLB actualizadas':''));
  }
  function count(){return legacy.size+prepared.length+live.nodes.reduce((sum,node)=>sum+(node.cuts3d?.length||0),0)}
- return {pick,addPoint,hoverAt,closePolygon,removeLastPoint,endStroke,clearSelection,apply,syncGeometry,isHoleAt,count,overlay};
+ return {pick,addPoint,hoverAt,closePolygon,removeLastPoint,endStroke,clearSelection,apply,syncGeometry,isHoleAt,count,overlay,undoPending,pendingUndoSerial};
 }
