@@ -53,11 +53,11 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 #prefabDialog .modal-foot{margin-top:12px;font-size:12px;color:#bbd9ca}
 @media(max-width:560px){#prefabDialog{padding:11px}#prefabCards{grid-template-columns:1fr}.prefab-card img{aspect-ratio:2}#prefabModal{padding:7px}}
 </style>
-<link rel="stylesheet" href="./editor-workspace.css?v=0.9.11">
+<link rel="stylesheet" href="./editor-workspace.css?v=0.9.12">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.11 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.12 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -132,6 +132,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <label>Posición Z<input id="prefabZ" type="number" step=".5" value="0"></label>
 <label>Rotación horizontal Y (°)<input id="prefabRotation" type="number" step="5" value="0"></label>
 <label>Inclinación vertical X (°)<input id="prefabRotationX" type="number" step="5" value="0"></label>
+<label>Rotación Z (°)<input id="prefabRotationZ" type="number" step="5" value="0"></label>
 <label><span id="prefabHeightLabel">Altura Y (anclada al terreno)</span><input id="prefabOffsetY" type="number" step=".5" value="0" disabled></label>
 <label>Escala<input id="prefabScale" type="number" min=".05" max="15" step=".1" value="1"></label>
 </div>
@@ -170,7 +171,37 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
   <div class="modal-foot">Haz clic en una estructura para prepararla y después colócala sobre el escenario. Las vistas previas son de los GLB reales.</div>
  </div>
 </div>
-<script src="./editor-workspace.js?v=0.9.11"></script>
+<section id="transformConstraints" hidden aria-label="Restricciones de transformación">
+ <h2>Restricciones de rotación · Alt + arrastrar</h2>
+ <div class="axis-lock-row" role="group" aria-label="Bloquear ejes de rotación">
+  <button type="button" data-rotation-lock="x" aria-pressed="false">X libre</button>
+  <button type="button" data-rotation-lock="y" aria-pressed="false">Y libre</button>
+  <button type="button" data-rotation-lock="z" aria-pressed="false">Z libre</button>
+ </div>
+ <p class="hint">Bloquear X e Y deja girar solo en Z. Bloquear X y Z deja girar solo en Y; bloquear Y y Z deja girar solo en X.</p>
+ <label class="anchor-toggle"><input id="anchorScaleY" type="checkbox"> Anclar base Y al escalar (posición inferior original)</label>
+ <p class="hint">La referencia del anclaje se calcula a partir del modelo al comenzar el escalado, no del terreno ni del nivel global 0.</p>
+</section>
+<section id="meshEditControls" hidden aria-label="Edición de malla 3D">
+ <h2>Ver malla · Vértices a través del objeto</h2>
+ <p class="hint" id="meshEditHelp">Selecciona un GLB para editar sus vértices.</p>
+ <div class="mesh-stats"><span>Mallas: <b id="meshMeshCount">0</b></span><span>Vértices: <b id="meshVertexCount">0</b></span><span>Seleccionados: <b id="meshVertexSelected">0</b></span><span>Bloqueados: <b id="meshVertexLocked">0</b></span></div>
+ <p class="hint">Clic: seleccionar un vértice (incluye los coincidentes); arrastra un rectángulo para seleccionar una zona. Ctrl + clic añade o elimina puntos. Se ven los vértices traseros.</p>
+ <div class="grid2"><button id="meshSelectAll" type="button">Seleccionar todos</button><button id="meshDeselect" type="button">Deseleccionar</button></div>
+ <div class="grid2"><button id="meshLockVertices" type="button" disabled>🔒 Bloquear vértices</button><button id="meshUnlockVertices" type="button" disabled>🔓 Desbloquear vértices</button></div>
+ <h2>Deformar vértices libres</h2>
+ <div class="grid2">
+  <label>Eje de escala<select id="meshScaleAxis"><option value="y">Y · Vertical</option><option value="x">X · Horizontal</option><option value="z">Z · Profundidad</option><option value="xyz">XYZ · Uniforme</option></select></label>
+  <label>Factor<input id="meshScaleFactor" type="number" min=".1" max="5" step=".05" value="1.25"></label>
+ </div>
+ <p class="hint">Los vértices bloqueados permanecen exactamente en su lugar. Si activas Anclar base Y en la pestaña Objeto, la parte inferior original no se mueve al escalar los demás.</p>
+ <div class="grid2"><button id="meshScaleApply" type="button" disabled>Aplicar escala libre</button><button id="meshResetDeform" type="button" disabled>Restaurar deformación</button></div>
+</section>
+<script src="./editor-workspace.js?v=0.9.12"></script>
+<div id="axisGizmo" aria-label="Ejes del espacio 3D: X rojo, Y verde vertical, Z azul">
+ <svg id="axisGizmoSvg" viewBox="0 0 112 110" width="112" height="110" aria-hidden="true"></svg>
+ <span>XYZ</span>
+</div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
 <div id="overlay"><b id="viewType">Vista cenital</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
@@ -205,5 +236,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.11').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.12').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
