@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {PREFABS} from './prefab-catalog.mjs?v=0.9.5';
+import {PREFABS} from './prefab-catalog.mjs?v=0.9.6';
 
 // Visual catalog: pictures are rendered from the actual cached GLB geometry.
 // One lazily created WebGL context supplies images for every model and angle.
