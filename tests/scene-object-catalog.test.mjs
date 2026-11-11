@@ -26,7 +26,7 @@ test('El visor solo enumera modelos persistentes colocados',()=>{
  const tree=objectTree(nodes,[],look);
  assert.equal(sceneObjectCount(nodes),6);
  assert.deepEqual(tree.map(g=>g.name),['Cuevas','Montañas','Piezas de cueva']);
- assert.deepEqual(tree.flatMap(g=>g.objects.map(o=>o.id)),[1,5,2,3,6,4].sort((a,b)=>a-b).length===6?tree.flatMap(g=>g.objects.map(o=>o.id)):[1,2,5,3,6,4]);
+ assert.deepEqual(tree.flatMap(g=>g.objects.map(o=>o.id)),[1,2,5,3,6,4]);
  assert.ok(tree.flatMap(g=>g.objects).every(o=>o.id<7));
  assert.ok(tree.find(g=>g.name==='Cuevas').objects.find(o=>o.id===2).hidden);
 });
