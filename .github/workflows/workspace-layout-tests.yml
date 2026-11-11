@@ -1,0 +1,36 @@
+name: Validar espacio de trabajo con tres paneles
+on:
+  push:
+    branches: [main, feat/workspace-layout-v0.9.9]
+    paths:
+      - 'editor-workspace.js'
+      - 'editor-workspace.css'
+      - 'index.html'
+      - 'tests/browser-workspace.mjs'
+      - 'tests/workspace-smoke.html'
+      - '.github/workflows/workspace-layout-tests.yml'
+  workflow_dispatch:
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check editor-workspace.js
+      - run: node --check editor.mjs
+      - run: node --check tests/browser-workspace.mjs
+      - name: Arrancar WILDTRAP en servidor local
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-workspace-http.log 2>&1 &
+          sleep 2
+      - name: Comprobar tres paneles y controles en Chromium
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-workspace.mjs
+      - name: Comprobar arranque habitual y seguro en Chromium
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-startup.mjs
