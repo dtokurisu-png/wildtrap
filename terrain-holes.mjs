@@ -1,21 +1,30 @@
 import * as THREE from 'three';
-import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-terrain-cuts.mjs?v=0.9.6';
+import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-terrain-cuts.mjs?v=0.9.8';
 
-// Selection happens against the uncut mesh: we can also restore a hole by
-// painting where the surface USED TO BE. The sculptor remains heightmap-based.
+// The knife uses clicks, not a brush. Original surfaces remain raycastable
+// even after cutting, so a closed polygon can restore an older hole.
 export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,getModelRoots=()=>[],renderCuts=true}){
  const originalMesh=new THREE.Mesh(terrainGeo,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
  originalMesh.name='Base heightmap for accurate 3D raycast';
  originalMesh.updateMatrixWorld(true); // Not added to scene or visible in renderer.
- const selected=[];
- let previous=null,prepared=[],legacy=new Set(),generated=null;
- const overlay=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({
-  color:0xffc477,side:THREE.DoubleSide,transparent:true,opacity:.37,
-  depthWrite:false,depthTest:false
- }));
- overlay.name='3D cut selection (not whole heightmap cells)';
+ const selected=[]; // Exactly one prepared polygon per operation.
+ const anchors=[]; // Clicked world-space corners; no mouse interpolation.
+ let closed=false,hover=null,prepared=[],legacy=new Set(),generated=null;
+ const overlay=new THREE.Group();
+ overlay.name='Polygon knife · vertices and edges';
  overlay.userData.editorOnly=true;overlay.renderOrder=16;overlay.frustumCulled=false;
- scene.add(overlay);
+ const edges=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({
+  color:0xffc477,transparent:true,opacity:1,depthTest:false,depthWrite:false
+ }));
+ const corners=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({
+  color:0xfff4ad,size:9,sizeAttenuation:false,depthTest:false,depthWrite:false
+ }));
+ const fill=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({
+  color:0xffc477,transparent:true,opacity:.24,depthTest:false,depthWrite:false,
+  side:THREE.DoubleSide
+ }));
+ edges.renderOrder=18;corners.renderOrder=19;fill.renderOrder=17;
+ overlay.add(fill,edges,corners);scene.add(overlay);
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
  const vec=(a)=>new THREE.Vector3(...a);
  function pick(ray){
@@ -102,86 +111,146 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
  function isHoleAt(x,z,y=heightAt(x,z)){
   return isTerrainCutAt(x,y,z,legacy,prepared,live.size,live.resolution);
  }
- function renderSelection(){
-  const vertices=[];
-  for(const input of selected){
-   const s=prepareCutStamp(input.worldPreview||input);
-   if(!s)continue;
-   const c=vec(s.center),u=vec(s.u),v=vec(s.v),n=vec(s.normal);
-   c.addScaledVector(n,.22);
-   for(let i=0;i<s.polygon.length;i++){
-    const a=s.polygon[i],b=s.polygon[(i+1)%s.polygon.length];
-    const pa=c.clone().addScaledVector(u,a[0]).addScaledVector(v,a[1]);
-    const pb=c.clone().addScaledVector(u,b[0]).addScaledVector(v,b[1]);
-    vertices.push(...c.toArray(),...pa.toArray(),...pb.toArray());
-   }
+
+ // Same tangent basis as the geometry engine. The click positions are kept intact
+ // in the preview; their projected 2D outline defines a precise prism in the mesh.
+ function basisFromPositions(points,normals){
+  const expected=new THREE.Vector3();
+  for(const n of normals)expected.add(n);
+  if(expected.lengthSq()<1e-9)expected.set(0,1,0);
+  expected.normalize();
+  const normal=new THREE.Vector3();
+  for(let i=0;i<points.length;i++){
+   const a=points[i],b=points[(i+1)%points.length];
+   normal.x+=(a.y-b.y)*(a.z+b.z);
+   normal.y+=(a.z-b.z)*(a.x+b.x);
+   normal.z+=(a.x-b.x)*(a.y+b.y);
   }
+  if(normal.lengthSq()<1e-9)normal.copy(expected);
+  normal.normalize();
+  if(normal.dot(expected)<0)normal.negate();
+  const u=Math.abs(normal.y)>.95?new THREE.Vector3(1,0,0):
+   new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),normal).normalize();
+  const v=new THREE.Vector3().crossVectors(normal,u).normalize();
+  return {normal,u,v};
+ }
+ function shapeFor(points,normals){
+  const {normal,u,v}=basisFromPositions(points,normals);
+  const center=points[0];
+  const polygon=points.map(p=>{
+   const relative=p.clone().sub(center);
+   return [relative.dot(u),relative.dot(v)];
+  });
+  return {center:center.toArray(),normal:normal.toArray(),shape:'polygon',
+   polygon,depth:clamp(Number($('holeDepth')?.value)||2,.25,20)};
+ }
+ function selectedStamp(){
+  if(anchors.length<3)return null;
+  const points=anchors.map(p=>vec(p.position));
+  const normals=anchors.map(p=>vec(p.normal));
+  const worldPreview=shapeFor(points,normals);
+  if(!prepareCutStamp(worldPreview))return null;
+  const modelNodeId=anchors[0].modelNodeId;
+  if(modelNodeId===null)return {...worldPreview,worldPreview};
+  const root=getModelRoots().find(entry=>entry.id===modelNodeId)?.root;
+  if(!root)return null;
+  root.updateMatrixWorld(true);
+  const localPoints=points.map(p=>root.worldToLocal(p.clone()));
+  const localNormals=points.map((p,i)=>root.worldToLocal(p.clone().add(normals[i]))
+   .sub(root.worldToLocal(p.clone())).normalize());
+  const local=shapeFor(localPoints,localNormals);
+  const scale=root.getWorldScale(new THREE.Vector3());
+  const factor=Math.max(.01,Math.min(Math.abs(scale.x),Math.abs(scale.y),Math.abs(scale.z)));
+  local.depth=clamp(worldPreview.depth/factor,.25,20);
+  if(!prepareCutStamp(local))return null;
+  return {...local,modelNodeId,worldPreview};
+ }
+ function setGeometry(mesh,vertices){
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
-  const old=overlay.geometry;
-  overlay.geometry=geometry;old.dispose();
-  overlay.visible=selected.length>0;
-  $('holeSelectionCount').textContent=selected.length+' trazos 3D seleccionados';
+  const old=mesh.geometry;mesh.geometry=geometry;old.dispose();
  }
- function paint(hit,remove=false){
-  if(!hit||!Array.isArray(hit.normal))return;
+ function renderSelection(){
+  const lines=[],dots=[],triangles=[];
+  const first=anchors[0];
+  const offsetPoint=p=>vec(p.position).addScaledVector(vec(p.normal),.15).toArray();
+  const pushSegment=(a,b)=>lines.push(...a,...b);
+  for(const a of anchors)dots.push(...offsetPoint(a));
+  for(let i=1;i<anchors.length;i++)pushSegment(offsetPoint(anchors[i-1]),offsetPoint(anchors[i]));
+  if(closed&&anchors.length>=3)pushSegment(offsetPoint(anchors.at(-1)),offsetPoint(first));
+  if(!closed&&anchors.length&&hover&&hover.modelNodeId===first.modelNodeId){
+   let target=hover;
+   // Preview closing edge when near the initial corner.
+   if(hover.screen&&first.screen&&anchors.length>=3&&
+    Math.hypot(hover.screen[0]-first.screen[0],hover.screen[1]-first.screen[1])<14)target=first;
+   pushSegment(offsetPoint(anchors.at(-1)),offsetPoint(target));
+  }
+  if(closed&&selected[0]){
+   const s=prepareCutStamp(selected[0].worldPreview||selected[0]);
+   if(s){
+    const origin=vec(s.center).addScaledVector(vec(s.normal),.10);
+    const u=vec(s.u),v=vec(s.v);
+    const p=s.polygon.map(p=>new THREE.Vector2(p[0],p[1]));
+    const faces=THREE.ShapeUtils.triangulateShape(p,[]);
+    for(const face of faces)for(const i of face){
+     triangles.push(...origin.clone().addScaledVector(u,p[i].x).addScaledVector(v,p[i].y).toArray());
+    }
+   }
+  }
+  setGeometry(edges,lines);setGeometry(corners,dots);setGeometry(fill,triangles);
+  fill.visible=triangles.length>0;
+  overlay.visible=anchors.length>0;
+  $('holeSelectionCount').textContent=closed?
+   'Contorno cerrado · '+anchors.length+' vértices · listo para cortar':
+   anchors.length+' vértices · '+(anchors.length?'haz clic en el primero para cerrar':'clic para iniciar el contorno');
+  $('createHole').disabled=!closed;
+  $('restoreHole').disabled=!closed;
+  $('undoHolePoint').disabled=!anchors.length;
+  $('closeHoleContour').disabled=closed||anchors.length<3;
+ }
+ function addPoint(hit,screen){
+  if(!hit||!Array.isArray(hit.normal)||closed)return;
+  const id=Number.isInteger(hit.modelNodeId)?hit.modelNodeId:null;
+  if(anchors.length&&anchors[0].modelNodeId!==id){
+   toast('Continúa sobre la misma malla o reinicia el contorno.');return;
+  }
+  if(anchors.length>=3&&screen&&anchors[0].screen&&
+   Math.hypot(screen[0]-anchors[0].screen[0],screen[1]-anchors[0].screen[1])<14){
+   closePolygon();return;
+  }
+  if(anchors.length>=48){toast('Máximo 48 puntos por contorno');return;}
   const position=[hit.x,hit.y,hit.z];
-  const modelNodeId=Number.isInteger(hit.modelNodeId)?hit.modelNodeId:null;
-  const radius=clamp(Number($('brushRadius').value)||4,.4,65);
-  if(remove){
-   const n=selected.length;
-   for(let i=selected.length-1;i>=0;i--){
-    const entry=selected[i],p=(entry.worldPreview||entry).center;
-    if((entry.modelNodeId??null)===modelNodeId&&Math.hypot(position[0]-p[0],position[1]-p[1],position[2]-p[2])<=radius)selected.splice(i,1);
-   }
-   previous=null;
-   if(n!==selected.length)renderSelection();
-   return;
+  if(anchors.length){
+   const last=anchors.at(-1).position;
+   if(Math.hypot(...position.map((v,i)=>v-last[i]))<.05)return;
   }
-  const depth=clamp(Number($('holeDepth')?.value)||2,.25,20);
-  const shape=$('holeShape').value,dir=$('holeDirection').value;
-  const minGap=Math.max(.6,radius*.33);
-  const last=previous?.modelNodeId===modelNodeId?previous:null;
-  const distance=last?Math.hypot(...position.map((x,i)=>x-last.center[i])):Infinity;
-  if(last&&distance<minGap)return;
-  // Interpolate fast mouse strokes, no gaps between neighbouring brushes.
-  const steps=last?Math.max(1,Math.ceil(distance/minGap)):1;
-  const count=Math.min(steps,Math.max(0,180-selected.length));
-  for(let i=1;i<=count;i++){
-   // Never stretch individual brush stamps across a fast mouse movement.
-   // When selection is full, leave the remaining distance for a new pass.
-   const t=i/steps;
-   const center=last?last.center.map((x,k)=>x+(position[k]-x)*t):position.slice();
-   const normal=last?last.normal.map((x,k)=>x+(hit.normal[k]-x)*t):hit.normal.slice();
-   const worldPreview={center,normal,radius,depth,shape,dir};
-   let s=worldPreview;
-   if(modelNodeId!==null){
-    const root=getModelRoots().find(item=>item.id===modelNodeId)?.root;
-    if(!root)continue;
-    root.updateMatrixWorld(true);
-    const centerVec=vec(center);
-    const localPoint=root.worldToLocal(centerVec.clone());
-    const localNext=root.worldToLocal(centerVec.clone().add(vec(normal)));
-    const localNormal=localNext.sub(localPoint).normalize();
-    const rootScale=root.getWorldScale(new THREE.Vector3());
-    const factor=Math.max(.01,Math.abs(rootScale.x));
-    s={center:localPoint.toArray(),normal:localNormal.toArray(),
-     radius:radius/factor,depth:depth/factor,shape,dir,modelNodeId,worldPreview};
-   }
-   if(prepareCutStamp(s))selected.push(s);
-  }
-  if(count<steps)toast('Selección completa: aplica el corte y continúa con otra pasada');
-  const tail=selected[selected.length-1];
-  const world=tail?.worldPreview||tail;
-  previous=tail&&((tail.modelNodeId??null)===modelNodeId)?
-   {center:world.center.slice(),normal:world.normal.slice(),modelNodeId}:last;
-  if(count)renderSelection();
+  anchors.push({position,normal:hit.normal.slice(),modelNodeId:id,screen:screen||null});
+  hover=null;renderSelection();
  }
- function clearSelection(){selected.length=0;previous=null;renderSelection()}
- function endStroke(){previous=null}
+ function hoverAt(hit,screen){
+  hover=hit&&Array.isArray(hit.normal)?
+   {position:[hit.x,hit.y,hit.z],normal:hit.normal.slice(),
+    modelNodeId:Number.isInteger(hit.modelNodeId)?hit.modelNodeId:null,screen:screen||null}:null;
+  if(anchors.length&&!closed)renderSelection();
+ }
+ function closePolygon(){
+  if(closed||anchors.length<3){toast('Coloca al menos tres puntos para cerrar el contorno');return false;}
+  const stamp=selectedStamp();
+  if(!stamp){toast('Contorno inválido: evita líneas cruzadas, puntos repetidos o una forma sin área');return false;}
+  selected.splice(0,selected.length,stamp);
+  closed=true;hover=null;renderSelection();return true;
+ }
+ function removeLastPoint(){
+  if(closed){closed=false;selected.length=0;}
+  anchors.pop();hover=null;renderSelection();
+ }
+ function clearSelection(){
+  anchors.length=0;selected.length=0;closed=false;hover=null;renderSelection();
+ }
+ function endStroke(){} // Pointer release does not change a click-based knife.
  function apply(cut){
   if(!renderCuts){toast('Recortes suspendidos en recuperación: primero guarda una copia del escenario.');return}
-  if(!selected.length){toast('Primero pinta una zona directamente sobre una superficie 3D');return}
+  if(!closed||selected.length!==1){toast('Primero cierra el contorno del cuchillo');return}
   const perModel=new Map();
   let terrainCount=0;
   for(const stamp of selected){
@@ -218,8 +287,8 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   if(terrainChanged)refreshTerrain();
   persist();
   toast((cut?'Recorte':'Restauración')+' 3D aplicado: '+applied+
-   ' trazo(s)'+(modelChanged?' · mallas GLB actualizadas':''));
+   ' polígono(s)'+(modelChanged?' · mallas GLB actualizadas':''));
  }
  function count(){return legacy.size+prepared.length+live.nodes.reduce((sum,node)=>sum+(node.cuts3d?.length||0),0)}
- return {pick,paint,endStroke,clearSelection,apply,syncGeometry,isHoleAt,count,overlay};
+ return {pick,addPoint,hoverAt,closePolygon,removeLastPoint,endStroke,clearSelection,apply,syncGeometry,isHoleAt,count,overlay};
 }
