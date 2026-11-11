@@ -266,6 +266,9 @@ else camera.aspect=w/h;camera.updateProjectionMatrix();
 let viewSpan=720;
 function setTop(){camera.position.set(0,950,.01);camera.up.set(0,0,-1);orbit.target.set(0,0,0);camera.lookAt(0,0,0);orbit.update();orbit.enableRotate=false;resize()}
 setTop();
+prefabLibrary=createPrefabLibrary(()=>{draw();updatePrefabLoadStatus()});
+void prefabLibrary.preload().then(()=>{draw();updatePrefabLoadStatus()});
+updatePrefabLoadStatus();
 holesEditor=createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$});
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y)});
 $('test').onclick=()=>preview.start();
@@ -274,10 +277,111 @@ $('restoreHole').onclick=()=>{holesEditor.apply(false);draw()};
 $('clearHoleSelection').onclick=()=>holesEditor.clearSelection();
 $('stopTest').onclick=()=>preview.stop();
 $('localFarolera').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview.fromFile(file);e.target.value=''});
+function setNodeSelection(ids){
+ selectedIds.clear();
+ for(const id of ids)if(live.nodes.some(n=>n.id===id))selectedIds.add(id);
+ selectedId=[...selectedIds].at(-1)??null;
+ updateSelectionHighlights();updateStatus();
+}
+function pointerRay(e){
+ const bounds=view.getBoundingClientRect();
+ mouse.x=(e.clientX-bounds.left)/bounds.width*2-1;
+ mouse.y=-(e.clientY-bounds.top)/bounds.height*2+1;
+ ray.setFromCamera(mouse,camera);
+ return ray;
+}
+function pickedNodeAt(e){
+ const hits=pointerRay(e).intersectObjects([...surface.children,...cavePiecesLayer.children],true);
+ for(const hit of hits){
+  let obj=hit.object;
+  while(obj&&!Number.isInteger(obj.userData?.wildtrapNodeId))obj=obj.parent;
+  if(obj){
+   const node=live.nodes.find(n=>n.id===obj.userData.wildtrapNodeId);
+   if(node)return node;
+  }
+ }
+ return null;
+}
+function updateMarquee(x,y){
+ if(!marqueeStart)return;
+ const el=$('selectionMarquee');
+ const left=Math.min(marqueeStart.x,x),top=Math.min(marqueeStart.y,y);
+ el.style.left=left+'px';el.style.top=top+'px';
+ el.style.width=Math.abs(x-marqueeStart.x)+'px';
+ el.style.height=Math.abs(y-marqueeStart.y)+'px';
+}
+function marqueeHits(x,y){
+ const left=Math.min(marqueeStart.x,x),right=Math.max(marqueeStart.x,x);
+ const top=Math.min(marqueeStart.y,y),bottom=Math.max(marqueeStart.y,y);
+ const viewBox=view.getBoundingClientRect(),ids=[];
+ scene.updateMatrixWorld(true);
+ camera.updateMatrixWorld(true);
+ for(const [id,roots] of renderedNodes){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const root of roots){
+   if(!root.visible)continue;
+   const bounds=new THREE.Box3().setFromObject(root);
+   if(bounds.isEmpty())continue;
+   for(const bx of [bounds.min.x,bounds.max.x])
+    for(const by of [bounds.min.y,bounds.max.y])
+     for(const bz of [bounds.min.z,bounds.max.z]){
+      const v=new THREE.Vector3(bx,by,bz).project(camera);
+      if(v.z < -1||v.z>1)continue;
+      const sx=viewBox.left+(v.x+1)*viewBox.width/2;
+      const sy=viewBox.top+(1-v.y)*viewBox.height/2;
+      minX=Math.min(minX,sx);minY=Math.min(minY,sy);
+      maxX=Math.max(maxX,sx);maxY=Math.max(maxY,sy);
+     }
+  }
+  if(minX<=right&&maxX>=left&&minY<=bottom&&maxY>=top)ids.push(id);
+ }
+ return ids;
+}
+let previousOrbitEnabled=true;
 view.addEventListener('pointerdown',e=>{
-if(preview.active||preview.busy)return;
-if(e.button!==0)return;const p=convertCoords(e);if(!p)return;
+ if(preview.active||preview.busy||!e.ctrlKey||(e.button!==0&&e.button!==2))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(e.button===0){
+  const picked=pickedNodeAt(e);
+  if(!picked){setNodeSelection([]);return}
+  const next=new Set(selectedIds);
+  if(next.has(picked.id))next.delete(picked.id);else next.add(picked.id);
+  setNodeSelection(next);
+ }else{
+  marqueeStart={x:e.clientX,y:e.clientY};
+  previousOrbitEnabled=orbit.enabled;orbit.enabled=false;
+  $('selectionMarquee').style.display='block';
+  updateMarquee(e.clientX,e.clientY);
+ }
+},true);
+view.addEventListener('pointermove',e=>{
+ if(!marqueeStart)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ updateMarquee(e.clientX,e.clientY);
+},true);
+view.addEventListener('contextmenu',e=>{if(e.ctrlKey||marqueeStart)e.preventDefault()});
+window.addEventListener('pointerup',e=>{
+ if(!marqueeStart)return;
+ const start=marqueeStart,dx=e.clientX-start.x,dy=e.clientY-start.y;
+ if(Math.hypot(dx,dy)>5)setNodeSelection(marqueeHits(e.clientX,e.clientY));
+ marqueeStart=null;
+ $('selectionMarquee').style.display='none';
+ orbit.enabled=previousOrbitEnabled;
+});
+view.addEventListener('pointerdown',e=>{
+if(preview.active||preview.busy||marqueeStart)return;
+if(e.button!==0)return;
+const p=convertCoords(e);if(!p)return;
 pointerDown=true;changed=false;
+if(mode==='move'){
+ const hovered=pickedNodeAt(e);
+ if(hovered){
+  if(!selectedIds.has(hovered.id))setNodeSelection([hovered.id]);
+  snapshot();dragId=hovered.id;
+  moveBases={x:p.x,z:p.z,nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>({id:n.id,original:structuredClone(n)}))};
+  return;
+ }
+}
 if(mode==='holePaint'||mode==='holeErase'){holesEditor.paint(p,mode==='holeErase');changed=true}
  else if(tools[mode]){snapshot();brush(p.x,p.z);changed=true}else act(p);
 });
@@ -296,85 +400,67 @@ const radius=tools[mode]?Number($('brushRadius').value):4;
 cursor.scale.setScalar(radius);
 if(pointerDown&&holeMode)holesEditor.paint(p,mode==='holeErase');
 else if(pointerDown&&tools[mode])brush(p.x,p.z);
-if(pointerDown&&mode==='move'&&dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n){if(n.a&&n.b){const old=n._drag?.start||n,dx=p.x-(n._drag?.x??p.x),dz=p.z-(n._drag?.z??p.z);n.a={x:old.a.x+dx,z:old.a.z+dz};n.b={x:old.b.x+dx,z:old.b.z+dz}}else{n.x=p.x;n.z=p.z}draw();persist()}}
+if(pointerDown&&mode==='move'&&moveBases){
+ const dx=p.x-moveBases.x,dz=p.z-moveBases.z;
+ for(const entry of moveBases.nodes){
+  const n=live.nodes.find(a=>a.id===entry.id),old=entry.original;
+  if(!n)continue;
+  if(old.a&&old.b){
+   n.a={x:old.a.x+dx,z:old.a.z+dz};
+   n.b={x:old.b.x+dx,z:old.b.z+dz};
+  }else if(old.x!==undefined){
+   n.x=clamp(old.x+dx,-SIZE/2,SIZE/2);
+   n.z=clamp(old.z+dz,-SIZE/2,SIZE/2);
+  }
+ }
+ draw();persist();
+}
 });
-window.addEventListener('pointerup',()=>{pointerDown=false;holesEditor.endStroke();if(dragId!==null){const n=live.nodes.find(n=>n.id===dragId);if(n)delete n._drag;persist()}dragId=null});
+window.addEventListener('pointerup',()=>{pointerDown=false;holesEditor.endStroke();moveBases=null;dragId=null});
 view.addEventListener('wheel',e=>{if(!camera.isOrthographicCamera)return;e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()},{passive:false});
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
 $('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
-$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.holes=[];live.cuts3d=[];live.nextId=1;holesEditor.clearSelection();refreshTerrain();draw();persist()};
-$('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);if(!Array.isArray(live.holes))live.holes=[];if(!Array.isArray(v.cuts3d))live.cuts3d=[];holesEditor.clearSelection();refreshTerrain();draw();persist()};
-$('applyCavePiece').onclick=()=>{
- const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cavePiece');
- if(!n){toast('Selecciona primero una pieza de Estructuras / Cuevas');return}
- const opts=pieceOptions(n.piece,{
-  width:Number($('pieceWidth').value),length:Number($('pieceLength').value),
-  height:Number($('pieceHeight').value),thickness:Number($('pieceThickness').value)
- });
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.holes=[];live.cuts3d=[];live.nextId=1;selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('undo').onclick=()=>{const data=undo.pop();if(!data)return;const v=JSON.parse(data);Object.assign(live,v);if(!Array.isArray(live.holes))live.holes=[];if(!Array.isArray(v.cuts3d))live.cuts3d=[];selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('prefabType').addEventListener('change',()=>{if(mode==='prefab')updateStatus()});
+$('applyPrefab').onclick=()=>{
+ const targets=[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(n=>n?.kind==='prefab');
+ if(!targets.length){toast('Selecciona un modelo GLB con Ctrl + clic');return}
  snapshot();
- Object.assign(n,opts,{rotation:(Number($('pieceRotation').value)||0)*Math.PI/180,
-  offsetY:Number($('pieceOffsetY').value)||0,
-  scale:Math.max(.2,Math.min(5,Number($('pieceScale').value)||1))});
- draw();persist();toast('Dimensiones de pieza actualizadas sin borrar deformaciones');
-};
-$('cavePieceType').addEventListener('change',()=>{
- const type=CAVE_PIECE_TYPES.find(p=>p.id===$('cavePieceType').value);
- if(!type)return;
- const [w,h,l]=type.defaultSize;
- $('pieceWidth').value=w;
- $('pieceHeight').value=h;
- $('pieceLength').value=l;
- $('pieceThickness').value=1.25;
- $('pieceRotation').value=0;
- $('pieceOffsetY').value=0;
- $('pieceScale').value=1;
-});
-$('duplicateCavePiece').onclick=()=>{
- const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cavePiece');
- if(!n){toast('Selecciona primero una pieza de cueva');return}
- const copy=structuredClone(n);delete copy._drag;
- copy.x=clamp(copy.x+Math.max(6,copy.width*.7),-SIZE/2+3,SIZE/2-3);
- copy.z=clamp(copy.z+3,-SIZE/2+3,SIZE/2-3);
- delete copy.id;addNode(copy);
- toast('Pieza duplicada como malla independiente');
-};
-$('applyModule').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId);if(!n||!['mountain','cave'].includes(n.kind)){toast('Selecciona una montaña o cueva');return}snapshot();if(n.kind==='mountain'){n.height=clamp(Number($('moduleHeight').value)||35,4,100);n.radius=clamp(Number($('moduleRadius').value)||33,10,90);n.caveDoor={localX:n.radius*.25,localY:n.height+3.5,localZ:1.5}}else{n.scale=clamp(Number($('moduleScale').value)||1,.3,3)}draw();persist();toast('Módulo actualizado')};
-$('focusCave').onclick=()=>{const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='cave');if(!n){toast('Selecciona primero una cueva con la herramienta Seleccionar');return}$('underground').checked=true;draw();camera.up.set(0,1,0);camera.position.set(n.x+26,24,n.z+32);orbit.target.set(n.x,-13,n.z);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Interior de cueva';toast('Vista de interior subterráneo: la superficie queda oculta')};
-$('surfaceView').onclick=()=>{$('underground').checked=false;draw();setTop();$('viewType').textContent='Vista cenital'};
-$('underground').onchange=()=>{draw();if($('underground').checked)toast('Vista subterránea: se oculta el terreno para inspeccionar las salas')};
-$('remove').onclick=()=>{if(selectedId===null)return;snapshot();live.nodes=live.nodes.filter(n=>n.id!==selectedId);selectedId=null;draw();persist()};
-$('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];holesEditor.clearSelection();updateMaxHeightControl();refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
-$('importHeight').addEventListener('change',async e=>{
-const file=e.target.files?.[0];if(!file)return;
-const url=URL.createObjectURL(file);
-try{
- const img=new Image();img.src=url;await img.decode();
- const canvas=document.createElement('canvas');canvas.width=N;canvas.height=N;const ctx=canvas.getContext('2d',{willReadFrequently:true});
- ctx.drawImage(img,0,0,N,N);const data=ctx.getImageData(0,0,N,N).data,max=Number($('maxHeight').value);
- snapshot();
- for(let z=0;z<N;z++)for(let x=0;x<N;x++){
- const i=(z*N+x)*4,r=data[i],g=data[i+1],b=data[i+2],alpha=data[i+3];
- const lum=(.2126*r+.7152*g+.0722*b)/255;
- // Negro alto / blanco bajo. Verdes oscuros resultan más elevados.
- const h=alpha<10?0:($('invertHeight').checked?lum:1-lum)*max;
- live.heights[index(x,z)]=clamp(h,0,max);
+ const primary=targets.find(n=>n.id===selectedId)||targets[0];
+ const dx=(Number($('prefabX').value)||0)-primary.x;
+ const dz=(Number($('prefabZ').value)||0)-primary.z;
+ const rot=(Number($('prefabRotation').value)||0)*Math.PI/180;
+ const rotationDelta=rot-(primary.rotation||0);
+ const heightDelta=(Number($('prefabOffsetY').value)||0)-(primary.offsetY||0);
+ const newScale=clamp(Number($('prefabScale').value)||1,.05,15);
+ const scaleRatio=newScale/(primary.scale||1);
+ for(const n of targets){
+  n.x=clamp(n.x+dx,-SIZE/2,SIZE/2);
+  n.z=clamp(n.z+dz,-SIZE/2,SIZE/2);
+  n.rotation=(n.rotation||0)+rotationDelta;
+  n.offsetY=(n.offsetY||0)+heightDelta;
+  n.scale=clamp((n.scale||1)*scaleRatio,.05,15);
  }
- refreshTerrain();draw();persist();toast('Alturas importadas desde '+file.name);
-}catch(err){toast('Error en imagen: '+err.message)}
-finally{URL.revokeObjectURL(url);e.target.value=''}
-});
-$('exportHeight').onclick=()=>{
-const canvas=document.createElement('canvas');canvas.width=canvas.height=N;
-const ctx=canvas.getContext('2d'),image=ctx.createImageData(N,N);
-for(let i=0;i<COUNT;i++){const t=1-clamp(live.heights[i]/Number($('maxHeight').value),0,1);const gray=Math.round(255*t);image.data[i*4]=gray;image.data[i*4+1]=gray;image.data[i*4+2]=gray;image.data[i*4+3]=255}
-ctx.putImageData(image,0,0);canvas.toBlob(b=>{if(b)download('wildtrap-alturas.png',b)});
+ draw();persist();toast(targets.length+' modelo(s) actualizado(s)');
 };
+$('duplicatePrefab').onclick=()=>{
+ const n=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
+ if(!n){toast('Selecciona un modelo GLB con Ctrl + clic');return}
+ const copy=structuredClone(n);delete copy.id;
+ copy.x=clamp(copy.x+12,-SIZE/2+3,SIZE/2-3);
+ copy.z=clamp(copy.z+8,-SIZE/2+3,SIZE/2-3);
+ addNode(copy);toast('Modelo duplicado');
+};
+$('clearNodeSelection').onclick=()=>setNodeSelection([]);
+$('remove').onclick=()=>{if(!selectedIds.size)return;snapshot();live.nodes=live.nodes.filter(n=>!selectedIds.has(n.id));selectedIds.clear();selectedId=null;draw();persist()};
+$('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];selectedIds.clear();selectedId=null;holesEditor.clearSelection();updateMaxHeightControl();refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function toast(msg){$('toast').textContent=msg;setTimeout(()=>{if($('toast').textContent===msg)$('toast').textContent=''},4500)}
 window.addEventListener('keydown',e=>{if(preview.active||preview.busy)return;if(e.target.matches('input,textarea'))return;
-if(e.key==='Escape'){pending=null;setMode('select')}
+if(e.key==='Escape'){pending=null;setNodeSelection([]);setMode('move')}
 if(e.key==='Delete')$('remove').click();
 if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
 });
@@ -395,6 +481,7 @@ async function restoreSavedBase(confirmOverwrite=false){
   live.holes=[];
   live.cuts3d=[];
   live.version=3;
+  selectedIds.clear();selectedId=null;
   holesEditor.clearSelection();updateMaxHeightControl();
   refreshTerrain();draw();persist();
   toast('Terreno base original recuperado · 630 × 630');
