@@ -11,18 +11,24 @@ const choices=[...html.matchAll(/data-prefab-choice="([^"]+)"/g)].map(m=>m[1]);
 const previewImages=[...html.matchAll(/data-prefab-preview="([^"]+)"/g)].map(m=>m[1]);
 const viewButtons=[...html.matchAll(/data-preview-view="([^"]+)"/g)].map(m=>m[1]);
 
-test('el botón abre un modal oculto con cierre accesible',()=>{
+test('el catálogo se acopla en el panel de Estructuras y no bloquea el escenario',()=>{
  assert.ok(html.includes('id="openPrefabGallery"'));
  assert.ok(!html.includes('data-tool="prefab"'));
- assert.ok(html.includes('id="prefabModal" hidden role="dialog" aria-modal="true"'));
+ assert.ok(html.includes('id="prefabModal" hidden role="region"'));
+ assert.ok(html.includes('data-inline-gallery="true"'));
+ assert.ok(!html.includes('aria-modal="true"'));
  assert.ok(html.includes('id="closePrefabGallery"'));
  assert.ok(html.includes('id="prefabGalleryTitle"'));
  assert.ok(html.includes('#prefabModal[hidden]'));
- assert.ok(editor.includes("prefabGallery.open()"));
+ assert.ok(editor.includes('prefabGallery.open()'));
+ assert.ok(editor.includes('prefabGallery.isBlocking()'));
+ assert.ok(gallery.includes("const inline=root.dataset.inlineGallery==='true'"));
  assert.ok(gallery.includes('root.hidden=false'));
  assert.ok(gallery.includes('root.hidden=true'));
+ const workspace=fs.readFileSync(new URL('../editor-workspace.js',import.meta.url),'utf8');
+ assert.ok(workspace.includes('models.append(galleryRoot)'));
+ assert.ok(workspace.includes("'wildtrap:workspace-tool'"));
 });
-
 test('muestra exactamente los cuatro modelos originales y una imagen por modelo',()=>{
  assert.deepEqual(choices,PREFABS.map(p=>p.id));
  assert.deepEqual(previewImages,choices);
@@ -39,7 +45,7 @@ test('permite perspectiva, frente, lado, atrás y vista superior',()=>{
  assert.ok(html.includes('alt="Vista previa 3D de'));
 });
 
-test('al elegir una tarjeta cierra el modal y activa el modo de colocación',()=>{
+test('al elegir una tarjeta activa colocación sin interrumpir el escenario',()=>{
  assert.ok(gallery.includes('close();'));
  assert.ok(gallery.includes('onPick(id)'));
  assert.ok(editor.includes("const prefabGallery=createPrefabGallery("));
