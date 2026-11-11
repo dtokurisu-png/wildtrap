@@ -178,3 +178,12 @@ Las herramientas **Pintar corte 3D** y **Borrar trazo pendiente** entran en un m
 El núcleo [adaptive-model-cuts.mjs](adaptive-model-cuts.mjs) recorta triángulos con interpolación de UV/normales/colores y conserva los grupos de materiales. No altera la cuadrícula del terreno ni genera automáticamente paredes de espesor, interiores de cuevas o colisiones físicas completas de los GLB; se trata de **cortes reales de superficie**, no de un booleano volumétrico cerrado. Hay límites de 80 trazos por instancia para evitar crecimiento excesivo de la malla. Las mallas animadas/skinned no se recortan por este método.
 
 Verificación: [tests/adaptive-model-cuts.test.mjs](tests/adaptive-model-cuts.test.mjs) comprueba agujeros parciales, restauración, UV, grupos de materiales, geometrías indexadas/no indexadas y la prioridad del pincel frente a selección y arrastre.
+
+## v0.9.8 — Cuchillo poligonal (sin pincel de corte)
+
+La herramienta **✂ Activar cuchillo** reemplaza el estampado continuo del pincel. Cada clic sobre el terreno o la superficie de una instancia GLB añade **un vértice de control**. Una línea une el último vértice con la posición del cursor; al volver a hacer clic cerca del primer punto el contorno se cierra. **Cerrar contorno** permite cerrarlo manualmente. Solo entonces se habilitan **Crear agujero** y **Restaurar región**. **Deshacer punto**, Retroceso y Escape corrigen o cancelan el dibujo; Ctrl+Z deshace un recorte ya aplicado.
+
+Cada contorno cerrado se guarda como **un único objeto** con `shape:"polygon"`, `polygon:[[u,v],...]`, `center`, `normal` y `depth`, sin cientos de sellos superpuestos. El motor recorta exactamente el polígono convexo; los polígonos cóncavos sencillos se descomponen internamente en triángulos únicamente para efectuar las operaciones geométricas. No se crean vértices de **control** adicionales, aunque la triangulación de la malla sí puede requerir vértices de intersección sobre las aristas (por ejemplo, si cruzan triángulos existentes). Se rechazan polígonos autointersecados o degenerados.
+
+Los contornos guardados en el terreno siguen en `cuts3d`, y los de GLB se almacenan en `nodes[].cuts3d` en las coordenadas locales de esa instancia. Se conserva la compatibilidad de lectura con cortes antiguos tipo pincel, el historial de deshacer, los JSON exportables y la URL `?recover=1` para rescatar un borrador que no arranque. El recorte es de **superficies**, no produce automáticamente paredes interiores ni sólidos herméticos.
+
