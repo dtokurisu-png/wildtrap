@@ -353,13 +353,26 @@ function updateStatus(){
   $('prefabZ').value=picked.z;
   $('prefabRotation').value=((picked.rotation||0)*180/Math.PI).toFixed(1);
   $('prefabRotationX').value=((picked.rotationX||0)*180/Math.PI).toFixed(1);
+  $('prefabRotationZ').value=((picked.rotationZ||0)*180/Math.PI).toFixed(1);
   const cave=isFreeCave(picked.prefabId);
   $('prefabOffsetY').disabled=!cave;
   $('prefabHeightLabel').textContent=cave?'Altura libre Y (mundo)':'Altura Y (anclada al terreno)';
   $('prefabOffsetY').value=prefabWorldY(picked,heightAt).toFixed(2);
   $('prefabScale').value=picked.scale||1;
  }
- if(!picked||picked.kind!=='prefab')$('prefabOffsetY').disabled=true;
+ const editable=picked?.kind==='prefab';
+ $('transformConstraints').hidden=!editable;
+ if(editable){
+  const locks=picked.rotationLocks||{};
+  for(const axis of ['x','y','z']){
+   const button=document.querySelector('[data-rotation-lock="'+axis+'"]');
+   button.setAttribute('aria-pressed',String(locks[axis]===true));
+   button.textContent=axis.toUpperCase()+(locks[axis]===true?' bloqueado':' libre');
+  }
+  $('anchorScaleY').checked=picked.anchorScaleY===true;
+ }
+ if(!editable)$('prefabOffsetY').disabled=true;
+ vertexEditor?.updateInfo();
  $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
  sceneObjectManager?.render();
 }
@@ -376,7 +389,8 @@ function setMode(v){
   updateSelectionHighlights();
  }
  mode=v;pending=null;
- cursor.visible=v!=='holePaint'&&!placementGhost;
+ cursor.visible=v!=='holePaint'&&v!=='meshEdit'&&!placementGhost;
+ vertexEditor?.setActive(v==='meshEdit');
  if(v!=='holePaint')holesEditor?.hoverAt(null);
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));
  $('openPrefabGallery').classList.toggle('active',v==='prefab');
@@ -538,6 +552,7 @@ function setNodeSelection(ids){
  for(const id of ids)if(live.nodes.some(n=>n.id===id))selectedIds.add(id);
  selectedId=[...selectedIds].at(-1)??null;
  updateSelectionHighlights();updateStatus();
+ if(mode==='meshEdit')vertexEditor?.rebuild();
 }
 function pointerRay(e){
  const bounds=view.getBoundingClientRect();
