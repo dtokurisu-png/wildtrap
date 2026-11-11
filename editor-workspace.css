@@ -225,7 +225,7 @@ body.testing #toast{left:16px;max-width:calc(100vw - 32px)}
 /* WILDTRAP v0.9.12 — vertex x-ray, axis locks and intangible outliner. */
 .scene-group-intangible,.scene-object-intangible{
  flex:none;background:transparent;border:1px solid transparent;border-radius:5px;
- min-width:29px;padding:3px 5px;font-size:19px;color:#9fbeb5;
+ min-width:32px;padding:4px 5px;font-size:10px;font-weight:800;letter-spacing:.4px;color:#9fbeb5;
 }
 .scene-group-intangible:hover,.scene-object-intangible:hover{background:#2f574a;border-color:#5f8b78}
 .scene-group-intangible.is-intangible,.scene-object-intangible.is-intangible{
