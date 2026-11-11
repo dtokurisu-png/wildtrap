@@ -6,7 +6,7 @@ import {createCavePieceObject} from './cave-pieces-three.mjs';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs';
 import {createPrefabGallery} from './prefab-gallery.mjs';
-import {scaleFromVerticalDrag,translateNodeOnTerrain} from './prefab-gestures.mjs';
+import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag} from './prefab-gestures.mjs';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -228,11 +228,12 @@ function setHoverNode(node,event){
  const indicator=$('modelHoverIndicator');
  if(node&&!marqueeStart){
   const noun=node.kind==='prefab'?(prefabById(node.prefabId)?.name||'Modelo'):'Elemento';
-  indicator.textContent=(event.shiftKey&&node.kind==='prefab'?'↕ Escalar ':'✥ ')+noun+' · '+(event.shiftKey&&node.kind==='prefab'?'Shift + arrastrar':'Clic y arrastrar');
+  const action=node.kind==='prefab'&&event.altKey?'rotate':node.kind==='prefab'&&event.shiftKey?'scale':'move';
+   indicator.textContent=(action==='rotate'?'⟳ Rotar ':action==='scale'?'↕ Escalar ':'✥ ')+noun+' · '+(action==='rotate'?'Alt + arrastrar':action==='scale'?'Shift + arrastrar':'Clic y arrastrar');
   indicator.style.left=Math.min(event.clientX+18,Math.max(0,innerWidth-220))+'px';
   indicator.style.top=Math.min(event.clientY+18,Math.max(0,innerHeight-42))+'px';
   indicator.style.display='block';
-  view.style.cursor=event.shiftKey&&node.kind==='prefab'?'ns-resize':'grab';
+  view.style.cursor=action==='rotate'?'crosshair':action==='scale'?'ns-resize':'grab';
  }else{
   indicator.style.display='none';view.style.cursor='crosshair';
  }
@@ -247,6 +248,7 @@ function updateStatus(){
   $('prefabX').value=picked.x;
   $('prefabZ').value=picked.z;
   $('prefabRotation').value=((picked.rotation||0)*180/Math.PI).toFixed(1);
+  $('prefabRotationX').value=((picked.rotationX||0)*180/Math.PI).toFixed(1);
   $('prefabOffsetY').value=picked.offsetY||0;
   $('prefabScale').value=picked.scale||1;
  }
@@ -473,12 +475,12 @@ function beginModelDrag(e,node){
   pointerId:e.pointerId,
   startX:e.clientX,startY:e.clientY,
   ground:{x:ground.x,z:ground.z},
-  action:e.shiftKey&&node.kind==='prefab'?'scale':'move',
+  action:e.altKey&&node.kind==='prefab'?'rotate':e.shiftKey&&node.kind==='prefab'?'scale':'move',
   nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>({id:n.id,original:structuredClone(n)})),
   changed:false
  };
  try{view.setPointerCapture(e.pointerId)}catch(_){}
- view.style.cursor=dragSession.action==='scale'?'ns-resize':'grabbing';
+ view.style.cursor=dragSession.action==='rotate'?'crosshair':dragSession.action==='scale'?'ns-resize':'grabbing';
  updateStatus();
 }
 function updateMovedPrefabs(){
@@ -490,7 +492,7 @@ function updateMovedPrefabs(){
   for(const root of renderedNodes.get(id)||[]){
    if(!root.userData.sharedAsset)continue;
    root.position.set(n.x,heightAt(n.x,n.z)+(Number(n.offsetY)||0),n.z);
-   root.rotation.y=n.rotation||0;
+   root.rotation.set(n.rotationX||0,n.rotation||0,0,'YXZ');
    root.scale.setScalar(n.scale||1);
   }
  }
@@ -508,6 +510,15 @@ function moveModelDrag(e){
    const n=live.nodes.find(x=>x.id===item.id);
    if(n?.kind==='prefab')n.scale=scaleFromVerticalDrag(item.original.scale||1,session.startY,e.clientY);
   }
+ }else if(session.action==='rotate'){
+  for(const item of session.nodes){
+   const n=live.nodes.find(x=>x.id===item.id);
+   if(n?.kind!=='prefab')continue;
+   const result=rotateFromPointerDrag(item.original.rotation||0,item.original.rotationX||0,
+    session.startX,session.startY,e.clientX,e.clientY);
+   n.rotation=result.rotation;
+   n.rotationX=result.rotationX;
+  }
  }else{
   const p=convertCoords(e);
   if(!p)return;
@@ -519,7 +530,7 @@ function moveModelDrag(e){
   }
  }
  updateMovedPrefabs();
- view.style.cursor=session.action==='scale'?'ns-resize':'grabbing';
+ view.style.cursor=session.action==='rotate'?'crosshair':session.action==='scale'?'ns-resize':'grabbing';
  const current=live.nodes.find(x=>x.id===session.nodes[0]?.id);
  if(current)setHoverNode(current,e);
 }
@@ -608,7 +619,9 @@ $('applyPrefab').onclick=()=>{
  const dx=(Number($('prefabX').value)||0)-primary.x;
  const dz=(Number($('prefabZ').value)||0)-primary.z;
  const rot=(Number($('prefabRotation').value)||0)*Math.PI/180;
+ const rotX=(Number($('prefabRotationX').value)||0)*Math.PI/180;
  const rotationDelta=rot-(primary.rotation||0);
+ const tiltDelta=rotX-(primary.rotationX||0);
  const heightDelta=(Number($('prefabOffsetY').value)||0)-(primary.offsetY||0);
  const newScale=clamp(Number($('prefabScale').value)||1,.05,15);
  const scaleRatio=newScale/(primary.scale||1);
@@ -616,6 +629,7 @@ $('applyPrefab').onclick=()=>{
   n.x=clamp(n.x+dx,-SIZE/2,SIZE/2);
   n.z=clamp(n.z+dz,-SIZE/2,SIZE/2);
   n.rotation=(n.rotation||0)+rotationDelta;
+  n.rotationX=(n.rotationX||0)+tiltDelta;
   n.offsetY=(n.offsetY||0)+heightDelta;
   n.scale=clamp((n.scale||1)*scaleRatio,.05,15);
  }
