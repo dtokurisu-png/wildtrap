@@ -665,9 +665,19 @@ function marqueeHits(x,y){
  }
  return ids;
 }
+// Vertex picking owns the left button while Ver malla is active.
+view.addEventListener('pointerdown',e=>{
+ if(mode==='meshEdit'&&!preview.active)vertexEditor?.pointerdown(e);
+},true);
+view.addEventListener('pointermove',e=>{
+ if(mode==='meshEdit')vertexEditor?.pointermove(e);
+},true);
+window.addEventListener('pointerup',e=>{
+ if(mode==='meshEdit')vertexEditor?.pointerup(e);
+},true);
 let previousOrbitEnabled=true;
 view.addEventListener('pointerdown',e=>{
- if(preview.active||preview.busy||mode==='holePaint'||!e.ctrlKey||(e.button!==0&&e.button!==2))return;
+ if(preview.active||preview.busy||mode==='holePaint'||mode==='meshEdit'||!e.ctrlKey||(e.button!==0&&e.button!==2))return;
  e.preventDefault();e.stopImmediatePropagation();
  if(e.button===0){
   const picked=pickedNodeAt(e);
@@ -787,7 +797,7 @@ function completeModelDrag(e){
  view.style.cursor='crosshair';
 }
 view.addEventListener('pointerdown',e=>{
- if(preview.active||preview.busy||marqueeStart||prefabGallery.isBlocking()||e.ctrlKey||e.button!==0)return;
+ if(preview.active||preview.busy||marqueeStart||prefabGallery.isBlocking()||mode==='meshEdit'||e.ctrlKey||e.button!==0)return;
  if(mode==='holePaint'){
   // Each click adds one corner; dragging does not create triangles.
   const hit=convertCoords(e);
@@ -824,7 +834,7 @@ view.addEventListener('pointerdown',e=>{
  }else act(p);
 });
 view.addEventListener('pointermove',e=>{
- if(preview.active||preview.busy||prefabGallery.isBlocking()||marqueeStart)return;
+ if(preview.active||preview.busy||prefabGallery.isBlocking()||marqueeStart||mode==='meshEdit')return;
  if(dragSession){moveModelDrag(e);return}
  const holeMode=mode==='holePaint';
  // No GLB selection or hover in cutting mode: only the cutter raycast runs.
@@ -955,7 +965,7 @@ if(e.key==='Escape'){
 if(mode==='holePaint'&&(e.key==='Backspace'||e.key==='Delete')){
  e.preventDefault();holesEditor.removeLastPoint();return;
 }
-if(e.key==='Delete')$('remove').click();
+if(e.key==='Delete'&&mode!=='meshEdit')$('remove').click();
 if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
 });
 window.addEventListener('resize',()=>{resize();preview.resize()});
