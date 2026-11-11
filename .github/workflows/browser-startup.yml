@@ -1,7 +1,7 @@
 name: Comprobar inicio real en navegador
 on:
   push:
-    branches: [main]
+    branches: [main, feat/polygon-knife-v0.9.8]
     paths:
       - 'tests/browser-startup.mjs'
       - '.github/workflows/browser-startup.yml'
