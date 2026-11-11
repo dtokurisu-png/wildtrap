@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {buildAdaptiveModel} from './adaptive-model-cuts.mjs?v=0.9.6';
+import {buildAdaptiveModel} from './adaptive-model-cuts.mjs?v=0.9.8';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
