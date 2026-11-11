@@ -21,4 +21,11 @@ jobs:
         with:
           node-version: '22'
       - run: command -v google-chrome || command -v chromium
-      - run: node tests/browser-startup.mjs
+      - name: Iniciar servidor local de la revisión
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-http.log 2>&1 &
+          sleep 2
+      - name: Probar editor y modo seguro en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-startup.mjs
