@@ -802,7 +802,7 @@ $('removeRecoveryCuts').onclick=()=>{
 };
 $('remove').onclick=()=>{if(!selectedIds.size)return;snapshot();live.nodes=live.nodes.filter(n=>!selectedIds.has(n.id));pruneUnusedSceneGroups();selectedIds.clear();selectedId=null;draw();persist()};
 $('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);selectedIds.clear();selectedId=null;holesEditor.clearSelection();updateMaxHeightControl();refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;holesEditor.clearSelection();updateMaxHeightControl();refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function toast(msg){$('toast').textContent=msg;setTimeout(()=>{if($('toast').textContent===msg)$('toast').textContent=''},4500)}
 window.addEventListener('keydown',e=>{if(preview.active||preview.busy)return;if(e.target.matches('input,textarea'))return;
@@ -833,6 +833,7 @@ async function restoreSavedBase(confirmOverwrite=false){
   live.holes=[];
   live.cuts3d=[];
   live.objectGroups=[];
+  live.settings={heightMax:120,...(data.settings&&typeof data.settings==='object'?data.settings:{})};
   live.version=3;
   selectedIds.clear();selectedId=null;
   holesEditor.clearSelection();updateMaxHeightControl();
@@ -849,6 +850,7 @@ try{
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
    Object.assign(live,d);live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);
+   live.settings={heightMax:120,...(d.settings&&typeof d.settings==='object'?d.settings:{})};
    recoveredDraft=true;
    toast('Proyecto recuperado del guardado automático; puedes usar Cargar terreno base');
   }
@@ -866,6 +868,7 @@ async function loadPublishedWorld(){
   live.holes=Array.isArray(world.holes)?world.holes:[];
   live.cuts3d=Array.isArray(world.cuts3d)?world.cuts3d:[];
   live.objectGroups=cleanObjectGroups(world.objectGroups);
+  live.settings={heightMax:120,...(world.settings&&typeof world.settings==='object'?world.settings:{})};
   selectedIds.clear();selectedId=null;
   updateMaxHeightControl();refreshTerrain();draw();persist();
   toast('Escenario oficial cargado desde el repositorio');
