@@ -3,7 +3,7 @@ import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-te
 
 // Selection happens against the uncut mesh: we can also restore a hole by
 // painting where the surface USED TO BE. The sculptor remains heightmap-based.
-export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,getModelRoots=()=>[]}){
+export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,getModelRoots=()=>[],renderCuts=true}){
  const originalMesh=new THREE.Mesh(terrainGeo,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
  originalMesh.name='Base heightmap for accurate 3D raycast';
  originalMesh.updateMatrixWorld(true); // Not added to scene or visible in renderer.
@@ -59,6 +59,16 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   return hit;
  }
  function syncGeometry(){
+  if(!renderCuts){
+   // Recovery view: keep every cut in live JSON, but do not tessellate it.
+   legacy=new Set();prepared=[];
+   if(generated){generated.dispose();generated=null}
+   terrain.geometry=terrainGeo;
+   $('holeMeshStats').textContent='RECUPERACIÓN: recortes conservados en datos, renderizado suspendido';
+   $('holeCounter').textContent=(live.cuts3d?.length||0)+' cortes terreno guardados · '+
+    live.nodes.reduce((n,node)=>n+(node.cuts3d?.length||0),0)+' cortes GLB guardados';
+   renderSelection();return;
+  }
   const n=live.resolution;
   legacy=new Set((live.holes||[]).filter(x=>Number.isInteger(x)&&x>=0&&x<(n-1)*(n-1)));
   prepared=(Array.isArray(live.cuts3d)?live.cuts3d:[]).map(prepareCutStamp).filter(Boolean);
@@ -170,6 +180,7 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
  function clearSelection(){selected.length=0;previous=null;renderSelection()}
  function endStroke(){previous=null}
  function apply(cut){
+  if(!renderCuts){toast('Recortes suspendidos en recuperación: primero guarda una copia del escenario.');return}
   if(!selected.length){toast('Primero pinta una zona directamente sobre una superficie 3D');return}
   const perModel=new Map();
   let terrainCount=0;
