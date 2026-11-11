@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
-import {adaptSummonWalk} from './walk-adapter.mjs';
+import {adaptSummonWalk} from './walk-adapter.mjs?v=0.9.5';
 
 // Source is the original Farolera, read-only, published by the user's R.O.K. repository.
 export const FAROLERA_URL='https://dtokurisu-png.github.io/rok-3d-test/assets/models/casters/farolera/chiara_idle.glb';
