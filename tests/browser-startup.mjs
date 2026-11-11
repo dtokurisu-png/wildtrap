@@ -23,6 +23,6 @@ for(const [mode,url] of [
  console.log('Errores recientes:',(run.stderr||'').slice(-1000));
  assert.ok(run.status===0,'Chrome falló o el navegador quedó bloqueado ('+mode+')');
  assert.match(boot,/\bhidden\b/,'La ventana de carga no desapareció ('+mode+')');
- assert.ok(!html.includes('No se pudo abrir: '),'El navegador reportó un error ('+mode+')');
+ assert.ok(!msg.includes('No se pudo abrir: '),'El navegador reportó un error ('+mode+')');
  console.log('ARRANQUE 3D OK — '+mode);
 }
