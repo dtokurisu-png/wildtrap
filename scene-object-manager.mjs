@@ -3,7 +3,8 @@ import {objectTree,sceneObjectCount,categoryForNode} from './scene-object-catalo
 // Editor-only outliner. This component NEVER mutates live world data directly:
 // its host callbacks use the normal snapshot / draw / persist pipeline.
 export function createSceneObjectManager({
- root,hierarchyRoot,getNodes,getGroups,getSelection,lookup,select,setVisibility,group,ungroup,rename
+ root,hierarchyRoot,getNodes,getGroups,getSelection,lookup,select,setVisibility,group,ungroup,rename,
+ terrainIsVisible=()=>true,setTerrainVisibility=()=>{}
 }){
  if(!root||!hierarchyRoot)throw new Error('No se encontraron las ventanas Objetos y Jerarquía');
  const create=(tag,className,text)=>{
@@ -32,8 +33,15 @@ export function createSceneObjectManager({
  }
  const note=create('p','hint scene-manager-note','Solo modelos colocados: spawns y marcadores lógicos no aparecen.');
  header.append(heading,actionBar,note);
+ const terrainSection=create('section','scene-group scene-terrain-group');
+ const terrainRow=create('div','scene-group-header');
+ const terrainLabel=create('span','scene-terrain-name','▤  Escenario · Terreno');
+ const terrainEye=create('button','scene-group-eye','◉');
+ terrainEye.type='button';
+ terrainEye.addEventListener('click',()=>setTerrainVisibility(!terrainIsVisible()));
+ terrainRow.append(terrainLabel,terrainEye);terrainSection.append(terrainRow);
  const treeRoot=create('div','scene-tree');
- root.replaceChildren(header,treeRoot);
+ root.replaceChildren(header,terrainSection,treeRoot);
  const hierarchyTitle=create('h2','', 'Jerarquía de la escena');
  const hierarchyBody=create('div','scene-hierarchy-body');
  hierarchyRoot.replaceChildren(hierarchyTitle,hierarchyBody);
@@ -43,6 +51,11 @@ export function createSceneObjectManager({
  const selectedStatic=()=>getSelection().filter(id=>getNodes().some(n=>n.id===id&&categoryForNode(n)));
  const findObject=id=>getNodes().find(n=>n.id===id);
  function syncSelection(){
+  const terrainVisible=terrainIsVisible();
+  terrainEye.textContent=terrainVisible?'◉':'◌';
+  terrainEye.title=terrainVisible?'Ocultar terreno (solo en el editor)':'Mostrar terreno';
+  terrainEye.setAttribute('aria-label',terrainEye.title);
+  terrainEye.classList.toggle('is-hidden',!terrainVisible);
   const selected=new Set(getSelection());
   for(const button of treeRoot.querySelectorAll('[data-object-id]')){
    const active=selected.has(Number(button.dataset.objectId));
@@ -153,7 +166,7 @@ export function createSceneObjectManager({
  function render(force=false){
   const state={
    buckets:objectTree(getNodes(),getGroups(),lookup),
-   collapsed,
+   collapsed,terrainVisible:terrainIsVisible(),
   };
   const next=JSON.stringify(state);
   if(force||signature!==next){
