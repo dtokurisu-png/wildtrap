@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-terrain-cuts.mjs';
+import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-terrain-cuts.mjs?v=0.9.5';
 
 // Selection happens against the uncut mesh: we can also restore a hole by
 // painting where the surface USED TO BE. The sculptor remains heightmap-based.
