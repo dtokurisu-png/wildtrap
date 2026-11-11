@@ -283,5 +283,6 @@ export function createMeshVertexEditor({
  return {setActive,rebuild,beforeDraw:clearVisuals,dispose,updateInfo,
   pointerdown,pointermove,pointerup,hasGesture:()=>Boolean(gesture),
   getState:()=>({active,currentId,points:samples.length,selected:selected.size,
-   locked:Object.values(normalizedLocks(getSelectedNode()?.vertexLocks)).reduce((a,b)=>a+b.length,0)})};
+   locked:Object.values(normalizedLocks(getSelectedNode()?.vertexLocks)).reduce((a,b)=>a+b.length,0),
+   operations:cleanVertexOperations(getSelectedNode()?.meshScaleOps).length})};
 }
