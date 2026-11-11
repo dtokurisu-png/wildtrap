@@ -1,7 +1,7 @@
 // WILDTRAP · Recorte local y reversible de mallas GLB ya colocadas.
 // Operación pura sin Three.js: trabaja sobre triángulos indexados o no indexados,
 // conserva grupos de materiales y atributos interpolables (UV/normales/colores).
-import {prepareCutStamp,overlapsTriangle} from './adaptive-terrain-cuts.mjs?v=0.9.6';
+import {prepareCutStamp,overlapsTriangle} from './adaptive-terrain-cuts.mjs?v=0.9.8';
 
 const EPS=1e-7;
 const MAX_STAMPS_PER_MESH=48,MAX_FRAGMENTS_PER_TRIANGLE=60;
@@ -134,14 +134,17 @@ export function buildAdaptiveModel(base,rawStamps=[],transformPoint=identity){
    touched++;
    let fragments=[{poly:[va,vb,vc],removed:false}];
    for(const stamp of relevant){
-    if(fragments.length>MAX_FRAGMENTS_PER_TRIANGLE){limitedFragments++;break;}
-    const next=[];
-    for(const frag of fragments){
-     const pieces=subtract(frag.poly,stamp,names);
-     for(const poly of pieces.outside)next.push({poly,removed:frag.removed});
-     if(pieces.inside.length)next.push({poly:pieces.inside,removed:stamp.op==='cut'});
+    // Preserve one stored polygon; triangulate only concave polygons internally.
+    for(const part of (stamp.parts||[stamp])){
+     if(fragments.length>MAX_FRAGMENTS_PER_TRIANGLE){limitedFragments++;break;}
+     const next=[];
+     for(const frag of fragments){
+      const pieces=subtract(frag.poly,part,names);
+      for(const poly of pieces.outside)next.push({poly,removed:frag.removed});
+      if(pieces.inside.length)next.push({poly:pieces.inside,removed:stamp.op==='cut'});
+     }
+     fragments=next;
     }
-    fragments=next;
    }
    for(const frag of fragments)if(!frag.removed)emit(frag.poly);
   }
