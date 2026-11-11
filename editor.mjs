@@ -358,7 +358,7 @@ function updateStatus(){
   const cave=isFreeCave(picked.prefabId);
   $('prefabOffsetY').disabled=!cave;
   $('prefabHeightLabel').textContent=cave?'Altura libre Y (mundo)':'Altura Y (anclada al terreno)';
-  $('prefabOffsetY').value=prefabWorldY(picked,heightAt).toFixed(2);
+  $('prefabOffsetY').value=(prefabWorldY(picked,heightAt)+(Number(picked.scaleAnchorOffsetY)||0)).toFixed(2);
   $('prefabScale').value=picked.scale||1;
  }
  const editable=picked?.kind==='prefab';
@@ -967,7 +967,7 @@ $('applyPrefab').onclick=()=>{
  const tiltDelta=rotX-(primary.rotationX||0);
  const inputY=Number($('prefabOffsetY').value);
  const heightDelta=isFreeCave(primary.prefabId)&&Number.isFinite(inputY)?
-  inputY-prefabWorldY(primary,heightAt):0;
+  inputY-(prefabWorldY(primary,heightAt)+(Number(primary.scaleAnchorOffsetY)||0)):0;
  const newScale=clamp(Number($('prefabScale').value)||1,.05,15);
  const scaleRatio=newScale/(primary.scale||1);
  for(const n of targets){
