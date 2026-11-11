@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {buildAdaptiveModel} from './adaptive-model-cuts.mjs';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
@@ -47,7 +48,56 @@ export function createPrefabLibrary(onChange=()=>{}){
   // YXZ: horizontal yaw around world Y and vertical tilt around local X.
   root.rotation.set(Number(node.rotationX)||0,Number(node.rotation)||0,0,'YXZ');
   root.scale.setScalar(Math.max(.01,Number(node.scale)||1));
+  // Cut against the untouched GLB mesh and keep its original geometry for
+  // future restoration and picking inside an already-open aperture.
+  const rootCuts=Array.isArray(node.cuts3d)?node.cuts3d:[];
+  if(rootCuts.length){
+   root.updateMatrixWorld(true);
+   const inverseRoot=root.matrixWorld.clone().invert();
+   root.traverse(child=>{
+    if(!child.isMesh||child.isSkinnedMesh)return;
+    const sourceGeometry=child.geometry;
+    child.userData.wildtrapSourceGeometry=sourceGeometry;
+    const meshToRoot=inverseRoot.clone().multiply(child.matrixWorld);
+    const attrs={};
+    for(const [name,attr] of Object.entries(sourceGeometry.attributes)){
+     if(attr.itemSize<1||attr.itemSize>4)continue;
+     const arr=[];
+     for(let i=0;i<attr.count;i++){
+      for(let j=0;j<attr.itemSize;j++){
+       const getter=['getX','getY','getZ','getW'][j];
+       arr.push(attr[getter](i));
+      }
+     }
+     attrs[name]={array:arr,itemSize:attr.itemSize,normalized:false};
+    }
+    const input={
+     attributes:attrs,
+     indices:sourceGeometry.index?.array?Array.from(sourceGeometry.index.array):null,
+     groups:sourceGeometry.groups.map(g=>({...g}))
+    };
+    const result=buildAdaptiveModel(input,rootCuts,point=>
+     new THREE.Vector3(...point).applyMatrix4(meshToRoot).toArray());
+    if(!result)return;
+    const geometry=new THREE.BufferGeometry();
+    for(const [name,attr] of Object.entries(result.attributes)){
+     geometry.setAttribute(name,new THREE.Float32BufferAttribute(attr.array,attr.itemSize));
+    }
+    geometry.setIndex(result.indices);
+    for(const group of result.groups)geometry.addGroup(group.start,group.count,group.materialIndex);
+    geometry.computeBoundingSphere();geometry.computeBoundingBox();
+    child.geometry=geometry;
+    child.userData.wildtrapGeneratedCutGeometry=geometry;
+   });
+  }
   return root;
+ }
+ function disposeInstance(root){
+  if(!root)return;
+  root.traverse(child=>{
+   const generated=child.userData?.wildtrapGeneratedCutGeometry;
+   if(generated){generated.dispose();delete child.userData.wildtrapGeneratedCutGeometry;}
+  });
  }
  function createPreview(id){
   const model=instance({id:0,prefabId:id,x:0,z:0,offsetY:0,rotation:0,scale:1},()=>0);
@@ -89,5 +139,5 @@ export function createPrefabLibrary(onChange=()=>{}){
   id:p.id,name:p.name,state:cache.has(p.id)?'listo':errors.has(p.id)?'error':'cargando',
   error:errors.get(p.id)||''
  }));}
- return {load,preload,instance,createPreview,disposePreview,status,has:id=>cache.has(id)};
+ return {load,preload,instance,disposeInstance,createPreview,disposePreview,status,has:id=>cache.has(id)};
 }
