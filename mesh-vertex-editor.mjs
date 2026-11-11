@@ -12,6 +12,7 @@ export function createMeshVertexEditor({
  let active=false,currentId=null,gesture=null;
  const selected=new Set();
  const samples=[],disposables=[],faded=[];
+ const vertexBuckets=new Map();
  const maxPoints=40000;
  const meshCount=()=>$('meshVertexCount');
  const setText=(id,value)=>{const el=$(id);if(el)el.textContent=String(value)};
@@ -29,7 +30,7 @@ export function createMeshVertexEditor({
    object.parent?.remove(object);
    geometry?.dispose?.();material?.dispose?.();
   }
-  disposables.length=0;samples.length=0;
+  disposables.length=0;samples.length=0;vertexBuckets.clear();
  }
  function release(){
   if(gesture){
@@ -100,11 +101,15 @@ export function createMeshVertexEditor({
    const step=Math.max(1,Math.ceil(count/left));
    const verts=[],colors=[],sampleRefs=[];
    // Make selection dots ignore depth, revealing back-face vertices too.
-   for(let i=0;i<count;i+=step){
+   for(let i=0;i<count;i++){
     const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
     const v=new THREE.Vector3(x,y,z);
     const id=pointKey(key,i);
-    const sample={key,index:i,mesh,vertex:v,id,paintIndex:sampleRefs.length};
+    const token=lockKey(v.clone().applyMatrix4(mesh.matrixWorld));
+    const bucket=vertexBuckets.get(token)||[];
+    bucket.push(id);vertexBuckets.set(token,bucket);
+    if(i%step!==0)continue;
+    const sample={key,index:i,mesh,vertex:v,id,token,paintIndex:sampleRefs.length};
     sampleRefs.push(sample);samples.push(sample);
     verts.push(x,y,z);
     colors.push(.1,1,.86);
@@ -156,16 +161,7 @@ export function createMeshVertexEditor({
   const box=view.getBoundingClientRect();
   return {x:box.left+(p.x+1)*box.width/2,y:box.top+(1-p.y)*box.height/2};
  }
- function matchingKeys(sample){
-  const v=sample.vertex.clone().applyMatrix4(sample.mesh.matrixWorld);
-  const token=lockKey(v);
-  const matches=[];
-  for(const s of samples){
-   const p=s.vertex.clone().applyMatrix4(s.mesh.matrixWorld);
-   if(lockKey(p)===token)matches.push(s.id);
-  }
-  return matches;
- }
+ function matchingKeys(sample){return vertexBuckets.get(sample.token)||[sample.id];}
  function chooseByPoint(e){
   let closest=null,distance=13;
   for(const sample of samples){
