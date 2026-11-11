@@ -44,7 +44,8 @@ export function createPrefabLibrary(onChange=()=>{}){
   model.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;}});
   root.add(model);
   root.position.set(node.x,heightAt(node.x,node.z)+(Number(node.offsetY)||0),node.z);
-  root.rotation.y=Number(node.rotation)||0;
+  // YXZ: horizontal yaw around world Y and vertical tilt around local X.
+  root.rotation.set(Number(node.rotationX)||0,Number(node.rotation)||0,0,'YXZ');
   root.scale.setScalar(Math.max(.01,Number(node.scale)||1));
   return root;
  }
