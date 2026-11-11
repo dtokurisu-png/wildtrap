@@ -131,3 +131,28 @@ La herramienta antigua eliminaba **celdas completas X/Z** de la cuadrícula y, e
 Recoge las decisiones posteriores al documento del [Guardián de los Ecos](docs/PROPUESTA_GUARDIAN_DE_LOS_ECOS.md): cinco biomas (Bosque, Pantano, Desierto, Llanura y Cuevas), quince recursos iniciales propuestos, diez objetos fabricables, especies de árboles comunes y raras, extracción mediante herramientas o habilidades de guardianes, equipamiento con espacio limitado, fabricación costosa de herramientas de emergencia con componentes escasos y compartidos, intercambio entre aliados, almacén, tienda y quince tipos de contratos aleatorios con principal viable, secundarios opcionales y recompensa extraordinaria por huevos de jefes.
 
 **Estado:** documentación de futuro diseño; este repositorio sigue siendo actualmente un editor de escenarios. Guardar la hoja **no** añade estos sistemas al juego.
+
+
+## v0.9 — Cuatro modelos GLB del usuario + selección con Ctrl
+
+Los cuatro GLB subidos a `assets/terrain/` son ahora los **únicos modelos del catálogo Estructuras / Cuevas**:
+- `montañá.glb` — Montaña.
+- `rocky ring 3d model.glb` — Cueva rocosa.
+- `stone ruin 3d model.glb` — Cueva de piedra.
+- `stylized rock ring 3d model.glb` — Cueva estilizada.
+
+El editor carga los GLB mediante Three.js (sin modificar los originales), reutiliza mallas y materiales, y permite colocar instancias independientes con X, Z, altura Y, rotación y escala. Conserva la geometría original sin reconstrucción procedural. Los nodos se guardan como `{kind:"prefab",prefabId,x,z,offsetY,rotation,scale}`.
+
+**Controles:** `Ctrl + clic izquierdo` añade o quita un objeto de la selección; `Ctrl + clic derecho arrastrando` selecciona los objetos que intersectan el rectángulo; la herramienta `Mover` desplaza los elementos seleccionados en conjunto. También se puede duplicar, eliminar, cambiar escala/rotación o deshacer.
+
+Se han retirado de la interfaz **Importar mapa de alturas**, **Cueva bajo el terreno**, las seis piezas de cuevas procedurales anteriores y los botones antiguos de cueva y montaña. Se conservan las herramientas de relieve, perforación 3D, rutas, muros, escaleras, anclajes, spawns y el modo Probar.
+
+### Escenario oficial para integrar con el juego futuro
+
+El documento [assets/terrain/wildtrap-world.json](assets/terrain/wildtrap-world.json) define el escenario publicado (heightmap, nodos, cortes y catálogo de GLB). Cuando no hay borrador local, el editor abre este archivo; con **Abrir mapa publicado** puede recuperarse expresamente. El archivo `prefab-catalog.mjs` contiene los identificadores de los modelos para reutilizarlos desde el repositorio del juego.
+
+**Persistencia actual:** los cambios del navegador se guardan automáticamente en localStorage y pueden exportarse/importarse en JSON. El archivo publicado `wildtrap-world.json` está versionado en GitHub, pero el navegador de GitHub Pages **no puede escribirlo directamente** sin un servicio autorizado; por tanto no se afirma que cada cambio local se sincronice automáticamente al repositorio. Para publicar una revisión se debe actualizar ese archivo mediante la conexión autorizada a GitHub, por ejemplo proporcionando el JSON exportado en esta conversación. Este límite se mantiene explícito para evitar perder cambios.
+
+**Alcance del modo Probar:** se muestran los nuevos GLB, pero la Farolera conserva las colisiones del terreno anterior. La integración de colisión simplificada con los modelos GLB se evaluará por separado.
+
+[Pruebas automáticas del editor y GLB](tests/editor-glb-integration.test.mjs)
