@@ -222,3 +222,32 @@ Pruebas: `tests/scene-object-catalog.test.mjs` valida categorías y grupos sin T
 - **Validación:** `tests/phase3-tool-controls-smoke.html` prueba en Chrome el ajuste del pincel en cuatro direcciones, la galería embebida, el deshacer de vértices/cierre y el orden cronológico entre acciones pendientes y operaciones del escenario. Los tests de GLB, cortes y recuperación siguen incluidos en las comprobaciones.
 
 No incluye aún la Fase 4 (edición transparente de malla, bloqueo de vértices, anclaje y restricciones XYZ).
+
+## v0.9.12 — Fase 4: edición de malla, Intangible y restricciones
+
+La Fase 4 completa el rediseño del editor, conservando la interfaz de tres paneles, el catálogo, los recortes poligonales y los proyectos existentes.
+
+### Intangible: referencias transparentes y no seleccionables
+
+Junto al ojo **◉** de cada modelo persistente aparece **INT**. Actívalo para mostrar ese objeto como un fantasma semitransparente que se ve incluso a través del terreno, sin ocultarlo ni eliminarlo. La herramienta Cuchillo lo ignora, así como el picking, hover y la selección rectangular del escenario: el clic alcanza la superficie tangible situada detrás. Pulsa **INT** nuevamente para recuperar el comportamiento normal. El botón **INT** situado junto al ojo del grupo aplica la misma función a todos sus modelos. Oculto e Intangible son estados independientes y se guardan en el JSON; cambiar uno no desactiva el otro. Los objetos intangibles se vuelven sólidos solo mientras está activo el modo Play, pero la edición y el estado guardado no cambian.
+
+### Ver malla 3D y bloquear vértices
+
+Selecciona un **modelo GLB** desde el escenario o desde **Objetos** y pulsa **Malla** en la barra izquierda. La malla se vuelve translúcida; se muestran aristas verde-agua y vértices delanteros y traseros con profundidad desactivada. Haz clic en un punto o arrastra un rectángulo para seleccionar vértices (Ctrl añade o quita). Los vértices coincidentes en la geometría se seleccionan juntos.
+
+- **Bloquear vértices:** conserva las posiciones de los vértices elegidos, incluso cuando después deformes el resto.
+- **Desbloquear vértices:** devuelve esos puntos al conjunto deformable.
+- **Deformar vértices libres:** elige X, Y, Z o XYZ y factor entre 0.1 y 5. Se deforma la copia de ese modelo, no el GLB compartido. Los bloqueos se conservan con la operación que se acaba de aplicar: futuros cambios en la selección no reescriben deformaciones previas.
+- **Restaurar deformación:** reconstruye el modelo original sin borrar los bloqueos.
+
+Con modelos GLB grandes se limita el número de puntos dibujados simultáneamente por rendimiento; **Seleccionar todos** sigue incluyendo todos sus vértices. Cuando una malla ya tiene recortes, el editor utiliza las posiciones e índices estables de su topología fuente para que el cuchillo y los bloqueos no se mezclen con los triángulos nuevos. No se altera la caché compartida de archivos GLB. El guardado se reconstruye tras abrir JSON y es compatible con mapas anteriores sin datos de edición. Los modelos procedimentales heredados (no GLB) no tienen edición de vértices en esta versión; sí admiten **Intangible**.
+
+### Restringir rotaciones y anclar base
+
+En la pestaña **Objeto** de un GLB seleccionado están los botones **X / Y / Z bloqueado**. Estos afectan a **Alt + arrastrar**: horizontal gira alrededor del eje Y cuando Y está libre, vertical inclina alrededor de X cuando X está libre, y si X/Y están bloqueados y Z está libre el movimiento horizontal gira sobre Z. Se guarda el estado por modelo. El inspector añade rotación Z numérica y un indicador de ejes ligado a la orientación de la cámara (X rojo, Y verde, Z azul).
+
+**Anclar base Y al escalar:** fija la posición inferior del propio objeto tomada al comenzar el gesto, también con transformaciones numéricas. No depende de que el terreno esté al nivel global 0: si la base está en Y = 37, seguirá en esa posición durante el escalado. Dentro de la herramienta Malla, el mismo anclaje determina el pivote de las deformaciones de vértices libres.
+
+El estado se guarda como campos opcionales `editorIntangible`, `rotationLocks`, `rotationZ`, `anchorScaleY`, `scaleAnchorOffsetY`, `vertexLocks` y `meshScaleOps` en los nodos, sin cambiar el formato anterior. Todo cambio aplicado utiliza el historial actual de Ctrl+Z.
+
+Pruebas: `tests/mesh-deform.test.mjs` verifica vértices realmente deformados y la inmutabilidad del original; `tests/browser-phase4-mesh.mjs` recorre en Chrome la interfaz de Intangible, malla, bloqueo, escala, rotaciones, anclaje, restauración, Ctrl+Z y guardado; las regresiones de Fases 1–3, GLB, cuchillo y rescate siguen ejecutándose.
