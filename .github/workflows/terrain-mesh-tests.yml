@@ -1,7 +1,7 @@
 name: Validar recortes repetidos y malla real de la arena
 on:
   push:
-    branches: [main, feat/knife-mesh-overlay-v0.9.14]
+    branches: [main]
     paths:
       - 'adaptive-terrain-cuts.mjs'
       - 'terrain-holes.mjs'
