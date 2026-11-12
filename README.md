@@ -251,3 +251,35 @@ En la pestaña **Objeto** de un GLB seleccionado están los botones **X / Y / Z 
 El estado se guarda como campos opcionales `editorIntangible`, `rotationLocks`, `rotationZ`, `anchorScaleY`, `scaleAnchorOffsetY`, `vertexLocks` y `meshScaleOps` en los nodos, sin cambiar el formato anterior. Todo cambio aplicado utiliza el historial actual de Ctrl+Z.
 
 Pruebas: `tests/mesh-deform.test.mjs` verifica vértices realmente deformados y la inmutabilidad del original; `tests/browser-phase4-mesh.mjs` recorre en Chrome la interfaz de Intangible, malla, bloqueo, escala, rotaciones, anclaje, restauración, Ctrl+Z y guardado; las regresiones de Fases 1–3, GLB, cuchillo y rescate siguen ejecutándose.
+
+
+## v0.9.13 — Corrección de triángulos residuales y vista real de la malla de la arena
+
+### Por qué permanecían caras después de usar el cuchillo
+
+Se encontraron dos limitaciones **silenciosas** en la reconstrucción del terreno: se eliminaban del cálculo recortes antiguos a partir del número 19 dentro de una misma celda, y una vez procesados 5.000 triángulos el sistema volvía a introducir caras originales sin recortar. Un tercer caso era el exceso de fragmentos al cortar reiteradamente superficies previamente vaciadas.
+
+El motor ya no descarta recortes anteriores de una celda ni reintroduce caras cuando supera 5.000 triángulos. En secuencias de cortes superpuestos no vuelve a subdividir regiones definitivamente eliminadas. Se conserva un límite explícito de complejidad por triángulo como protección contra congelamientos: si se rebasa, se comunica el problema y **se cancela la nueva operación sin guardarla como un corte exitoso**. Los recortes previos continúan intactos y la vista de topología indica si alguno de los datos ya guardados excede ese límite.
+
+Antes de aplicar un nuevo recorte al terreno, WILDTRAP comprueba cuánto cambia el **área real de sus triángulos visibles**. Si el contorno no llega a ninguna cara nueva (por ejemplo, porque ya era un agujero o la profundidad del prisma no llega a la superficie), no se almacena otro recorte ni aparece un falso mensaje de éxito. Cambia el ángulo o la profundidad y examina la cara correspondiente. El material del relieve es de doble cara, pero su heightmap es una única superficie: verlo desde atrás no implica una segunda malla independiente.
+
+### Inspeccionar caras, aristas y vértices del terreno
+
+En **Objetos → Escenario · Terreno** aparece ahora **◫ Malla**, junto al ojo. Es un acceso directo a la herramienta **Malla** y selecciona **Terreno de la arena** en el panel derecho. Allí se pueden mostrar u ocultar por separado:
+
+- **Caras:** superficies trianguladas del relieve real, incluidos los huecos existentes.
+- **Aristas:** todas las líneas que unen vértices y delimitan los triángulos después de los recortes.
+- **Vértices:** únicamente los vértices actualmente utilizados por las caras, no los puntos de la malla original que hayan quedado sueltos sin caras.
+- **Rayos X:** permite ver la topología por detrás a través del terreno.
+
+Haz **clic en el triángulo que continúa visible**: se destaca su contorno y se muestran el número de cara, sus tres índices de vértice y coordenadas XYZ. Eso permite identificar si pertenece a la arena o si el triángulo aparente es, en realidad, la superficie de otro modelo 3D superpuesto. La visualización no modifica los datos del proyecto ni genera cortes nuevos.
+
+La herramienta Malla ahora tiene un selector entre **Terreno de la arena** y **Modelo GLB seleccionado**. Los modelos GLB también disponen de los interruptores Caras/Aristas/Vértices/Rayos X; las aristas reflejan la malla visible recortada y ya no desaparecen cuando el modelo supera 11.000 posiciones de vértices. Se mantiene la edición y bloqueo de vértices GLB de la versión anterior.
+
+### Pruebas
+
+- `tests/adaptive-terrain-cuts.test.mjs`: 25 operaciones en una misma celda con dos regiones, más de 5.000 triángulos de una pared, cortes, restauraciones, agujeros antiguos y coordenadas tridimensionales.
+- `tests/browser-terrain-mesh.mjs`: arranque del escenario recortado, inspección de caras/XYZ, capas de aristas/vértices, ojos del terreno y cambio a editor GLB.
+- El flujo de validación incluye regresión de las cuatro fases de interfaz, cuchillo, mapa con recortes, pruebas GLB y arranque normal/recuperación.
+
+Si una cara continúa apareciendo, abre Malla → Terreno, pulsa esa cara para consultar sus índices y revisa el indicador de estado del cuchillo. Una captura junto con el JSON exportado del escenario permitirá reproducir exactamente la geometría.
