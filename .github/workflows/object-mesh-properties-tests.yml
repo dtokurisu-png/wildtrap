@@ -1,7 +1,7 @@
 name: Validar controles Malla, Intangible y altura de cuevas
 on:
   push:
-    branches: [main, feat/object-mesh-intangible-snap-v0.9.17]
+    branches: [main]
     paths:
       - 'scene-object-manager.mjs'
       - 'scene-object-catalog.mjs'
