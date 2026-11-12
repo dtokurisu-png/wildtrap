@@ -67,10 +67,14 @@
   assert(draft?.editorCamera&&sameVector(draft.editorCamera.position,custom.position),
    'El borrador de escenario no contiene la posición de cámara');
   step='recargar el editor y recuperar la última vista';
-  const old=w;
+  // An iframe keeps the SAME WindowProxy across navigation; compare the
+  // document and the editor-camera controller instance instead.
+  const oldDocument=d,oldController=w.__editorCamera;
   frame.src='../?safe=1&reload-camera=1';
-  w=await wait(()=>frame.contentDocument?.querySelector('#boot[hidden]')&&
-   frame.contentWindow!==old&&frame.contentWindow.__editorCamera?frame.contentWindow:null);
+  w=await wait(()=>frame.contentDocument!==oldDocument&&
+   frame.contentDocument?.querySelector('#boot[hidden]')&&
+   frame.contentWindow.__editorCamera&&frame.contentWindow.__editorCamera!==oldController
+    ?frame.contentWindow:null);
   d=frame.contentDocument;
   const reopened=w.__editorCamera.getState();
   assert(sameVector(reopened.position,saved.position),'Al reiniciar se perdió posición XYZ');
