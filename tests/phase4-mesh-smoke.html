@@ -52,6 +52,20 @@
     assert(state.active===true&&state.currentId===902,'Ver malla no activó el modelo seleccionado');
     assert(state.points>10,'La malla no expone vértices');
     assert(!d.getElementById('meshEditControls').hidden,'No se mostraron los controles de malla');
+    assert(d.getElementById('meshTarget').value==='model','Debe mantener la malla GLB seleccionada');
+    assert(state.renderedEdges>0&&state.visibleEdges>0,'Los GLB deben mostrar aristas reales de la topología');
+    for(const key of ['modelFaces','modelEdges','modelVertices','modelXray'])
+     assert(d.getElementById(key)?.checked,'Falta activar la capa '+key);
+    const edgeSwitch=d.getElementById('modelEdges');
+    edgeSwitch.checked=false;edgeSwitch.dispatchEvent(new Event('change',{bubbles:true}));
+    assert(w.__meshEditor.getState().visibleEdges===0,'El interruptor no ocultó las aristas');
+    edgeSwitch.checked=true;edgeSwitch.dispatchEvent(new Event('change',{bubbles:true}));
+    assert(w.__meshEditor.getState().visibleEdges>0,'El interruptor no restauró las aristas');
+    d.getElementById('modelFaces').checked=false;
+    d.getElementById('modelFaces').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(!w.__meshEditor.getState().visibleFaces,'No se ocultaron las caras GLB');
+    d.getElementById('modelFaces').checked=true;
+    d.getElementById('modelFaces').dispatchEvent(new Event('change',{bubbles:true}));
     assert(d.getElementById('axisGizmoSvg')?.innerHTML.includes('>Y</text>'),'Falta indicador de ejes XYZ');
     step='selección y bloqueo real';
     d.getElementById('meshSelectAll').click();
