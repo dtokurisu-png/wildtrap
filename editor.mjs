@@ -769,7 +769,7 @@ window.__axisView={snap:snapCameraToAxis,state:()=>({
 refreshAxisGizmo();
 // Persist the editor camera separately from the large world JSON so a simple
 // camera movement is not lost when reloading before a full autosave finishes.
-let cameraReadyToSave=false,cameraSaveTimer=null;
+let cameraReadyToSave=false,cameraSaveTimer=null,cameraDraftTimer=null;
 function currentEditorCamera(){
  return normalizeEditorCameraState({
   position:camera.position.toArray(),
@@ -788,9 +788,15 @@ function flushCameraSave(){
  // A tiny, mode-scoped write happens before the debounced full scene write.
  try{localStorage.setItem(cameraKey,JSON.stringify(state))}
  catch(_){/* The full draft/export remains a fallback when storage is full. */}
- // IMPORTANT: camera updates must NEVER reset the timer for an unrelated
- // world edit. Otherwise continuous orbit damping starves X/Y/Z lock saves.
- // The existing draft autosave incorporates live.editorCamera when it fires.
+ // Camera-only full-draft writes use their OWN timer and never call
+ // persist(), which would postpone an unrelated terrain/object edit.
+ if(cameraDraftTimer!==null)clearTimeout(cameraDraftTimer);
+ cameraDraftTimer=setTimeout(()=>{
+  cameraDraftTimer=null;
+  try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(_){
+   // The tiny camera key was already committed above.
+  }
+ },680);
 }
 function scheduleCameraSave(){
  if(!cameraReadyToSave||testingScene||preview.active||preview.busy)return;
@@ -840,8 +846,10 @@ orbit.addEventListener('change',()=>{
 window.addEventListener('pagehide',()=>{
  if(cameraReadyToSave)flushCameraSave();
  // On a rapid reload, commit a pending terrain/object edit synchronously too.
- if(saveTimer!==null){
-  clearTimeout(saveTimer);saveTimer=null;
+ if(saveTimer!==null||cameraDraftTimer!==null){
+  if(saveTimer!==null)clearTimeout(saveTimer);
+  if(cameraDraftTimer!==null)clearTimeout(cameraDraftTimer);
+  saveTimer=null;cameraDraftTimer=null;
   try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(_){}
  }
 });
