@@ -124,11 +124,11 @@ export function createPrefabLibrary(onChange=()=>{}){
     const faded=source=>{
      const mat=source.clone();
      mat.transparent=true;mat.opacity=Math.min(.26,(source.opacity??1)*.26);
-     mat.depthWrite=false;mat.depthTest=false;mat.side=THREE.DoubleSide;
+     mat.depthWrite=false;mat.depthTest=true;mat.side=THREE.DoubleSide;
      return mat;
     };
     child.material=Array.isArray(child.material)?child.material.map(faded):faded(child.material);
-    child.renderOrder=12; // Reference stays visible through opaque terrain; cutter line draws above.
+    child.renderOrder=0; // Depth tested: hidden sections stay behind opaque terrain or other models.
     child.userData.wildtrapGeneratedMaterials=
      Array.isArray(child.material)?child.material:[child.material];
    });
