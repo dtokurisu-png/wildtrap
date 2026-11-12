@@ -88,3 +88,43 @@ test('cortes serializados en el JSON conservan exactamente los vértices',()=>{
  assert.deepEqual(a.positions,b.positions);
  assert.deepEqual(a.indices,b.indices);
 });
+
+
+test('25 recortes en la misma celda no descartan los primeros 18 ni dejan triángulos originales',()=>{
+ const base=cliff();
+ const stamps=Array.from({length:25},(_,i)=>stamp(i*.19,30,0,.32,'cut'));
+ const early=buildAdaptiveTerrain(base,[],stamps.slice(0,18),10,2);
+ const full=buildAdaptiveTerrain(base,[],stamps,10,2);
+ assert.ok(full&&early);
+ assert.equal(full.stats.incomplete,false);
+ assert.equal(full.stats.limitedFragments,0);
+ assert.ok(area(full)<area(early)-.3,
+  'Los cortes posteriores al decimoctavo deben continuar eliminando superficie');
+ const repeated=buildAdaptiveTerrain(base,[],[...stamps,...stamps],10,2);
+ assert.equal(repeated.stats.incomplete,false);
+ assert.ok(Math.abs(area(repeated)-area(full))<.0001,
+  'Repetir exactamente los mismos cortes no debe volver a crear triángulos');
+});
+test('el límite antiguo de 5000 triángulos no reintroduce caras originales',()=>{
+ const resolution=65,side=64,size=64,step=size/side;
+ const positions=[],colors=[],normals=[],uvs=[],indices=[];
+ for(let j=0;j<resolution;j++)for(let i=0;i<resolution;i++){
+  positions.push(-size/2+i*step,0,-size/2+j*step);
+  colors.push(.3,.6,.4);normals.push(0,1,0);uvs.push(i/side,j/side);
+ }
+ for(let j=0;j<side;j++)for(let i=0;i<side;i++){
+  const a=j*resolution+i,b=a+1,c=a+resolution,d=c+1;
+  indices.push(a,c,b,b,c,d);
+ }
+ const base={positions,colors,normals,uvs,indices};
+ const broad={op:'cut',shape:'polygon',center:[0,0,0],normal:[0,1,0],
+  polygon:[[-29,-29],[29,-29],[29,29],[-29,29]],depth:2};
+ const result=buildAdaptiveTerrain(base,[],[broad],size,resolution);
+ assert.ok(result);
+ assert.ok(result.stats.clippedTriangles>5000,
+  'Esta prueba debe alcanzar más de 5000 triángulos');
+ assert.equal(result.stats.limitedTriangles,0);
+ assert.equal(result.stats.incomplete,false);
+ assert.ok(area(result)<area(base)*.25,
+  'No se deben reinsertar triángulos base después del límite antiguo');
+});
