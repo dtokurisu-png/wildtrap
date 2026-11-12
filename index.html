@@ -57,7 +57,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.23 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.24 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -109,7 +109,26 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <label>Nombre de la zona<input id="zoneName" type="text" maxlength="80" style="width:100%"></label>
 <p class="hint" id="zonePointCount"></p>
 <div class="grid2"><button id="zoneEditVertices">Editar vértices</button><button id="zoneDelete">Eliminar zona</button></div>
-<p class="hint">Las zonas se guardan en el JSON del escenario. Los acantilados llegarán en la fase 2.</p>
+<div style="border-top:1px solid #426b5b;margin-top:12px;padding-top:9px">
+<h2>Acantilados de esta zona</h2>
+<p class="hint">Define una o varias superficies inclinadas o verticales sobre la malla 3D. No modifica el terreno.</p>
+<label>Pendiente mínima <output id="zoneCliffSlopeValue">40°</output>
+<input id="zoneCliffSlope" type="range" min="5" max="85" step="5" value="40" oninput="document.getElementById('zoneCliffSlopeValue').textContent=this.value+'°'"></label>
+<button id="zoneCliffAdd" type="button" style="width:100%">+ Acantilado</button>
+<div class="grid2" style="margin-top:6px">
+<button id="zoneCliffUndo" type="button" disabled>↶ Último punto</button>
+<button id="zoneCliffClose" type="button" disabled>◇ Cerrar acantilado</button>
+</div>
+<button id="zoneCliffCancel" type="button" style="width:100%;margin-top:5px">Cancelar contorno</button>
+<p class="hint" id="zoneCliffHint">Selecciona una zona para registrar sus acantilados.</p>
+<div id="zoneCliffList"></div>
+<div id="zoneCliffProperties" hidden>
+<label>Nombre del acantilado<input id="zoneCliffName" type="text" maxlength="80" style="width:100%;padding:5px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px"></label>
+<p class="hint" id="zoneCliffFaces">0 caras</p>
+<button id="zoneCliffDelete" type="button">Eliminar acantilado</button>
+</div>
+</div>
+<p class="hint">Las regiones y las caras de cada acantilado se exportan junto con el escenario.</p>
 </div>
 <p class="hint">Escape cancela el trazado. Retroceso elimina el último punto. Las zonas no alteran el terreno ni los recortes.</p>
 </section>
@@ -288,5 +307,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.23').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.24').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
