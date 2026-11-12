@@ -45,17 +45,26 @@
     group.click();
     assert(d.querySelector('[data-intangible-id="901"]').getAttribute('aria-pressed')==='false',
      'El control del grupo no volvió tangible el modelo');
-    step='editor de vértices';
+    step='malla por objeto desde gestor';
+    assert(!d.querySelector('[data-workspace="mesh"]'),
+      'No debe quedar una herramienta Malla independiente en la barra');
     d.querySelector('[data-object-id="902"]').click();
-    d.querySelector('[data-workspace="mesh"]').click();
+    const outlinerMesh=d.querySelector('[data-mesh-id="902"]');
+    assert(outlinerMesh,'Falta el control de malla individual');
+    outlinerMesh.click();
+    assert(outlinerMesh.getAttribute('aria-pressed')==='true','El botón no activó Malla');
+    assert(w.__objectMeshOverlays.getState().ids.includes(902),
+      'No apareció la capa del modelo');
+    assert(!d.getElementById('meshEditControls').hidden,
+      'No se mostraron las propiedades de la malla del GLB');
+    d.getElementById('modelVertexEditToggle').click();
     const state=w.__meshEditor.getState();
-    assert(state.active===true&&state.currentId===902,'Ver malla no activó el modelo seleccionado');
+    assert(state.active===true&&state.currentId===902,'Editar vértices no activó el modelo');
     assert(state.points>10,'La malla no expone vértices');
-    assert(!d.getElementById('meshEditControls').hidden,'No se mostraron los controles de malla');
-    assert(d.getElementById('meshTarget').value==='model','Debe mantener la malla GLB seleccionada');
     assert(state.renderedEdges>0&&state.visibleEdges>0,'Los GLB deben mostrar aristas reales de la topología');
-    for(const key of ['modelFaces','modelEdges','modelVertices','modelXray'])
-     assert(d.getElementById(key)?.checked,'Falta activar la capa '+key);
+    for(const key of ['modelFaces','modelEdges','modelVertices'])
+      assert(d.getElementById(key)?.checked,'Falta activar '+key);
+    assert(!d.getElementById('modelXray').checked,'Rayos X debe poder encenderse manualmente');
     const edgeSwitch=d.getElementById('modelEdges');
     edgeSwitch.checked=false;edgeSwitch.dispatchEvent(new Event('change',{bubbles:true}));
     assert(w.__meshEditor.getState().visibleEdges===0,'El interruptor no ocultó las aristas');
@@ -109,24 +118,21 @@
     d.getElementById('meshResetDeform').click();
     assert(w.__meshEditor.getState().operations===0,'Restaurar deformación no restauró el GLB');
     assert(d.getElementById('meshEditControls')?.hidden===false,'Restaurar cerró inesperadamente Ver malla');
-    step='malla GLB como referencia durante el corte';
+    step='malla GLB persiste con cuchillo activo';
     d.querySelector('[data-workspace="knife"]').click();
-    const during=w.__meshEditor.getState();
-    assert(during.active&&during.currentId===902&&during.renderedEdges>0&&during.visibleEdges>0,
-     'La malla GLB seleccionada desapareció al cambiar al cuchillo: '+JSON.stringify(during));
-    assert(d.getElementById('knifeMeshTarget').value==='model','No retuvo GLB como superficie');
-    assert(d.getElementById('knifeMeshToggle').getAttribute('aria-pressed')==='true',
-     'No se mantiene activada la referencia GLB durante el corte');
-    assert(d.getElementById('meshEditControls').hidden,
-     'Las acciones de deformación de vértices deben estar ocultas mientras está activo el cuchillo');
-    d.getElementById('knifeLayerEdges').checked=false;
-    d.getElementById('knifeLayerEdges').dispatchEvent(new Event('change',{bubbles:true}));
-    assert(w.__meshEditor.getState().visibleEdges===0,
-     'Las aristas GLB no responden al interruptor de la tijera');
-    d.getElementById('knifeLayerEdges').checked=true;
-    d.getElementById('knifeLayerEdges').dispatchEvent(new Event('change',{bubbles:true}));
-    assert(w.__meshEditor.getState().visibleEdges>0,
-     'Las aristas GLB no se restauran durante el corte');
+    assert(!w.__meshEditor.getState().active,'El cuchillo no desactivó la edición de vértices');
+    assert(w.__objectMeshOverlays.getState().ids.includes(902),
+      'La malla visible del GLB desapareció al activar Cuchillo');
+    assert(!d.getElementById('knifeMeshToggle'),'No se debe añadir un botón Malla adicional en Cuchillo');
+    const meshButton=d.querySelector('[data-mesh-id="902"]');
+    meshButton.click();
+    assert(!w.__objectMeshOverlays.getState().ids.includes(902),
+      'El botón del propio objeto no oculta su malla en modo Cuchillo');
+    meshButton.click();
+    assert(w.__objectMeshOverlays.getState().ids.includes(902),
+      'El botón del objeto no restaura Malla en modo Cuchillo');
+    assert(w.__workspaceLayout.getState().workspace==='knife',
+      'Malla del gestor no debe cambiar de herramienta');
     document.body.dataset.result='PASS';
     output.textContent='PASS · intangible individual/grupo, x-ray, bloqueo, escala, anclaje Y, XYZ y guardado';
    }catch(error){fail(step,error)}
