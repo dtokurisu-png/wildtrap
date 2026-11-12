@@ -4,7 +4,7 @@ import {objectTree,sceneObjectCount,categoryForNode} from './scene-object-catalo
 // its host callbacks use the normal snapshot / draw / persist pipeline.
 export function createSceneObjectManager({
  root,hierarchyRoot,getNodes,getGroups,getSelection,lookup,select,setVisibility,setIntangible=()=>{},group,ungroup,rename,
- terrainIsVisible=()=>true,setTerrainVisibility=()=>{}
+ terrainIsVisible=()=>true,setTerrainVisibility=()=>{},showTerrainMesh=()=>{}
 }){
  if(!root||!hierarchyRoot)throw new Error('No se encontraron las ventanas Objetos y Jerarquía');
  const create=(tag,className,text)=>{
@@ -39,7 +39,11 @@ export function createSceneObjectManager({
  const terrainEye=create('button','scene-group-eye','◉');
  terrainEye.type='button';
  terrainEye.addEventListener('click',()=>setTerrainVisibility(!terrainIsVisible()));
- terrainRow.append(terrainLabel,terrainEye);terrainSection.append(terrainRow);
+ const meshButton=create('button','scene-terrain-edit','◫ Malla');
+ meshButton.type='button';meshButton.title='Inspeccionar vértices, aristas y caras del terreno';
+ meshButton.setAttribute('aria-label','Ver malla del terreno de la arena');
+ meshButton.addEventListener('click',showTerrainMesh);
+ terrainRow.append(terrainLabel,terrainEye,meshButton);terrainSection.append(terrainRow);
  const treeRoot=create('div','scene-tree');
  root.replaceChildren(header,terrainSection,treeRoot);
  const hierarchyTitle=create('h2','', 'Jerarquía de la escena');
