@@ -317,3 +317,28 @@ body.testing #axisGizmo{display:none}
 }
 .knife-mesh-overlay .terrain-mesh-toggles{margin:0}
 .knife-mesh-overlay>.hint{margin:0;font-size:10px;line-height:1.5}
+
+/* v0.9.16: the displayed XYZ markers are interactive camera shortcuts.
+   Only the three marker buttons accept pointer events; the overlay never
+   intercepts gestures on the 3D viewport. */
+#axisGizmoSvg{pointer-events:none}
+#axisGizmo>.axis-view-button{
+ position:absolute;width:30px;height:30px;z-index:3;
+ padding:0;margin:0;border-radius:50%;border:1px solid transparent;
+ background:transparent;color:transparent;font-size:0;line-height:0;
+ pointer-events:auto;touch-action:manipulation;cursor:pointer;
+}
+#axisGizmo>.axis-view-button:hover{
+ border-color:#eafff5;box-shadow:0 0 0 3px #b9ffe344;
+ background:#d9ffe522;
+}
+#axisGizmo>.axis-view-button:focus-visible{
+ outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 4px #174734;
+}
+#axisGizmo>.axis-view-button[aria-pressed="true"]{
+ border-color:#fcf2c8;
+}
+#axisGizmo>span{white-space:nowrap;font-size:9px;letter-spacing:.1px}
+@media(max-width:800px){
+ #axisGizmo>.axis-view-button{width:24px;height:24px}
+}
