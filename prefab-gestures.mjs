@@ -40,3 +40,31 @@ export function altitudeFromVerticalDrag(originalY,startScreenY,screenY){
  const dy=Number(startScreenY)-Number(screenY);
  return Number.isFinite(dy)?base+dy*.25:base;
 }
+
+// Free cave placement is a camera-aware SCREEN gesture, not a terrain raycast.
+// A normal drag maps screen X to the horizontal camera-right direction, and
+// screen Y directly to absolute world Y (up = higher). Space+drag works in
+// the camera-aligned ground plane for X/Z depth positioning, preserving Y.
+export function freeCaveFromScreenDrag(
+ original,startX,startY,screenX,screenY,right,up,
+ horizontalUnits=.5,verticalUnits=.25,mapSize=630,plane=false
+){
+ const x=Number(original?.x),y=Number(original?.y),z=Number(original?.z);
+ if(![x,y,z,startX,startY,screenX,screenY].every(Number.isFinite))return null;
+ const pixelsX=screenX-startX,pixelsUp=startY-screenY;
+ const width=Number.isFinite(horizontalUnits)&&horizontalUnits>0?horizontalUnits:.5;
+ const elev=Number.isFinite(verticalUnits)&&verticalUnits>0?verticalUnits:.25;
+ const norm=v=>{
+  const vx=Number(v?.x)||0,vz=Number(v?.z)||0;
+  const len=Math.hypot(vx,vz);
+  return len>1e-6?{x:vx/len,z:vz/len}:null;
+ };
+ const cameraRight=norm(right)||{x:1,z:0};
+ const cameraUp=norm(up)||{x:0,z:-1};
+ const bound=mapSize/2-1;
+ return {
+  x:clamp(x+cameraRight.x*pixelsX*width+(plane?cameraUp.x*pixelsUp*width:0),-bound,bound),
+  z:clamp(z+cameraRight.z*pixelsX*width+(plane?cameraUp.z*pixelsUp*width:0),-bound,bound),
+  y:plane?y:y+pixelsUp*elev
+ };
+}
