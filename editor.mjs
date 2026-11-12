@@ -582,6 +582,86 @@ if(mode==='smooth'){let v=0,num=0;for(let yy=Math.max(0,j-1);yy<=Math.min(N-1,j+
 }
 refreshTerrain();draw();persist();
 }
+// Sculpt the SELECTED GLB, not the terrain underneath it. Every dab is
+// stored as an instance-local root-space stamp and replayed before cuts.
+// Selection, locked vertex IDs and the original GLB buffers stay unchanged.
+let modelSculptSession=null;
+function selectedSculptNode(){
+ const n=live.nodes.find(node=>node.id===selectedId);
+ return n?.kind==='prefab'&&!n.editorHidden&&!n.editorIntangible?n:null;
+}
+function pickModelSculptSurface(e,node){
+ const root=(renderedNodes.get(node.id)||[]).find(obj=>obj.userData?.sharedAsset);
+ if(!root)return null;
+ pointerRay(e);scene.updateMatrixWorld(true);
+ let hits=ray.intersectObject(root,true).filter(h=>h.object.isMesh&&!h.object.userData.editorOnly&&h.face);
+ if(!hits.length){
+  // Imported cave/rock meshes can be reversed: allow front/back painting.
+  const originals=new Map();
+  root.traverse(obj=>{
+   if(!obj.isMesh)return;
+   for(const m of Array.isArray(obj.material)?obj.material:[obj.material]){
+    if(m&&!originals.has(m)){originals.set(m,m.side);m.side=THREE.DoubleSide}
+   }
+  });
+  try{hits=ray.intersectObject(root,true).filter(h=>h.object.isMesh&&!h.object.userData.editorOnly&&h.face)}
+  finally{for(const [m,side] of originals)m.side=side}
+ }
+ const hit=hits[0];if(!hit)return null;
+ const inverseRoot=root.matrixWorld.clone().invert();
+ const normalWorld=hit.face.normal.clone()
+  .applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize();
+ const inverseRotation=root.getWorldQuaternion(new THREE.Quaternion()).invert();
+ const normalRoot=normalWorld.clone().applyQuaternion(inverseRotation).normalize();
+ const local=hit.point.clone().applyMatrix4(inverseRoot);
+ return {point:local.toArray(),normal:normalRoot.toArray(),
+  world:hit.point.clone(),normalWorld,root};
+}
+function sculptModelAt(node,hit,{start=false}={}){
+ if(!node||!hit||!sculptTools[mode])return false;
+ const stamps=cleanSculptStamps(node.meshSculptOps);
+ if(stamps.length>=240){toast('Máximo de 240 pinceladas para este modelo; guarda una copia antes de continuar.');return false}
+ const radius=Number(radiusInput.value)/Math.max(.01,Number(node.scale)||1);
+ const strength=Number(strengthInput.value)/Math.max(.01,Number(node.scale)||1);
+ if(!Number.isFinite(radius)||!Number.isFinite(strength))return false;
+ const last=stamps.at(-1);
+ if(!start&&last&&last.mode===mode&&
+  Math.hypot(...hit.point.map((v,i)=>v-last.center[i]))<Math.max(.07,radius*.16))
+  return false;
+ if(start)snapshot();
+ // A stroke snapshot, not the currently locked set at reload time.
+ node.meshSculptOps=[...stamps,{
+  mode,center:hit.point,normal:hit.normal,radius,strength,
+  locked:normalizedLocks(node.vertexLocks)
+ }];
+ draw();
+ return true;
+}
+function updateModelSculptCursor(hit){
+ cursor.visible=Boolean(hit);
+ if(!hit)return;
+ cursor.position.copy(hit.world).addScaledVector(hit.normalWorld,.08);
+ cursor.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),hit.normalWorld);
+ cursor.scale.setScalar(Number(radiusInput.value));
+}
+window.__modelSculpt={
+ getState:()=>({id:selectedId,mode,stamps:cleanSculptStamps(selectedSculptNode()?.meshSculptOps).length,
+  selectedIsGLB:Boolean(selectedSculptNode()),active:Boolean(modelSculptSession)}),
+ dab:(point,normal=[0,1,0])=>{
+  const n=selectedSculptNode();
+  if(!n||!sculptTools[mode]||!Array.isArray(point)||point.length!==3)return false;
+  const root=(renderedNodes.get(n.id)||[]).find(obj=>obj.userData?.sharedAsset);
+  if(!root)return false;
+  scene.updateMatrixWorld(true);
+  const inv=root.matrixWorld.clone().invert();
+  const p=new THREE.Vector3(...point).applyMatrix4(inv);
+  const norm=new THREE.Vector3(...normal).normalize()
+   .applyQuaternion(root.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();
+  const ok=sculptModelAt(n,{point:p.toArray(),normal:norm.toArray()}, {start:true});
+  if(ok)persist();
+  return ok;
+ }
+};
 function addNode(node){snapshot();const n={id:live.nextId++,...node};live.nodes.push(n);selectedId=n.id;selectedIds.clear();selectedIds.add(n.id);draw();persist()}
 function convertCoords(event){
 const rect=view.getBoundingClientRect();
