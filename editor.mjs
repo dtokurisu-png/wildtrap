@@ -503,6 +503,10 @@ for(const layer of ['Faces','Edges','Vertices','Xray']){
  });
 }
 function setMode(v){
+ if(modelSculptSession){
+  if(modelSculptSession.changed)persist();
+  modelSculptSession=null;
+ }
  if(v!=='prefab'&&armedPrefabId)clearPlacement();
  if(v==='holePaint'){
   if(dragSession)completeModelDrag({pointerId:dragSession.pointerId});
@@ -1253,6 +1257,19 @@ view.addEventListener('pointerdown',e=>{
   holesEditor.addPoint(hit,[e.clientX,e.clientY]);
   return;
  }
+ // Sculpt a selected GLB rather than moving it or painting the terrain.
+ if(sculptTools[mode]&&selectedId!==null){
+  e.preventDefault();
+  const node=selectedSculptNode();
+  if(!node){toast('Haz visible y tangible el modelo para esculpirlo');return}
+  const hit=pickModelSculptSurface(e,node);
+  if(!hit)return;
+  modelSculptSession={pointerId:e.pointerId,nodeId:node.id,changed:false};
+  if(sculptModelAt(node,hit,{start:true}))modelSculptSession.changed=true;
+  updateModelSculptCursor(hit);
+  try{view.setPointerCapture(e.pointerId)}catch(_){}
+  return;
+ }
  // First raycast the actual GLB/scene meshes, so clicking any visible rock selects it.
  const hovered=pickedNodeAt(e);
  if(hovered){
@@ -1281,7 +1298,24 @@ view.addEventListener('pointerdown',e=>{
 });
 view.addEventListener('pointermove',e=>{
  if(preview.active||preview.busy||prefabGallery.isBlocking()||marqueeStart||mode==='meshEdit')return;
+ if(modelSculptSession){
+  if(modelSculptSession.pointerId!==e.pointerId)return;
+  const n=live.nodes.find(n=>n.id===modelSculptSession.nodeId);
+  if(!n)return;
+  const hit=pickModelSculptSurface(e,n);
+  updateModelSculptCursor(hit);
+  if(hit&&sculptModelAt(n,hit))modelSculptSession.changed=true;
+  return;
+ }
  if(dragSession){moveModelDrag(e);return}
+ if(sculptTools[mode]&&selectedId!==null){
+  const node=selectedSculptNode();
+  const hit=node?pickModelSculptSurface(e,node):null;
+  updateModelSculptCursor(hit);
+  if(hit)$('coords').textContent='Modelo · X '+hit.world.x.toFixed(1)+
+   ' · Y '+hit.world.y.toFixed(1)+' · Z '+hit.world.z.toFixed(1);
+  return;
+ }
  const holeMode=mode==='holePaint';
  // No GLB selection or hover in cutting mode: only the cutter raycast runs.
  if(holeMode){
@@ -1310,6 +1344,11 @@ view.addEventListener('pointerleave',e=>{
  if(!dragSession){setHoverNode(null,e);updatePlacementAt(null);holesEditor?.hoverAt(null)}
 });
 window.addEventListener('pointerup',e=>{
+ if(modelSculptSession?.pointerId===e.pointerId){
+  const finished=modelSculptSession;modelSculptSession=null;
+  try{if(view.hasPointerCapture?.(e.pointerId))view.releasePointerCapture(e.pointerId)}catch(_){}
+  if(finished.changed)persist();
+ }
  completeModelDrag(e);
  pointerDown=false;holesEditor.endStroke();moveBases=null;dragId=null;
 });
