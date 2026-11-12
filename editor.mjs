@@ -375,6 +375,7 @@ function updateStatus(){
  const n=live.nodes.length;
  $('status').textContent=n+' elementos · '+(live.holes||[]).length+' celdas antiguas · '+(live.cuts3d||[]).filter(x=>x.op==='cut').length+' cortes 3D · '+live.nodes.filter(x=>x.kind==='prefab').length+' modelos GLB';
  const picked=live.nodes.find(x=>x.id===selectedId);
+ $('caveFreeMoveHelp').hidden=!(picked?.kind==='prefab'&&isFreeCave(picked.prefabId));
  $('selected').textContent=selectedIds.size>1?selectedIds.size+' elementos seleccionados':(picked?'ID '+picked.id+' · '+(picked.kind==='prefab'?prefabById(picked.prefabId)?.name||picked.prefabId:picked.kind):'Nada seleccionado');
  if(picked?.kind==='prefab'){
   if(!armedPrefabId)$('prefabType').value=picked.prefabId;
