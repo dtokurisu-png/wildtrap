@@ -1,0 +1,98 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP · movimiento libre de cuevas</title></head>
+<body data-result="PENDING"><div id="result">Comprobando movimiento 3D de cuevas</div>
+<script>
+(async()=>{
+ const out=document.getElementById('result');
+ const assert=(ok,msg)=>{if(!ok)throw Error(msg)};
+ const fail=(stage,error)=>{document.body.dataset.result='FAIL';out.textContent='FAIL '+stage+': '+error.message};
+ try{
+  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify({
+   version:3,size:630,resolution:129,heights:Array(129*129).fill(0),
+   nodes:[{id:901,kind:'prefab',prefabId:'rocky-cave',x:0,z:0,y:28,scale:1,rotation:0}],
+   objectGroups:[],holes:[],cuts3d:[],nextId:902,settings:{heightMax:120}
+  }));
+  const frame=document.createElement('iframe');frame.width=1440;frame.height=900;
+  frame.src='../?safe=1';document.body.append(frame);
+  let busy=false;const begun=Date.now();
+  const check=setInterval(async()=>{
+   if(busy||document.body.dataset.result!=='PENDING')return;
+   const d=frame.contentDocument,w=frame.contentWindow;
+   if(!d?.querySelector('#boot[hidden]')||!w.__sceneObjectManager||
+      !d.querySelector('[data-object-id="901"]')||
+      !String(d.getElementById('prefabStatus')?.textContent).includes('4/4')){
+    if(Date.now()-begun>25000){clearInterval(check);fail('arranque',Error('No se cargó el editor con la cueva GLB'))}
+    return;
+   }
+   busy=true;clearInterval(check);
+   let step='selección';
+   try{
+    const view=d.getElementById('viewport'),rect=view.getBoundingClientRect();
+    d.querySelector('[data-workspace="project"]').click();
+    d.querySelector('[data-object-id="901"]').click();
+    assert(!d.getElementById('caveFreeMoveHelp').hidden,'No se muestran los controles de cueva libre');
+    const p=(type,x,y,options={})=>{
+     const evt=new w.PointerEvent(type,{
+      bubbles:true,cancelable:true,composed:true,pointerId:71,pointerType:'mouse',
+      button:0,buttons:type==='pointerup'?0:(options.buttons??1),clientX:x,clientY:y
+     });
+     (type==='pointerup'?w:view).dispatchEvent(evt);
+    };
+    const findCave=()=>{
+     const centerX=rect.left+rect.width/2,centerY=rect.top+rect.height/2;
+     for(let dy=-130;dy<=130;dy+=8)for(let dx=-145;dx<=145;dx+=8){
+      const x=centerX+dx,y=centerY+dy;
+      if(x<rect.left+6||x>rect.right-6||y<rect.top+6||y>rect.bottom-6)continue;
+      p('pointermove',x,y,{buttons:0});
+      const label=d.getElementById('modelHoverIndicator');
+      if(label.style.display==='block'&&label.textContent.includes('Cueva'))return {x,y};
+     }
+     return null;
+    };
+    let hit=findCave();
+    assert(hit,'La cueva no es seleccionable mediante raycast de su geometría');
+    step='Espacio+arrastrar profundidad X/Z';
+    w.dispatchEvent(new w.KeyboardEvent('keydown',{
+     bubbles:true,cancelable:true,code:'Space',key:' '
+    }));
+    p('pointerdown',hit.x,hit.y);
+    p('pointermove',hit.x+34,hit.y-34);
+    const planeHeight=Number(d.getElementById('prefabOffsetY').value);
+    const planeX=Number(d.getElementById('prefabX').value);
+    const planeZ=Number(d.getElementById('prefabZ').value);
+    assert(Math.abs(planeHeight-28)<.02,'La profundidad modificó Y: '+planeHeight);
+    assert(Math.hypot(planeX,planeZ)>5,'Espacio+arrastrar no desplazó X/Z: '+planeX+','+planeZ);
+    p('pointerup',hit.x+34,hit.y-34);
+    w.dispatchEvent(new w.KeyboardEvent('keyup',{
+     bubbles:true,cancelable:true,code:'Space',key:' '
+    }));
+    step='movimiento Y sin modificadores';
+    hit=findCave();
+    assert(hit,'No pudo volver a seleccionar la cueva después de moverla en X/Z');
+    p('pointerdown',hit.x,hit.y);
+    p('pointermove',hit.x,hit.y-85);
+    const raised=Number(d.getElementById('prefabOffsetY').value);
+    assert(raised>planeHeight+5,'Mover el ratón hacia arriba NO elevó Y: '+raised);
+    assert(Math.abs(Number(d.getElementById('prefabX').value)-planeX)<.02,
+     'Mover verticalmente alteró la X');
+    assert(Math.abs(Number(d.getElementById('prefabZ').value)-planeZ)<.02,
+     'Mover verticalmente alteró la Z');
+    step='atravesar la superficie sin colisiones';
+    p('pointermove',hit.x,hit.y+205);
+    const lowered=Number(d.getElementById('prefabOffsetY').value);
+    assert(lowered<0,'La cueva no pudo atravesar el plano del terreno Y=0: '+lowered);
+    assert(Math.abs(Number(d.getElementById('prefabX').value)-planeX)<.02,
+     'El terreno forzó el movimiento horizontal durante descenso libre');
+    p('pointerup',hit.x,hit.y+205);
+    step='guardado de Y absoluta';
+    await new Promise(resolve=>setTimeout(resolve,950));
+    const saved=JSON.parse(localStorage.getItem('wildtrap-editor-draft-safe-v1')||'{}');
+    const cave=saved.nodes?.find(n=>n.id===901);
+    assert(cave?.y<0&&Math.abs(cave.y-lowered)<.06,'La altura absoluta no persistió: '+cave?.y);
+    assert(saved.settings?.hideTerrainEditor!==true,'El terreno fue ocultado indebidamente');
+    document.body.dataset.result='PASS';
+    out.textContent='PASS · Space+arrastrar XZ, arrastre libre Y, atraviesa terreno y guarda Y absoluta';
+   }catch(e){fail(step,e)}
+  },170);
+ }catch(e){fail('preparación',e)}
+})();
+</script></body></html>
