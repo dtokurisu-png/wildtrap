@@ -11,6 +11,7 @@ import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.12';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.17';
 import {constrainedRotation} from './mesh-deform.mjs?v=0.9.12';
+import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
@@ -51,6 +52,9 @@ const flags=new URLSearchParams(location.search);
 const safeMode=flags.has('safe'),recoveryMode=flags.has('recover');
 const draftKey=recoveryMode?'wildtrap-editor-draft-recovered-v1':
  safeMode?'wildtrap-editor-draft-safe-v1':'wildtrap-editor-draft-v1';
+// A separate small key survives reloads even if the full world draft write
+// is still debounced. Each mode has its own camera state.
+const cameraKey=draftKey+'-camera-v1';
 const undo=[],undoSerials=[];let actionSerial=0;
 const nextUndoSerial=()=>++actionSerial;
 let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
@@ -628,9 +632,23 @@ const w=view.clientWidth,h=view.clientHeight;renderer.setSize(w,h,false);
 if(camera.isOrthographicCamera){const aspect=w/h;camera.left=-viewSpan*aspect/2;camera.right=viewSpan*aspect/2;camera.top=viewSpan/2;camera.bottom=-viewSpan/2}
 else camera.aspect=w/h;camera.updateProjectionMatrix();
 }
-let viewSpan=720;
-function setTop(){camera.position.set(0,950,.01);camera.up.set(0,0,-1);orbit.target.set(0,0,0);camera.lookAt(0,0,0);orbit.update();orbit.enableRotate=false;resize()}
-setTop();
+let viewSpan=DEFAULT_3D_CAMERA.viewSpan;
+function setTop(){
+ camera.position.set(0,950,.01);camera.up.set(0,0,-1);
+ orbit.target.set(0,0,0);camera.lookAt(0,0,0);
+ orbit.enableRotate=false;orbit.update();resize();
+ $('viewType').textContent='Vista cenital';
+}
+function setDefault3D(){
+ camera.up.fromArray(DEFAULT_3D_CAMERA.up);
+ camera.position.fromArray(DEFAULT_3D_CAMERA.position);
+ orbit.target.fromArray(DEFAULT_3D_CAMERA.target);
+ camera.lookAt(orbit.target);
+ orbit.enableRotate=true;orbit.update();resize();
+ $('viewType').textContent='Vista 3D';
+}
+// No saved view: start at the same angled 3D view as the existing Vista 3D button.
+setDefault3D();
 prefabLibrary=createPrefabLibrary(()=>{draw();updatePrefabLoadStatus()});
 void prefabLibrary.preload().then(()=>{draw();updatePrefabLoadStatus()});
 updatePrefabLoadStatus();
@@ -1130,8 +1148,8 @@ view.addEventListener('wheel',e=>{
  e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()
 },{passive:false});
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
-$('top').onclick=()=>{setTop();$('viewType').textContent='Vista cenital'};
-$('angle').onclick=()=>{camera.up.set(0,1,0);camera.position.set(300,330,350);orbit.target.set(0,0,0);orbit.enableRotate=true;orbit.update();$('viewType').textContent='Vista 3D'};
+$('top').onclick=()=>{setTop();scheduleCameraSave()};
+$('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.objectGroups=[];live.holes=[];live.cuts3d=[];live.nextId=1;selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 $('undo').onclick=()=>{
  // Deshace la última acción entre los vértices pendientes y el historial
