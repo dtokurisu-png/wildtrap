@@ -1015,6 +1015,7 @@ window.addEventListener('pointerup',e=>{
 function beginModelDrag(e,node){
  if(!selectedIds.has(node.id))setNodeSelection([node.id]);
  selectedId=node.id;
+ for(const id of selectedIds)vertexEditor?.ensureAnchors(id);
  const freeCave=node.kind==='prefab'&&isFreeCave(node.prefabId);
  // A free-cave drag does not intersect terrain on pointerdown OR pointermove.
  const ground=freeCave?null:(convertCoords(e)||{x:node.x||0,z:node.z||0});
@@ -1050,11 +1051,13 @@ function beginModelDrag(e,node){
  updateStatus();
 }
 function updateMovedPrefabs(){
- let hasNonPrefab=false;
+ let hasNonPrefab=false,rebuildAnchoredGeometry=false;
  for(const id of selectedIds){
   const n=live.nodes.find(node=>node.id===id);
   if(!n)continue;
   if(n.kind!=='prefab'){hasNonPrefab=true;continue}
+  if(Object.values(normalizedLocks(n.vertexLocks)).some(ids=>ids.length)&&
+     (dragSession?.action==='scale'||n.vertexTotalLock===true))rebuildAnchoredGeometry=true;
   for(const root of renderedNodes.get(id)||[]){
    if(!root.userData.sharedAsset)continue;
    root.position.set(n.x,prefabWorldY(n,heightAt)+(Number(n.scaleAnchorOffsetY)||0),n.z);
@@ -1062,7 +1065,7 @@ function updateMovedPrefabs(){
    root.scale.setScalar(n.scale||1);
   }
  }
- if(hasNonPrefab)draw();
+ if(hasNonPrefab||rebuildAnchoredGeometry)draw();
  else{updateSelectionHighlights();updateHoverHighlight();updateStatus()}
 }
 function moveModelDrag(e){
@@ -1133,7 +1136,8 @@ function moveModelDrag(e){
  if(session.action==='scale'){
   for(const item of session.nodes){
    const n=live.nodes.find(x=>x.id===item.id);
-   if(n?.kind!=='prefab'||n.anchorScaleY!==true||!Number.isFinite(item.bottomY))continue;
+   if(n?.kind!=='prefab'||n.anchorScaleY!==true||!Number.isFinite(item.bottomY)||
+      Object.values(normalizedLocks(n.vertexLocks)).some(ids=>ids.length))continue;
    const root=(renderedNodes.get(n.id)||[]).find(x=>x.userData.sharedAsset);
    if(!root)continue;
    const box=new THREE.Box3().setFromObject(root);
@@ -1298,9 +1302,10 @@ $('anchorScaleY').addEventListener('change',e=>{
 $('applyPrefab').onclick=()=>{
  const targets=[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(n=>n?.kind==='prefab');
  if(!targets.length){toast('Selecciona un modelo GLB con Ctrl + clic');return}
+ for(const n of targets)vertexEditor?.ensureAnchors(n.id);
  const oldBottoms=new Map();
  for(const n of targets){
-  if(n.anchorScaleY!==true)continue;
+  if(n.anchorScaleY!==true||Object.values(normalizedLocks(n.vertexLocks)).some(ids=>ids.length))continue;
   const root=(renderedNodes.get(n.id)||[]).find(x=>x.userData.sharedAsset);
   if(root){const b=new THREE.Box3().setFromObject(root);if(!b.isEmpty())oldBottoms.set(n.id,b.min.y)}
  }
