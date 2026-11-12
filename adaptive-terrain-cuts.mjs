@@ -3,7 +3,11 @@
 // Un corte poligonal almacena sus esquinas; solo polígonos cóncavos se triangulan internamente.
 const EPS=1e-7;
 // Hard limits keep malformed or densely overlapping cuts from freezing the UI.
-const MAX_STAMPS_PER_CELL=18,MAX_FRAGMENTS_PER_TRIANGLE=72,MAX_CLIPPED_TRIANGLES=5000;
+// A heightfield has at most (resolution - 1)^2 * 2 triangles.
+// Never silently discard old cuts or put uncut source triangles back.
+// Complicated cut/restore cycles still have a per-triangle complexity guard,
+// reported to the caller so an incomplete cut cannot be saved as successful.
+const MAX_FRAGMENTS_PER_TRIANGLE=240;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -216,7 +220,6 @@ function spatialStamps(stamps,size,resolution){
    if(!map.has(id))map.set(id,[]);
    const cellStamps=map.get(id);
    cellStamps.push(s);
-   if(cellStamps.length>MAX_STAMPS_PER_CELL)cellStamps.shift();
   }
  }
  return map;
@@ -261,11 +264,6 @@ export function buildAdaptiveTerrain(base,legacyList=[],rawStamps=[],size=630,re
    continue;
   }
   for(let tri=0;tri<2;tri++){
-   if(clippedTriangles>=MAX_CLIPPED_TRIANGLES){
-    limitedTriangles++;
-    for(let j=0;j<3;j++)indices.push(original[start+tri*3+j]);
-    continue;
-   }
    const a=vertex(original[start+tri*3]),b=vertex(original[start+tri*3+1]),c=vertex(original[start+tri*3+2]);
    let fragments=[{poly:[a,b,c],removed}];
    let touched=false;
@@ -276,10 +274,14 @@ export function buildAdaptiveTerrain(base,legacyList=[],rawStamps=[],size=630,re
     for(const part of (s.parts||[s])){
      if(fragments.length>MAX_FRAGMENTS_PER_TRIANGLE){limitedFragments++;break;}
      const next=[];
+     const targetRemoved=s.op==='cut';
      for(const fragment of fragments){
+      // Once a region is already cut, an overlapping cut cannot fragment
+      // it again. Likewise restoring a visible region is a no-op.
+      if(fragment.removed===targetRemoved){next.push(fragment);continue}
       const result=subtractPrism(fragment.poly,part);
       for(const polygon of result.outside)next.push({poly:polygon,removed:fragment.removed});
-      if(result.inside.length)next.push({poly:result.inside,removed:s.op==='cut'});
+      if(result.inside.length)next.push({poly:result.inside,removed:targetRemoved});
      }
      fragments=next;
     }
@@ -291,5 +293,5 @@ export function buildAdaptiveTerrain(base,legacyList=[],rawStamps=[],size=630,re
  }
  return {positions,colors,uvs,normals,indices,stats:{originalTriangles:original.length/3,
   finalTriangles:indices.length/3,newVertices:positions.length/3-vertexCount,clippedTriangles,addedFaces,
-  limitedTriangles,limitedFragments}};
+  limitedTriangles,limitedFragments,incomplete:limitedTriangles>0||limitedFragments>0}};
 }
