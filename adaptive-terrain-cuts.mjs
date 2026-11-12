@@ -267,7 +267,8 @@ export function buildAdaptiveTerrain(base,legacyList=[],rawStamps=[],size=630,re
    const a=vertex(original[start+tri*3]),b=vertex(original[start+tri*3+1]),c=vertex(original[start+tri*3+2]);
    let fragments=[{poly:[a,b,c],removed}];
    let touched=false;
-   for(const s of cuts){
+   for(let stampIndex=0;stampIndex<cuts.length;stampIndex++){
+    const s=cuts[stampIndex];
     if(!overlapsTriangle(s,a.p,b.p,c.p))continue;
     touched=true;
     // Concave polygons are the union of nonoverlapping triangular prisms.
@@ -285,6 +286,11 @@ export function buildAdaptiveTerrain(base,legacyList=[],rawStamps=[],size=630,re
      }
      fragments=next;
     }
+    // Once no future restoration exists, removed regions are permanently
+    // absent. Keeping them causes quadratic fragmentation when users cut the
+    // same spot 10+ times; discard them instead of clipping dead triangles.
+    if(!cuts.slice(stampIndex+1).some(next=>next.op==='restore'))
+     fragments=fragments.filter(fragment=>!fragment.removed);
    }
    if(!touched&&!removed){indices.push(a.id,b.id,c.id);continue}
    clippedTriangles++;
