@@ -3,7 +3,7 @@ import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-te
 
 // The knife uses clicks, not a brush. Original surfaces remain raycastable
 // even after cutting, so a closed polygon can restore an older hole.
-export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,getModelRoots=()=>[],renderCuts=true,nextUndoSerial=()=>0}){
+export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,getModelRoots=()=>[],terrainIsIntangible=()=>false,renderCuts=true,nextUndoSerial=()=>0}){
  const originalMesh=new THREE.Mesh(terrainGeo,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
  originalMesh.name='Base heightmap for accurate 3D raycast';
  originalMesh.updateMatrixWorld(true); // Not added to scene or visible in renderer.
@@ -59,7 +59,7 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
     normal:normal.toArray(),modelNodeId};
   };
   originalMesh.updateMatrixWorld(true);
-  if(terrain.visible)record(ray.intersectObject(originalMesh,false)[0]);
+  if(terrain.visible&&!terrainIsIntangible())record(ray.intersectObject(originalMesh,false)[0]);
   const materialSides=new Map();
   for(const entry of getModelRoots()){
    const root=entry.root;
