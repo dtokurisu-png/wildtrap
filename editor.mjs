@@ -1222,7 +1222,7 @@ view.addEventListener('wheel',e=>{
   return;
  }
  if(!camera.isOrthographicCamera)return;
- e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize()
+ e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize();scheduleCameraSave()
 },{passive:false});
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
@@ -1345,8 +1345,11 @@ $('removeRecoveryCuts').onclick=()=>{
  toast('Recortes retirados de la copia. Exporta JSON para recuperar el escenario.');
 };
 $('remove').onclick=()=>{if(!selectedIds.size)return;snapshot();live.nodes=live.nodes.filter(n=>!selectedIds.has(n.id));pruneUnusedSceneGroups();selectedIds.clear();selectedId=null;draw();persist()};
-$('export').onclick=()=>{download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;holesEditor.clearSelection();updateMaxHeightControl();refreshTerrain();draw();persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
+$('export').onclick=()=>{live.editorCamera=currentEditorCamera();download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;holesEditor.clearSelection();
+updateMaxHeightControl();refreshTerrain();draw();
+if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
+persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function toast(msg){$('toast').textContent=msg;setTimeout(()=>{if($('toast').textContent===msg)$('toast').textContent=''},4500)}
 window.addEventListener('keydown',e=>{if(preview.active||preview.busy)return;if(e.target.matches('input,textarea'))return;
@@ -1381,6 +1384,7 @@ async function restoreSavedBase(confirmOverwrite=false){
   live.version=3;
   selectedIds.clear();selectedId=null;
   holesEditor.clearSelection();updateMaxHeightControl();
+  live.editorCamera=currentEditorCamera();
   refreshTerrain();draw();persist();
   toast('Terreno base original recuperado · 630 × 630');
  }catch(error){toast('No se pudo abrir terreno base: '+error.message)}
@@ -1400,6 +1404,14 @@ try{
   }
  }
 }catch(e){toast('No se pudo recuperar el proyecto local')}
+// Prefer the small camera record (flushed on pagehide) over an older camera
+// included in the world draft; invalid legacy records fall back to 3D.
+let lastCamera=null;
+try{lastCamera=JSON.parse(localStorage.getItem(cameraKey)||'null')}catch(_){}
+const cameraRestored=restoreEditorCamera(lastCamera)||restoreEditorCamera(live.editorCamera);
+if(!cameraRestored)$('viewType').textContent='Vista 3D';
+cameraReadyToSave=true;
+live.editorCamera=currentEditorCamera();
 // Completar primero un frame: datos grandes del proyecto no deben impedir
 // que desaparezca la pantalla de inicio. La recuperación ocurre después.
 async function loadPublishedWorld(){
@@ -1414,6 +1426,9 @@ async function loadPublishedWorld(){
   live.objectGroups=cleanObjectGroups(world.objectGroups);
   live.settings={heightMax:120,...(world.settings&&typeof world.settings==='object'?world.settings:{})};
   selectedIds.clear();selectedId=null;
+  // Do not reset the user's last camera merely because the published map loaded.
+  if(!restoreEditorCamera(world.editorCamera,{remember:true}))
+   live.editorCamera=currentEditorCamera();
   updateMaxHeightControl();refreshTerrain();draw();persist();
   toast('Escenario oficial cargado desde el repositorio');
  }catch(err){console.warn('No se pudo cargar mapa oficial',err);void restoreSavedBase(false)}
