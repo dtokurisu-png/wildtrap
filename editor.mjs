@@ -559,6 +559,7 @@ holesEditor=createTerrainHoles({
  renderCuts:!recoveryMode,nextUndoSerial
 });
 terrainInspector=createTerrainMeshInspector({scene,camera,view,terrain,$});
+window.__terrainMeshInspector=terrainInspector;
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
  resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
  onStop:()=>{
