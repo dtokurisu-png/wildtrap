@@ -1,0 +1,66 @@
+name: Validar controles Malla, Intangible y altura de cuevas
+on:
+  push:
+    branches: [main, feat/object-mesh-intangible-snap-v0.9.17]
+    paths:
+      - 'scene-object-manager.mjs'
+      - 'scene-object-catalog.mjs'
+      - 'scene-mesh-overlays.mjs'
+      - 'editor-workspace.js'
+      - 'editor-workspace.css'
+      - 'editor.mjs'
+      - 'index.html'
+      - 'mesh-vertex-editor.mjs'
+      - 'prefab-library.mjs'
+      - 'terrain-holes.mjs'
+      - 'terrain-mesh-inspector.mjs'
+      - 'tests/object-mesh-properties-smoke.html'
+      - 'tests/browser-object-mesh-properties.mjs'
+      - 'tests/terrain-mesh-smoke.html'
+      - 'tests/phase4-mesh-smoke.html'
+      - 'tests/browser-workspace.mjs'
+      - '.github/workflows/object-mesh-properties-tests.yml'
+  workflow_dispatch:
+jobs:
+  object-mesh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxis y pruebas de geometría
+        run: |
+          node --check editor.mjs
+          node --check editor-workspace.js
+          node --check scene-object-manager.mjs
+          node --check scene-object-catalog.mjs
+          node --check scene-mesh-overlays.mjs
+          node --check mesh-vertex-editor.mjs
+          node --check prefab-library.mjs
+          node --check terrain-holes.mjs
+          node --check terrain-mesh-inspector.mjs
+          node --test tests/cave-free-placement.test.mjs
+          node --test tests/prefab-gestures.test.mjs
+          node --test tests/adaptive-terrain-cuts.test.mjs
+      - name: Servidor local
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-object-mesh-http.log 2>&1 &
+          sleep 2
+      - name: Controles de escena y Snap Y en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-object-mesh-properties.mjs
+      - name: Regresiones de malla, tijera, GLB y paneles
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-terrain-mesh.mjs
+          node tests/browser-phase4-mesh.mjs
+          node tests/browser-phase3-tool-controls.mjs
+          node tests/browser-scene-object-manager.mjs
+          node tests/browser-workspace.mjs
+          node tests/browser-startup.mjs
+          node tests/browser-cave-free-y.mjs
+          node tests/browser-axis-view-locks.mjs
