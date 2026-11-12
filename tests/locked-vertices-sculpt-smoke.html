@@ -1,0 +1,121 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP · esculpido GLB y bloqueos</title></head>
+<body data-result="PENDING"><div id="result">Comprobando escultura de objetos y bloqueos físicos</div>
+<script>
+(async()=>{
+ const out=document.getElementById('result'),assert=(ok,msg)=>{if(!ok)throw Error(msg)};
+ const fail=(step,e)=>{document.body.dataset.result='FAIL';out.textContent='FAIL '+step+': '+(e?.message||e)};
+ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ const same=(a,b,eps=.04)=>Array.isArray(a)&&Array.isArray(b)&&a.every((x,i)=>Math.abs(x-b[i])<eps);
+ const distance=(a,b)=>a&&b?Math.hypot(...a.map((x,i)=>x-b[i])):0;
+ const draftKey='wildtrap-editor-draft-safe-v1';
+ try{
+  localStorage.setItem(draftKey,JSON.stringify({
+   version:3,size:630,resolution:129,heights:Array(129*129).fill(0),
+   nodes:[{id:901,kind:'prefab',prefabId:'rocky-cave',x:0,z:0,y:48,scale:1,rotation:0}],
+   objectGroups:[],holes:[],cuts3d:[],nextId:902,settings:{heightMax:120}
+  }));
+  const frame=document.createElement('iframe');frame.width=1440;frame.height=900;
+  frame.src='../?safe=1';document.body.append(frame);
+  const began=Date.now();let busy=false;
+  const loop=setInterval(async()=>{
+   if(busy||document.body.dataset.result!=='PENDING')return;
+   const w=frame.contentWindow,d=frame.contentDocument;
+   if(!d?.querySelector('#boot[hidden]')||!w.__meshEditor||!w.__meshProbe||
+      !w.__modelSculpt||!d.querySelector('[data-object-id="901"]')||
+      !String(d.getElementById('prefabStatus')?.textContent).includes('4/4')){
+    if(Date.now()-began>35000){clearInterval(loop);fail('inicio',Error('No cargó GLB real ni los controles'))}
+    return;
+   }
+   busy=true;clearInterval(loop);let step='interfaz sin botones redundantes';
+   try{
+    const probe=(key,index)=>w.__meshProbe.vertex(901,key,index);
+    const applyScale=value=>{
+     d.getElementById('prefabScale').value=String(value);
+     d.getElementById('applyPrefab').click();
+    };
+    const applyX=value=>{
+     d.getElementById('prefabX').value=String(value);
+     d.getElementById('applyPrefab').click();
+    };
+    assert(!d.getElementById('objectMeshToggle'),'Sigue el botón redundante Mostrar malla del objeto');
+    assert(!d.getElementById('meshScaleApply'),'Sigue la escala libre redundante');
+    assert(!d.getElementById('meshScaleFactor'),'Sigue el factor de escala libre');
+    assert(d.getElementById('meshTotalLock'),'Falta la opción de Bloqueo total');
+    step='bloquear un vértice real del GLB';
+    d.querySelector('[data-object-id="901"]').click();
+    d.getElementById('modelVertexEditToggle').click();
+    assert(w.__meshEditor.getState().active,'No se inició la selección de vértices');
+    const first=w.__meshEditor.debugSelectFirst();
+    assert(first&&first.selected.length,'No hay vértices reales para seleccionar');
+    const lockedBefore=probe(first.key,first.index);
+    assert(lockedBefore,'El primer vértice no está en la malla');
+    d.getElementById('meshLockVertices').click();
+    assert(w.__meshEditor.getState().locked>0,'No se bloquearon los vértices elegidos');
+    assert(w.__meshProbe.node(901).vertexLockAnchors?.[first.key]?.[first.index],
+      'El bloqueo no guardó el anclaje de geometría real');
+    assert(!d.getElementById('meshTotalLock').disabled,'Bloqueo total no se habilitó');
+    d.getElementById('modelVertexEditToggle').click();
+    assert(!w.__meshEditor.getState().active,'Finalizar edición no la terminó');
+    // Record unlocked vertices; a different GLB point must move during scale.
+    const before=[];
+    for(let i=0;i<150;i++)if(!first.selected.includes(first.key+':'+i)){
+     const v=probe(first.key,i);if(v)before.push({i,v});
+    }
+    assert(before.length>0,'No quedaron vértices libres para comparar');
+    step='Shift-escalado del modelo y bloqueo normal';
+    applyScale(1.8);
+    const lockedAfter=probe(first.key,first.index);
+    assert(same(lockedAfter,lockedBefore),
+     'Escalado ordinario movió un vértice BLOQUEADO: '+JSON.stringify({lockedBefore,lockedAfter}));
+    const changed=before.map(item=>({...item,now:probe(first.key,item.i)}))
+     .filter(item=>distance(item.v,item.now)>1);
+    assert(changed.length>0,'La escala no modificó ningún vértice libre');
+    step='bloqueo normal permite trasladar TODO el objeto';
+    applyX(40);
+    const movedLocked=probe(first.key,first.index);
+    assert(same(movedLocked,[lockedBefore[0]+40,lockedBefore[1],lockedBefore[2]]),
+     'El bloqueo normal no acompañó el traslado del modelo');
+    step='bloqueo total fija la posición mundial';
+    d.getElementById('modelVertexEditToggle').click();
+    assert(w.__meshEditor.getState().active,'No pudo reabrirse la edición');
+    const total=d.getElementById('meshTotalLock');
+    total.checked=true;total.dispatchEvent(new Event('change',{bubbles:true}));
+    assert(w.__meshEditor.getState().totalLock,'Bloqueo total no se activó');
+    const worldFrozen=probe(first.key,first.index);
+    d.getElementById('modelVertexEditToggle').click();
+    applyX(80);
+    assert(same(probe(first.key,first.index),worldFrozen),
+     'El bloqueo TOTAL se movió cuando el modelo cambió X');
+    step='esculpir objeto, no terreno';
+    d.querySelector('[data-workspace="sculpt"]').click();
+    assert(w.__workspaceLayout.getState().workspace==='sculpt','No se pudo abrir Esculpir');
+    assert(w.__modelSculpt.getState().selectedIsGLB,
+      'Esculpir no detecta el GLB seleccionado');
+    const target=probe(first.key,changed[0].i),sculptBefore=target?.slice();
+    assert(target,'No hay vértice libre para esculpir');
+    d.getElementById('brushRadius').value='65';
+    d.getElementById('strength').value='14';
+    assert(w.__modelSculpt.dab(sculptBefore,[0,1,0]),'El pincel no registró escultura sobre el GLB');
+    assert(w.__modelSculpt.getState().stamps===1,'El esculpido no quedó registrado');
+    const sculptAfter=probe(first.key,changed[0].i);
+    assert(distance(sculptBefore,sculptAfter)>.15,
+     'El pincel Subir no modificó realmente la geometría del GLB');
+    assert(same(probe(first.key,first.index),worldFrozen),
+     'El pincel movió un vértice BLOQUEADO TOTAL');
+    step='persistencia de bloqueos, esculpido y altura del terreno';
+    await sleep(1100);
+    const saved=JSON.parse(localStorage.getItem(draftKey)||'{}');
+    const stored=saved.nodes?.find(n=>n.id===901);
+    assert(stored?.vertexTotalLock===true,'El bloqueo total no quedó guardado');
+    assert(stored?.vertexLocks?.[first.key]?.includes(first.index),'Los índices bloqueados se perdieron');
+    assert(stored?.vertexLockAnchors?.[first.key]?.[first.index]?.world,
+     'No persistió la coordenada mundial de bloqueo total');
+    assert(stored?.meshSculptOps?.length===1,'La pincelada no se guardó en JSON');
+    assert(stored.heights?.every(h=>h===0),'Esculpir objeto alteró el terreno');
+    document.body.dataset.result='PASS';
+    out.textContent='PASS · bloqueo normal resiste escala, traslado permitido; bloqueo total fija mundo; esculpir GLB real sin tocar el terreno';
+   }catch(e){fail(step,e)}
+  },180);
+ }catch(e){fail('preparación',e)}
+})();
+</script></body></html>
