@@ -6,10 +6,10 @@ export function normalizedVertexAnchors(data){
  const output={};
  if(!data||typeof data!=='object'||Array.isArray(data))return output;
  for(const [meshKey,vertices] of Object.entries(data)){
-  if(!/^\\d{1,4}$/.test(meshKey)||!vertices||typeof vertices!=='object'||Array.isArray(vertices))continue;
+  if(!/^\d{1,4}$/.test(meshKey)||!vertices||typeof vertices!=='object'||Array.isArray(vertices))continue;
   const accepted={};
   for(const [index,value] of Object.entries(vertices)){
-   if(!/^\\d{1,7}$/.test(index)||!value||!validVec(value.root)||!validVec(value.world)||
+   if(!/^\d{1,7}$/.test(index)||!value||!validVec(value.root)||!validVec(value.world)||
     !Number.isFinite(value.scale)||value.scale<.001||value.scale>1000)continue;
    accepted[index]={root:value.root.slice(),world:value.world.slice(),scale:value.scale};
   }
