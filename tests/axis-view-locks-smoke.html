@@ -14,7 +14,7 @@
   const frame=document.createElement('iframe');frame.width=1440;frame.height=900;
   frame.src='../?safe=1';document.body.append(frame);
   let running=false;const start=Date.now();
-  const interval=setInterval(()=>{
+  const interval=setInterval(async()=>{
    if(running||document.body.dataset.result!=='PENDING')return;
    const d=frame.contentDocument,w=frame.contentWindow;
    if(!d?.querySelector('#boot[hidden]')||!w.__axisView||!w.__sceneObjectManager||
