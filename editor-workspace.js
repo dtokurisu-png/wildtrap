@@ -101,8 +101,10 @@
  for(const note of modelNotes.slice(1))modelFields.append(note);
  objectEditor.append(selection,empty,modelFields);
  const constraints=$('transformConstraints'),meshControls=$('meshEditControls');
- if(!constraints||!meshControls)throw Error('Faltan los controles de malla y transformación');
- objectEditor.append(constraints,meshControls);
+ const meshTargetPanel=$('meshTargetPanel'),terrainMeshControls=$('terrainMeshControls');
+ if(!constraints||!meshControls||!meshTargetPanel||!terrainMeshControls)
+  throw Error('Faltan controles de malla, terreno o transformación');
+ objectEditor.append(constraints,meshTargetPanel,terrainMeshControls,meshControls);
  // Galería GLB original, acoplada al área Estructuras: las cinco cámaras siguen
  // usando las vistas reales de cada archivo, sin modal ni segunda copia.
  const galleryRoot=$('prefabModal');
