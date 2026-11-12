@@ -24,7 +24,8 @@ test('esculpir Subir/Bajar/Nivelar/Suavizar no toca vértices bloqueados',()=>{
    locked:{'0':[0]}}];
   const result=sculptRootPoints(pts,stamps,[],'0');
   assert.deepEqual(result[0],pts[0],mode+' alteró el vértice bloqueado');
-  if(mode!=='smooth')assert.notDeepEqual(result[1],pts[1],mode+' no modificó zona libre');
+  if(mode==='flatten')assert.notDeepEqual(result[3],pts[3],'Nivelar no acercó el punto elevado al plano');
+  else if(mode!=='smooth')assert.notDeepEqual(result[1],pts[1],mode+' no modificó zona libre');
  }
 });
 test('bloqueos capturados por pincelada no deshacen escultura previa',()=>{
