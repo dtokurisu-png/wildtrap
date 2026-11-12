@@ -10,6 +10,7 @@ on:
       - 'tests/editor-camera-persistence-smoke.html'
       - 'tests/browser-editor-camera-persistence.mjs'
       - 'tests/axis-view-locks-smoke.html'
+      - 'tests/browser-cut-recovery.mjs'
       - '.github/workflows/editor-camera-persistence-tests.yml'
   workflow_dispatch:
 jobs:
@@ -35,6 +36,10 @@ jobs:
         env:
           WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
         run: node tests/browser-editor-camera-persistence.mjs
+      - name: Recuperación real de un borrador con 85 recortes
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-cut-recovery.mjs
       - name: Regresiones del editor y vistas XYZ
         env:
           WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
