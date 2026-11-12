@@ -1656,8 +1656,8 @@ window.__editorReady?.();
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
 async function initializeZoneTool(){
  try{
-  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.21');
-  zoneTool=createZoneEditor({scene,view,camera,live,heightAt,snapshot,persist,toast,
+  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.24');
+  zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy});
   zoneTool.refreshAll();
