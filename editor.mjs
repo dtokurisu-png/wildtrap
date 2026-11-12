@@ -788,7 +788,9 @@ function flushCameraSave(){
  // A tiny, mode-scoped write happens before the debounced full scene write.
  try{localStorage.setItem(cameraKey,JSON.stringify(state))}
  catch(_){/* The full draft/export remains a fallback when storage is full. */}
- persist();
+ // IMPORTANT: camera updates must NEVER reset the timer for an unrelated
+ // world edit. Otherwise continuous orbit damping starves X/Y/Z lock saves.
+ // The existing draft autosave incorporates live.editorCamera when it fires.
 }
 function scheduleCameraSave(){
  if(!cameraReadyToSave||testingScene||preview.active||preview.busy)return;
@@ -835,7 +837,14 @@ orbit.addEventListener('change',()=>{
  scheduleCameraSave();
 });
 // Pagehide and tab switching commit the last camera even after a short gesture.
-window.addEventListener('pagehide',()=>{if(cameraReadyToSave)flushCameraSave()});
+window.addEventListener('pagehide',()=>{
+ if(cameraReadyToSave)flushCameraSave();
+ // On a rapid reload, commit a pending terrain/object edit synchronously too.
+ if(saveTimer!==null){
+  clearTimeout(saveTimer);saveTimer=null;
+  try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(_){}
+ }
+});
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden&&cameraReadyToSave)flushCameraSave();
 });
