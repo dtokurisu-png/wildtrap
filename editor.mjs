@@ -410,7 +410,7 @@ function updateStatus(){
  $('status').textContent=n+' elementos · '+(live.holes||[]).length+' celdas antiguas · '+(live.cuts3d||[]).filter(x=>x.op==='cut').length+' cortes 3D · '+live.nodes.filter(x=>x.kind==='prefab').length+' modelos GLB';
  const picked=live.nodes.find(x=>x.id===selectedId);
  $('caveFreeMoveHelp').hidden=!(picked?.kind==='prefab'&&isFreeCave(picked.prefabId));
- $('selected').textContent=selectedIds.size>1?selectedIds.size+' elementos seleccionados':(picked?'ID '+picked.id+' · '+(picked.kind==='prefab'?prefabById(picked.prefabId)?.name||picked.prefabId:picked.kind):'Nada seleccionado');
+ $('selected').textContent=terrainPropertiesSelected?'Terreno de la arena':selectedIds.size>1?selectedIds.size+' elementos seleccionados':(picked?'ID '+picked.id+' · '+(picked.kind==='prefab'?prefabById(picked.prefabId)?.name||picked.prefabId:picked.kind):'Nada seleccionado');
  const cave=picked?.kind==='prefab'&&isFreeCave(picked.prefabId);
  if(picked?.kind==='prefab'){
   if(!armedPrefabId)$('prefabType').value=picked.prefabId;
@@ -426,6 +426,13 @@ function updateStatus(){
  }
  const editable=picked?.kind==='prefab';
  $('transformConstraints').hidden=!editable;
+ $('meshEditControls').hidden=!editable;
+ $('terrainMeshControls').hidden=!terrainPropertiesSelected;
+ $('objectMeshToggle').setAttribute('aria-pressed',String(picked?.editorMeshVisible===true));
+ $('objectMeshToggle').textContent=picked?.editorMeshVisible?'◫ Ocultar malla del objeto':'◫ Mostrar malla del objeto';
+ $('modelVertexEditToggle').setAttribute('aria-pressed',String(mode==='meshEdit'));
+ $('modelVertexEditToggle').textContent=mode==='meshEdit'?'✓ Finalizar edición de vértices':'✣ Editar vértices del modelo';
+ $('snapCaveToTerrain').disabled=!cave||picked?.rotationLocks?.y===true;
  if(editable){
   const locks=picked.rotationLocks||{};
   // The saved XYZ lock buttons apply to movement AND rotation.
@@ -449,62 +456,44 @@ function updateStatus(){
  $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
  sceneObjectManager?.render();
 }
-// Mesh visualization is an independent overlay; tools own pointer input.
-// In particular, polygon-knife clicks still place contour vertices while the
-// last selected terrain/GLB wireframe remains visible behind the yellow path.
-let meshOverlayPinned=false,meshPreviewNodeId=null;
-function syncKnifeMeshControls(){
- const target=$('meshTarget').value;
- $('knifeMeshTarget').value=target;
- $('meshOverlayKeep').checked=meshOverlayPinned;
- $('knifeMeshToggle').setAttribute('aria-pressed',String(meshOverlayPinned));
- $('knifeMeshToggle').textContent=meshOverlayPinned?'◫ Malla visible · Ocultar':'◫ Mostrar malla mientras recorto';
- const prefix=target==='terrain'?'terrain':'model';
- for(const layer of ['Faces','Edges','Vertices','Xray'])
-  $('knifeLayer'+layer).checked=$(prefix+layer).checked;
-}
+// Persistent topology display is independent of the active editor tool.
 function updateMeshInspection(){
- const editing=mode==='meshEdit',target=$('meshTarget').value;
- const visible=!testingScene&&(editing||meshOverlayPinned);
- const terrainMode=visible&&target==='terrain';
- $('meshTargetPanel').hidden=!editing;
- $('workspaceObjectProperties')?.classList.toggle('is-terrain',editing&&terrainMode);
- vertexEditor?.setActive(visible&&!terrainMode);
- terrainInspector?.setActive(terrainMode);
- syncKnifeMeshControls();
+ const editing=mode==='meshEdit'&&!testingScene&&live.nodes.some(n=>n.id===selectedId&&n.kind==='prefab');
+ const showTerrain=live.settings?.terrainMeshVisible===true&&!testingScene;
+ if(vertexEditor){
+  if(vertexEditor.getState().active!==editing)vertexEditor.setActive(editing);
+  else vertexEditor.updateInfo();
+ }
+ if(terrainInspector){
+  if(terrainInspector.getState().active!==showTerrain)terrainInspector.setActive(showTerrain);
+  else terrainInspector.refresh();
+ }
+ objectMeshOverlays?.refresh({skipId:editing?selectedId:null,testingScene});
+ $('terrainMeshControls').hidden=!terrainPropertiesSelected;
 }
-function changeMeshTarget(value){
- $('meshTarget').value=value;
- if(value==='model'&&selectedId!==null)meshPreviewNodeId=selectedId;
- updateMeshInspection();
-}
-$('meshTarget').addEventListener('change',()=>changeMeshTarget($('meshTarget').value));
-$('knifeMeshTarget').addEventListener('change',()=>{
- meshOverlayPinned=true;
- changeMeshTarget($('knifeMeshTarget').value);
+$('objectMeshToggle').addEventListener('click',()=>{
+ if(selectedId!==null)commitObjectMeshVisibility([selectedId],!live.nodes.find(n=>n.id===selectedId)?.editorMeshVisible);
 });
-$('meshOverlayKeep').addEventListener('change',()=>{
- meshOverlayPinned=$('meshOverlayKeep').checked;updateMeshInspection();
-});
-$('knifeMeshToggle').addEventListener('click',()=>{
- meshOverlayPinned=!meshOverlayPinned;updateMeshInspection();
+$('modelVertexEditToggle').addEventListener('click',()=>{
+ const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
+ if(!node){toast('Selecciona un modelo GLB para editar vértices');return}
+ if(mode==='holePaint'){toast('Sal del Cuchillo para editar vértices');return}
+ setMode(mode==='meshEdit'?'move':'meshEdit');
 });
 for(const layer of ['Faces','Edges','Vertices','Xray']){
- $('knifeLayer'+layer).addEventListener('change',()=>{
-  const prefix=$('meshTarget').value==='terrain'?'terrain':'model';
-  const source=$(prefix+layer);
-  source.checked=$('knifeLayer'+layer).checked;
-  source.dispatchEvent(new Event('change',{bubbles:true}));
+ $('model'+layer).addEventListener('change',()=>{
+  const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
+  if(!node)return;
+  const key=layer.toLowerCase();
+  const layers=normalizedMeshLayers(node.editorMeshLayers);
+  if(layers[key]===$('model'+layer).checked)return;
+  snapshot();node.editorMeshLayers={...layers,[key]:$('model'+layer).checked};
+  draw();persist();
  });
 }
 function setMode(v){
  if(v!=='prefab'&&armedPrefabId)clearPlacement();
  if(v==='holePaint'){
-  // Keep the selected GLB reference before the knife clears object selection.
-  // The visualization remains active; ONLY the cutter owns viewport clicks.
-  if(selectedId!==null&&live.nodes.some(n=>n.id===selectedId&&n.kind==='prefab'))
-   meshPreviewNodeId=selectedId;
-  // The polygon knife is exclusive: no picking, selection or moving GLBs.
   if(dragSession)completeModelDrag({pointerId:dragSession.pointerId});
   pointerDown=false;marqueeStart=null;
   $('selectionMarquee').style.display='none';
@@ -512,12 +501,6 @@ function setMode(v){
   hoveredNodeId=null;updateHoverHighlight();
   $('modelHoverIndicator').style.display='none';
   updateSelectionHighlights();
- }
- if(v==='meshEdit'&&mode!=='meshEdit'){
-  const picked=live.nodes.find(n=>n.id===selectedId);
-  $('meshTarget').value=picked?.kind==='prefab'?'model':'terrain';
-  if(picked?.kind==='prefab')meshPreviewNodeId=picked.id;
-  meshOverlayPinned=true;
  }
  mode=v;pending=null;
  cursor.visible=v!=='holePaint'&&v!=='meshEdit'&&!placementGhost;
@@ -679,7 +662,7 @@ const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heig
 });
 vertexEditor=createMeshVertexEditor({
  scene,camera,view,marquee:$('selectionMarquee'),$,
- getSelectedNode:()=>live.nodes.find(n=>n.id===(mode==='meshEdit'?(selectedId??meshPreviewNodeId):(meshPreviewNodeId??selectedId))),
+ getSelectedNode:()=>live.nodes.find(n=>n.id===selectedId),
  getRoot:id=>(renderedNodes.get(id)||[]).find(root=>root.userData.sharedAsset),
  getMode:()=>mode,snapshot,draw,persist,toast
 });
