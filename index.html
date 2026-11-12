@@ -57,7 +57,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.18 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.19 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -82,7 +82,8 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 </section>
 <section>
-<h2>1. Esculpir el terreno</h2>
+<h2>1. Esculpir · Terreno o modelo seleccionado</h2>
+<p class="hint" id="sculptTargetHint">Sin un GLB seleccionado, esculpes el terreno. Con un GLB seleccionado, Subir/Bajar/Nivelar/Suavizar trabajan sobre su geometría real sin modificar los vértices bloqueados. Finaliza la edición de vértices antes de esculpir.</p>
 <div class="grid">
 <button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Nivelar</button><button data-tool="smooth">Suavizar</button><button data-tool="move">Mover</button>
 </div>
@@ -202,7 +203,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 <section id="meshEditControls" hidden aria-label="Edición de malla 3D">
  <h2>Modelo seleccionado · Propiedades de malla</h2>
-  <button type="button" id="objectMeshToggle" aria-pressed="false" style="width:100%">◫ Mostrar malla de este objeto</button>
+  
   <button type="button" id="modelVertexEditToggle" aria-pressed="false" style="width:100%;margin-top:6px">✣ Editar vértices del modelo</button>
   <p class="hint">Puedes mostrar la malla en modo Cuchillo desde Objetos de escena. Para seleccionar y deformar vértices, activa Editar vértices aquí; el cuchillo y la edición de vértices no actúan simultáneamente.</p>
  <p class="hint" id="meshEditHelp">Selecciona un GLB. Activa «Editar vértices» para manipular su geometría.</p>
@@ -216,13 +217,9 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <p class="hint">Clic: seleccionar un vértice (incluye los coincidentes); arrastra un rectángulo para seleccionar una zona. Ctrl + clic añade o elimina puntos. Se ven los vértices traseros.</p>
  <div class="grid2"><button id="meshSelectAll" type="button">Seleccionar todos</button><button id="meshDeselect" type="button">Deseleccionar</button></div>
  <div class="grid2"><button id="meshLockVertices" type="button" disabled>🔒 Bloquear vértices</button><button id="meshUnlockVertices" type="button" disabled>🔓 Desbloquear vértices</button></div>
- <h2>Deformar vértices libres</h2>
- <div class="grid2">
-  <label>Eje de escala<select id="meshScaleAxis"><option value="y">Y · Vertical</option><option value="x">X · Horizontal</option><option value="z">Z · Profundidad</option><option value="xyz">XYZ · Uniforme</option></select></label>
-  <label>Factor<input id="meshScaleFactor" type="number" min=".1" max="5" step=".05" value="1.25"></label>
- </div>
- <p class="hint">Los vértices bloqueados permanecen exactamente en su lugar. Si activas Anclar base Y en la pestaña Objeto, la parte inferior original no se mueve al escalar los demás.</p>
- <div class="grid2"><button id="meshScaleApply" type="button" disabled>Aplicar escala libre</button><button id="meshResetDeform" type="button" disabled>Restaurar deformación</button></div>
+ <label class="anchor-toggle"><input type="checkbox" id="meshTotalLock" disabled> Activar bloqueo total de vértices</label>
+<p class="hint">🔒 Normal: los vértices bloqueados no se escalan ni se esculpen, pero acompañan el movimiento del modelo. <b>Bloqueo total:</b> permanecen fijos en su posición del mundo aunque muevas, escales o rotes el objeto. Termina la edición y utiliza Shift + arrastrar para escalar respetando los bloqueos.</p>
+<button id="meshResetDeform" type="button" disabled style="width:100%">Restaurar esculpido y deformaciones antiguas</button>
 </section>
 <button type="button" id="meshEditorActivate" data-tool="meshEdit" hidden aria-hidden="true" tabindex="-1"></button>
 <script src="./editor-workspace.js?v=0.9.17"></script>
@@ -267,5 +264,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.18').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.19').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
