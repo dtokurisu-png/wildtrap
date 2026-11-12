@@ -267,3 +267,33 @@ body.testing #axisGizmo{display:none}
  .scene-object-eye,.scene-group-eye{padding:3px 4px}
  .scene-group-intangible,.scene-object-intangible{padding:3px;min-width:25px}
 }
+
+/* v0.9.13 — inspect actual arena mesh (faces, edges, vertices and X-ray). */
+#meshTargetPanel[hidden],#terrainMeshControls[hidden]{display:none!important}
+#meshTargetPanel,#terrainMeshControls{
+ border-top:1px solid #4b7b68;padding:10px 0;margin-top:10px;
+}
+#meshTargetPanel h2,#terrainMeshControls h2{
+ font-size:13px;color:#a3f9db;margin:0 0 8px;
+}
+#meshTarget{
+ width:100%;min-width:0;padding:9px 7px;background:#1c3a30;
+ color:#dffbea;border:1px solid #598d79;border-radius:6px;
+}
+.terrain-mesh-toggles{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:9px 0;
+}
+.terrain-mesh-toggles label{
+ display:flex;align-items:center;gap:5px;padding:7px 6px;border-radius:7px;
+ background:#203f34;border:1px solid #527d69;font-size:11px;
+}
+.terrain-mesh-toggles input{width:auto;flex:none;accent-color:#00c8a7}
+#terrainMeshStats,#terrainFaceInfo{
+ font-size:11px;line-height:1.55;overflow-wrap:anywhere;margin:7px 0;
+}
+.scene-terrain-edit{
+ flex:none;border:1px solid #619984;background:#214b3c;color:#c1f3de;
+ border-radius:5px;padding:3px 6px;font-size:10px;min-width:58px;margin:3px;
+}
+.scene-terrain-edit:hover{background:#31634d}
+#workspaceObjectProperties.is-terrain .workspace-empty{display:none!important}
