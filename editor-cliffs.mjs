@@ -76,7 +76,7 @@ export function createCliffRegions({scene,terrainGeo,view,camera,live,heightAt,s
   dispose();overlay.visible=isActive()&&!isBlocked();
   if(!overlay.visible)return;
   const zone=getZone();
-  if(!zone)return;
+  if(!zone||zone.hidden)return;
   for(const cliff of zone.cliffs||[]){
    if(cliff.hidden)continue;
    const faces=(cliff.faces||[]).filter(f=>Number.isInteger(f)&&f>=0&&f<(terrainGeo.index?.count||terrainGeo.attributes.position.count)/3);
@@ -116,7 +116,7 @@ export function createCliffRegions({scene,terrainGeo,view,camera,live,heightAt,s
   const cliff=zone?.cliffs?.find(c=>c.id===selectedId);
   $('zoneCliffProperties').hidden=!cliff;
   if(cliff){$('zoneCliffName').value=cliff.name;$('zoneCliffFaces').textContent=(cliff.faces?.length||0)+' triángulos de terreno';}
-  $('zoneCliffAdd').disabled=!zone;
+  $('zoneCliffAdd').disabled=!zone||zone.hidden;
   $('zoneCliffClose').disabled=!drawing||points.length<3;
   $('zoneCliffUndo').disabled=!points.length;
   $('zoneCliffAdd').classList.toggle('active',drawing);
@@ -126,7 +126,7 @@ export function createCliffRegions({scene,terrainGeo,view,camera,live,heightAt,s
  }
  function refresh(){refreshPanel();render();}
  function start(){
-  if(!getZone())return;
+  if(!getZone()||getZone().hidden)return;
   drawing=true;points=[];hover=null;selectedId=null;refresh();
  }
  function cancel(){drawing=false;points=[];hover=null;refresh();}
