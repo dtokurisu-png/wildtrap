@@ -61,7 +61,7 @@
  const rail=el('nav');rail.id='workspaceRail';rail.setAttribute('aria-label','Herramientas del editor');
  const toolbarEntries=[
   ['project','◉','Vista','Vista y proyecto'],
-  ['sculpt','▲','Esculpir','Esculpir terreno'],
+  ['sculpt','▲','Esculpir','Esculpir terreno o modelo 3D seleccionado'],
   ['knife','✂','Cuchillo','Cuchillo poligonal'],
   ['structures','▦','Estruct.','Estructuras'],
  ];
