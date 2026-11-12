@@ -307,5 +307,9 @@ export function createMeshVertexEditor({
   pointerdown,pointermove,pointerup,hasGesture:()=>Boolean(gesture),
   getState:()=>({active,currentId,points:samples.length,selected:selected.size,
    locked:Object.values(normalizedLocks(getSelectedNode()?.vertexLocks)).reduce((a,b)=>a+b.length,0),
-   operations:cleanVertexOperations(getSelectedNode()?.meshScaleOps).length})};
+   operations:cleanVertexOperations(getSelectedNode()?.meshScaleOps).length,
+   renderedEdges:disposables.filter(x=>x.kind==='edges').length,
+   visibleEdges:disposables.filter(x=>x.kind==='edges'&&x.object.visible).length,
+   visibleVertices:disposables.filter(x=>x.kind==='vertices'&&x.object.visible).length,
+   visibleFaces:$('modelFaces').checked,xray:$('modelXray').checked})};
 }
