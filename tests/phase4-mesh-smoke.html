@@ -109,6 +109,24 @@
     d.getElementById('meshResetDeform').click();
     assert(w.__meshEditor.getState().operations===0,'Restaurar deformación no restauró el GLB');
     assert(d.getElementById('meshEditControls')?.hidden===false,'Restaurar cerró inesperadamente Ver malla');
+    step='malla GLB como referencia durante el corte';
+    d.querySelector('[data-workspace="knife"]').click();
+    const during=w.__meshEditor.getState();
+    assert(during.active&&during.currentId===902&&during.renderedEdges>0&&during.visibleEdges>0,
+     'La malla GLB seleccionada desapareció al cambiar al cuchillo: '+JSON.stringify(during));
+    assert(d.getElementById('knifeMeshTarget').value==='model','No retuvo GLB como superficie');
+    assert(d.getElementById('knifeMeshToggle').getAttribute('aria-pressed')==='true',
+     'No se mantiene activada la referencia GLB durante el corte');
+    assert(d.getElementById('meshEditControls').hidden,
+     'Las acciones de deformación de vértices deben estar ocultas mientras está activo el cuchillo');
+    d.getElementById('knifeLayerEdges').checked=false;
+    d.getElementById('knifeLayerEdges').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(w.__meshEditor.getState().visibleEdges===0,
+     'Las aristas GLB no responden al interruptor de la tijera');
+    d.getElementById('knifeLayerEdges').checked=true;
+    d.getElementById('knifeLayerEdges').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(w.__meshEditor.getState().visibleEdges>0,
+     'Las aristas GLB no se restauran durante el corte');
     document.body.dataset.result='PASS';
     output.textContent='PASS · intangible individual/grupo, x-ray, bloqueo, escala, anclaje Y, XYZ y guardado';
    }catch(error){fail(step,error)}
