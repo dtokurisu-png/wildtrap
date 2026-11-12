@@ -666,6 +666,25 @@ window.__modelSculpt={
   return ok;
  }
 };
+// Read-only diagnostic: actual rendered coordinates for regressions and
+// inspecting precisely which vertex is prevented from moving.
+window.__meshProbe={
+ vertex:(id,key,index)=>{
+  const root=(renderedNodes.get(id)||[]).find(r=>r.userData?.sharedAsset);
+  if(!root)return null;
+  root.updateMatrixWorld(true);
+  let output=null;
+  root.traverse(mesh=>{
+   if(output||!mesh.isMesh||mesh.userData?.wildtrapMeshKey!==String(key))return;
+   const attr=mesh.geometry?.getAttribute('position');
+   if(!attr||index<0||index>=attr.count)return;
+   output=new THREE.Vector3(attr.getX(index),attr.getY(index),attr.getZ(index))
+    .applyMatrix4(mesh.matrixWorld).toArray();
+  });
+  return output;
+ },
+ node:id=>structuredClone(live.nodes.find(n=>n.id===id)||null)
+};
 function addNode(node){snapshot();const n={id:live.nextId++,...node};live.nodes.push(n);selectedId=n.id;selectedIds.clear();selectedIds.add(n.id);draw();persist()}
 function convertCoords(event){
 const rect=view.getBoundingClientRect();
