@@ -1,0 +1,113 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP propiedades y mallas</title></head>
+<body data-result="PENDING"><div id="result">Validando mallas, INT y altura de cuevas</div><script>
+(async()=>{
+ const result=document.getElementById('result'),assert=(ok,msg)=>{if(!ok)throw Error(msg)};
+ const fail=(step,err)=>{document.body.dataset.result='FAIL';result.textContent='FAIL '+step+': '+err.message};
+ try{
+  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify({
+   version:3,size:630,resolution:129,heights:Array(129*129).fill(0),
+   nodes:[
+    {id:901,kind:'prefab',prefabId:'rocky-cave',x:0,y:48,z:0,scale:1,rotation:0},
+    {id:902,kind:'prefab',prefabId:'stone-cave',x:75,y:21,z:25,scale:1,rotation:0},
+    {id:903,kind:'prefab',prefabId:'mountain',x:-60,z:-45,scale:1,rotation:0}
+   ],objectGroups:[],holes:[],cuts3d:[],nextId:904,settings:{heightMax:120}
+  }));
+  const frame=document.createElement('iframe');frame.width=1440;frame.height=900;
+  frame.src='../?safe=1';document.body.append(frame);
+  const start=Date.now();let busy=false;
+  const timer=setInterval(async()=>{
+   if(busy||document.body.dataset.result!=='PENDING')return;
+   const d=frame.contentDocument,w=frame.contentWindow;
+   if(!d?.querySelector('#boot[hidden]')||!w.__objectMeshOverlays||!w.__sceneObjectManager||
+     !d.querySelector('[data-object-id="901"]')||
+     !String(d.getElementById('prefabStatus')?.textContent).includes('4/4')){
+    if(Date.now()-start>27000){clearInterval(timer);fail('arranque',Error('Faltan GLB o botones de escena'))}
+    return;
+   }
+   busy=true;clearInterval(timer);
+   let step='eliminar herramienta redundante';
+   try{
+    assert(!d.querySelector('[data-workspace="mesh"]'),'El botón izquierdo Malla no se eliminó');
+    assert(!d.getElementById('knifeMeshToggle'),'Quedó el interruptor redundante del Cuchillo');
+    assert(d.getElementById('structuresOpenObjectProperties'),
+     'Falta el acceso a propiedades desde Estructuras');
+    step='mallas por objeto y grupos';
+    const select=id=>d.querySelector('[data-object-id="'+id+'"]').click();
+    const mesh=id=>d.querySelector('[data-mesh-id="'+id+'"]');
+    const ids=()=>w.__objectMeshOverlays.getState().ids;
+    const group=()=>d.querySelector('[data-group-mesh="type:caves"]');
+    select(901);
+    mesh(901).click();
+    assert(mesh(901).getAttribute('aria-pressed')==='true'&&ids().includes(901),
+     'No se mostró la malla de la primera cueva');
+    assert(!ids().includes(902),'Una malla afectó otra cueva');
+    group().click();
+    assert(ids().includes(901)&&ids().includes(902),'El grupo no activó ambas mallas');
+    group().click();
+    assert(!ids().includes(901)&&!ids().includes(902),'El grupo no apagó ambas mallas');
+    mesh(901).click();
+    step='propiedades individuales de caras/aristas/vértices';
+    select(901);
+    const panel=d.getElementById('meshEditControls');
+    assert(!panel.hidden,'Las propiedades del GLB se ocultan fuera del antiguo modo Malla');
+    const edges=d.getElementById('modelEdges');
+    edges.checked=false;edges.dispatchEvent(new Event('change',{bubbles:true}));
+    const stat=w.__objectMeshOverlays.getState().perObject.find(x=>x.id===901);
+    assert(stat?.layers.edges===false,'Las aristas no guardaron su estado individual');
+    assert(stat.meshes>0&&stat.vertices>10,'No se dibujó la topología GLB real');
+    step='mantener malla durante Cuchillo';
+    d.querySelector('[data-workspace="knife"]').click();
+    assert(w.__workspaceLayout.getState().workspace==='knife','No se activó Cuchillo');
+    assert(ids().includes(901),'El Cuchillo borró la malla del modelo');
+    mesh(901).click();
+    assert(!ids().includes(901),'No se puede desactivar una malla desde Objetos mientras se recorta');
+    mesh(901).click();
+    assert(ids().includes(901)&&w.__workspaceLayout.getState().workspace==='knife',
+     'Mostrar Malla volvió a cambiar de herramienta');
+    step='malla e intangible del terreno';
+    const row=d.querySelector('.scene-terrain-group');
+    row.querySelector('.scene-terrain-name').click();
+    const terrainMesh=d.querySelector('[data-terrain-mesh]');
+    terrainMesh.click();
+    assert(w.__terrainMeshInspector.getState().active,'El terreno no activó su propio visor de malla');
+    assert(!d.getElementById('terrainMeshControls').hidden,
+     'No muestra controles de malla del terreno en su pestaña de propiedades');
+    const terrainGhost=d.querySelector('[data-terrain-intangible]');
+    terrainGhost.click();
+    assert(terrainGhost.getAttribute('aria-pressed')==='true','No se activó Intangible en el terreno');
+    assert(w.__workspaceLayout.getState().workspace==='knife',
+     'INT y Malla de terreno sacaron al usuario del Cuchillo');
+    terrainGhost.click();
+    assert(terrainGhost.getAttribute('aria-pressed')==='false','No restauró el terreno tangible');
+    step='una sola acción para igualar altura';
+    select(901);
+    assert(d.getElementById('snapCaveToTerrain').disabled===false,
+     'El botón igualar altura no está disponible para cuevas libres');
+    assert(Number(d.getElementById('prefabOffsetY').value)>40,'La cueva inicial no tiene altura independiente');
+    d.getElementById('snapCaveToTerrain').click();
+    assert(Math.abs(Number(d.getElementById('prefabOffsetY').value))<.03,
+     'La altura no se igualó a la superficie Y=0');
+    assert(ids().includes(901),'Igualar altura alteró la visibilidad de la malla');
+    step='bloqueo Y y persistencia';
+    d.querySelector('[data-rotation-lock="y"]').click();
+    assert(d.getElementById('snapCaveToTerrain').disabled,
+     'Un bloqueo Y activo debe impedir igualar altura');
+    await new Promise(resolve=>setTimeout(resolve,1050));
+    const saved=JSON.parse(localStorage.getItem('wildtrap-editor-draft-safe-v1')||'{}');
+    assert(saved.nodes?.find(n=>n.id===901)?.editorMeshVisible===true,
+     'No persistió la malla visible de la cueva');
+    assert(saved.nodes?.find(n=>n.id===901)?.editorMeshLayers?.edges===false,
+     'No persistió el ajuste Aristas de la cueva');
+    assert(Math.abs(saved.nodes?.find(n=>n.id===901)?.y)<.03,
+     'Igualar terreno no guardó la altura Y absoluta');
+    assert(saved.nodes?.find(n=>n.id===901)?.rotationLocks?.y===true,
+     'No se respetó el bloqueo Y');
+    assert(saved.settings?.terrainMeshVisible===true&&saved.settings?.terrainIntangible===false,
+     'Las propiedades de Malla/INT del terreno no se guardaron');
+    document.body.dataset.result='PASS';
+    result.textContent='PASS · escena y grupos Malla, propiedades por objeto, Cuchillo, INT terreno y altura de cueva';
+   }catch(err){fail(step,err)}
+  },180);
+ }catch(err){fail('preparación',err)}
+})();
+</script></body></html>
