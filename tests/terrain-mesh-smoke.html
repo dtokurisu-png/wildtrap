@@ -29,11 +29,13 @@
     assert(row,'Falta fila Escenario · Terreno');
     const edit=row.querySelector('.scene-terrain-edit');
     assert(edit,'Falta el botón Ver malla de la arena');
+    assert(!d.querySelector('[data-workspace="mesh"]'),'No debe existir botón Malla izquierdo');
+    row.querySelector('.scene-terrain-name').click();
     edit.click();
     const panel=d.getElementById('terrainMeshControls');
-    assert(w.__workspaceLayout.getState().workspace==='mesh','No abrió herramienta Malla');
-    assert(d.getElementById('meshTarget').value==='terrain','No escogió terreno');
-    assert(!panel.hidden,'Panel terreno no visible');
+    assert(w.__workspaceLayout.getState().workspace!=='mesh','Malla cambió la herramienta');
+    assert(!panel.hidden,'Propiedades del terreno no disponibles');
+    assert(edit.getAttribute('aria-pressed')==='true','El botón de escena no activó la malla');
     step='topología real';
     const info=w.__terrainMeshInspector.getState();
     assert(info.active&&info.visible,'No activó inspector');
@@ -75,16 +77,14 @@
     assert(w.__workspaceLayout.getState().workspace==='knife','No activó la tijera');
     assert(w.__terrainMeshInspector.getState().active&&w.__terrainMeshInspector.getState().visible,
      'La malla desapareció al escoger la tijera');
-    const keep=d.getElementById('knifeMeshToggle');
-    assert(keep.getAttribute('aria-pressed')==='true','No se conservó la capa al cambiar de herramienta');
-    assert(d.getElementById('knifeMeshTarget').value==='terrain','Cuchillo no mantuvo terreno como referencia');
-    // Reenable the layers from the knife panel, without switching tools.
-    d.getElementById('knifeLayerEdges').checked=true;
-    d.getElementById('knifeLayerEdges').dispatchEvent(new Event('change',{bubbles:true}));
-    assert(d.getElementById('terrainEdges').checked,'El control de aristas del cuchillo no se sincronizó');
-    d.getElementById('knifeLayerXray').checked=true;
-    d.getElementById('knifeLayerXray').dispatchEvent(new Event('change',{bubbles:true}));
-    assert(d.getElementById('terrainXray').checked,'Rayos X del cuchillo no están conectados');
+    assert(edit.getAttribute('aria-pressed')==='true','El botón de escena perdió estado');
+    w.__workspaceLayout.activateTab('object');
+    d.getElementById('terrainEdges').checked=true;
+    d.getElementById('terrainEdges').dispatchEvent(new Event('change',{bubbles:true}));
+    d.getElementById('terrainXray').checked=true;
+    d.getElementById('terrainXray').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(w.__workspaceLayout.getState().workspace==='knife',
+     'Propiedades de malla no deben abandonar la tijera');
     step='recortar con malla activa';
     const before=w.__terrainMeshInspector.getState();
     const click=(cx,cy)=>{
@@ -110,20 +110,17 @@
      JSON.stringify({before,after}));
     assert(w.__workspaceLayout.getState().workspace==='knife',
      'Al crear un agujero se perdió la herramienta Cuchillo');
-    step='interruptor de malla con cuchillo activo';
-    keep.click();
-    assert(!w.__terrainMeshInspector.getState().active&&keep.getAttribute('aria-pressed')==='false',
-     'No se puede ocultar la malla sin desactivar la tijera');
-    keep.click();
-    assert(w.__terrainMeshInspector.getState().active&&keep.getAttribute('aria-pressed')==='true',
-     'No se puede restaurar la malla con la tijera activa');
-    step='modo alternativo GLB';
-    d.getElementById('meshTarget').value='model';
-    d.getElementById('meshTarget').dispatchEvent(new Event('change',{bubbles:true}));
-    assert(!w.__terrainMeshInspector.getState().active,'La malla del terreno no se desactivó al escoger GLB');
-    assert(w.__meshEditor.getState().active,'No se conservó el editor GLB anterior');
+    step='conmutar malla desde gestor mientras está activo el cuchillo';
+    edit.click();
+    assert(!w.__terrainMeshInspector.getState().active&&edit.getAttribute('aria-pressed')==='false',
+     'El botón de terreno no apagó la malla con Cuchillo');
+    assert(w.__workspaceLayout.getState().workspace==='knife',
+     'Conmutar Malla cambió la herramienta activa');
+    edit.click();
+    assert(w.__terrainMeshInspector.getState().active&&edit.getAttribute('aria-pressed')==='true',
+     'El botón de terreno no restauró la malla con Cuchillo');
     document.body.dataset.result='PASS';
-    document.getElementById('result').textContent='PASS · arena recortada: caras, aristas, vértices, ojo, rayos X y selector';
+    document.getElementById('result').textContent='PASS · malla arena desde gestor, propiedades por capa y cuchillo simultáneo';
    }catch(e){fail(step,e)}
   },165);
  }catch(e){fail('preparación',e)}
