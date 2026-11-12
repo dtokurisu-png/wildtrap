@@ -124,11 +124,10 @@
     assert(w.__objectMeshOverlays.getState().ids.includes(902),
       'La malla visible del GLB desapareció al activar Cuchillo');
     assert(!d.getElementById('knifeMeshToggle'),'No se debe añadir un botón Malla adicional en Cuchillo');
-    const meshButton=d.querySelector('[data-mesh-id="902"]');
-    meshButton.click();
+    d.querySelector('[data-mesh-id="902"]').click();
     assert(!w.__objectMeshOverlays.getState().ids.includes(902),
       'El botón del propio objeto no oculta su malla en modo Cuchillo');
-    meshButton.click();
+    d.querySelector('[data-mesh-id="902"]').click();
     assert(w.__objectMeshOverlays.getState().ids.includes(902),
       'El botón del objeto no restaura Malla en modo Cuchillo');
     assert(w.__workspaceLayout.getState().workspace==='knife',
