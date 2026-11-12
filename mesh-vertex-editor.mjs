@@ -48,7 +48,9 @@ export function createMeshVertexEditor({
  function updateInfo(){
   const node=getSelectedNode();
   const supports=Boolean(node?.kind==='prefab'&&!node.editorHidden&&!node.editorIntangible&&getRoot(node.id));
-  controls.hidden=!active;
+  // Preview layers may remain on while the knife is active. Vertex mutation
+  // controls must stay hidden so the cutter exclusively receives pointer input.
+  controls.hidden=!active||getMode()!=='meshEdit';
   for(const id of ['meshLockVertices','meshUnlockVertices','meshScaleApply','meshResetDeform']){
    const button=$(id);if(button)button.disabled=!supports||(id==='meshLockVertices'||id==='meshUnlockVertices'?selected.size===0:false);
   }
@@ -125,14 +127,14 @@ export function createMeshVertexEditor({
    const cloudMat=new THREE.PointsMaterial({size:5,sizeAttenuation:false,
     vertexColors:true,depthTest:false,depthWrite:false,transparent:true,opacity:1});
    const cloud=new THREE.Points(cloudGeo,cloudMat);
-   cloud.userData.editorOnly=true;cloud.renderOrder=62;cloud.frustumCulled=false;
+   cloud.userData.editorOnly=true;cloud.renderOrder=13;cloud.frustumCulled=false;
    mesh.add(cloud);disposables.push({object:cloud,geometry:cloudGeo,material:cloudMat,sampleRefs,kind:'vertices'});
    // Edges reflect the ACTUAL cut topology. Dense GLBs can show full wireframe.
    const wireGeo=new THREE.WireframeGeometry(mesh.geometry);
    const wireMat=new THREE.LineBasicMaterial({color:0x39ffd0,transparent:true,opacity:.52,
     depthTest:false,depthWrite:false});
    const lines=new THREE.LineSegments(wireGeo,wireMat);
-   lines.userData.editorOnly=true;lines.renderOrder=60;lines.frustumCulled=false;
+   lines.userData.editorOnly=true;lines.renderOrder=12;lines.frustumCulled=false;
    mesh.add(lines);disposables.push({object:lines,geometry:wireGeo,material:wireMat,kind:'edges'});
    // Mesh-specific materials, leaving all GLB cache materials untouched.
    const orig=mesh.material;
