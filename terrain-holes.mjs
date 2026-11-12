@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-terrain-cuts.mjs?v=0.9.8';
+import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-terrain-cuts.mjs?v=0.9.13';
 
 // The knife uses clicks, not a brush. Original surfaces remain raycastable
 // even after cutting, so a closed polygon can restore an older hole.
@@ -118,7 +118,9 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
    if($('holeMeshStats'))$('holeMeshStats').textContent=
      'Triángulos originales '+result.stats.originalTriangles+
      ' · actuales '+result.stats.finalTriangles+
-     ' · vértices nuevos '+result.stats.newVertices;
+     ' · vértices nuevos '+result.stats.newVertices+
+    (result.stats.incomplete?' · ⚠ LÍMITE: algunas caras no se han cortado ('+
+      result.stats.limitedFragments+' grupos de fragmentos)':'');
   }else if($('holeMeshStats'))$('holeMeshStats').textContent='Malla base sin recortes adicionales';
   const old=generated;
   terrain.geometry=replacement;
@@ -271,6 +273,39 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   anchors.length=0;selected.length=0;pendingHistory.length=0;closed=false;hover=null;renderSelection();
  }
  function endStroke(){} // Pointer release does not change a click-based knife.
+ // Measure the REAL displayed triangle surface, not the uncut source
+ // used by cutter picking. This prevents reporting success on an empty hole.
+ function meshSurfaceArea(positions,indices){
+  let total=0;
+  for(let i=0;i<indices.length;i+=3){
+   const a=indices[i]*3,b=indices[i+1]*3,c=indices[i+2]*3;
+   const x1=positions[b]-positions[a],y1=positions[b+1]-positions[a+1],z1=positions[b+2]-positions[a+2];
+   const x2=positions[c]-positions[a],y2=positions[c+1]-positions[a+1],z2=positions[c+2]-positions[a+2];
+   total+=.5*Math.hypot(y1*z2-z1*y2,z1*x2-x1*z2,x1*y2-y1*x2);
+  }
+  return total;
+ }
+ function validateTerrainChange(pendingStamps,cut){
+  const current=terrain.geometry,attrs=terrainGeo.attributes;
+  const result=buildAdaptiveTerrain({
+   positions:attrs.position.array,colors:attrs.color.array,
+   normals:attrs.normal.array,uvs:attrs.uv.array,indices:terrainGeo.index.array
+  },[...legacy],[...(live.cuts3d||[]),...pendingStamps],live.size,live.resolution);
+  if(!result){toast('El recorte no encontró ninguna cara del terreno.');return false}
+  if(result.stats.incomplete){
+   toast('Corte cancelado: la geometría superó el límite de fragmentos. No se guardó un agujero incompleto.');
+   return false;
+  }
+  const before=meshSurfaceArea(current.attributes.position.array,current.index.array);
+  const after=meshSurfaceArea(result.positions,result.indices);
+  const change=(cut?before-after:after-before);
+  if(change<.0001){
+   toast(cut?'No se recortó ninguna cara nueva: la zona ya está vacía o el prisma no atraviesa la pared. Prueba mayor profundidad o revisa la malla.':
+    'No se restauró ninguna cara: la región ya estaba completa o el contorno no alcanza el terreno.');
+   return false;
+  }
+  return true;
+ }
  function apply(cut){
   if(!renderCuts){toast('Recortes suspendidos en recuperación: primero guarda una copia del escenario.');return}
   if(!closed||selected.length!==1){toast('Primero cierra el contorno del cuchillo');return}
@@ -282,6 +317,13 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
     if(!node)continue;
     perModel.set(node.id,(perModel.get(node.id)||0)+1);
    }else terrainCount++;
+  }
+  if(terrainCount){
+   const pending=selected.filter(stamp=>!Number.isInteger(stamp.modelNodeId)).map(stamp=>{
+    const {modelNodeId,worldPreview,...data}=stamp;
+    return {...data,op:cut?'cut':'restore'};
+   });
+   if(!validateTerrainChange(pending,cut))return;
   }
   if((live.cuts3d?.length||0)+terrainCount>700||
    [...perModel].some(([id,n])=>n+(live.nodes.find(node=>node.id===id)?.cuts3d?.length||0)>80)){
