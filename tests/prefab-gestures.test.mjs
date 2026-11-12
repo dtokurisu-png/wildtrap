@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,MIN_PREFAB_SCALE,MAX_PREFAB_SCALE} from '../prefab-gestures.mjs';
+import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,freeCaveFromScreenDrag,MIN_PREFAB_SCALE,MAX_PREFAB_SCALE} from '../prefab-gestures.mjs';
 
 const editor=fs.readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
 const library=fs.readFileSync(new URL('../prefab-library.mjs',import.meta.url),'utf8');
@@ -93,4 +93,36 @@ test('rotación 3D del GLB usa los ejes correctos y se conserva al editar el pro
  assert.ok(html.includes('id="prefabRotationZ"'));
  assert.ok(editor.includes('constrainedRotation('));
  assert.ok(html.includes("Alt + arrastrar"));
+});
+
+test('cueva libre: el arrastre vertical sin modificadores eleva Y sin tocar X/Z',()=>{
+ const cave={x:12,z:-8,y:37};
+ const up=freeCaveFromScreenDrag(cave,200,300,200,210,{x:1,z:0},{x:0,z:-1},.5,.4,630,false);
+ assert.deepEqual(up,{x:12,z:-8,y:73});
+ const down=freeCaveFromScreenDrag(cave,200,300,200,450,{x:1,z:0},{x:0,z:-1},.5,.4,630,false);
+ assert.deepEqual(down,{x:12,z:-8,y:-23});
+ assert.equal(cave.y,37,'Ni el terreno ni el control mutan la posición original');
+});
+test('cueva libre: lateral sigue la cámara sin depender de la pared de terreno',()=>{
+ const cave={x:7,z:9,y:-22};
+ const moved=freeCaveFromScreenDrag(cave,120,200,200,200,{x:0,z:1},{x:1,z:0},.25,.3,630,false);
+ assert.deepEqual(moved,{x:7,z:29,y:-22});
+ const bounded=freeCaveFromScreenDrag(cave,0,0,6000,0,{x:1,z:0},{x:0,z:1},.5,.3,630,false);
+ assert.equal(bounded.x,314);
+});
+test('Espacio + arrastrar mueve XZ (incluida profundidad), manteniendo Y exacta',()=>{
+ const cave={x:20,z:-40,y:95};
+ const moved=freeCaveFromScreenDrag(cave,100,100,130,55,
+  {x:1,z:0},{x:0,z:-1},.5,.4,630,true);
+ assert.deepEqual(moved,{x:35,z:-62.5,y:95});
+ const regular=freeCaveFromScreenDrag(cave,100,100,130,55,
+  {x:1,z:0},{x:0,z:-1},.5,.4,630,false);
+ assert.deepEqual(regular,{x:35,z:-40,y:113});
+});
+test('la función de movimiento libre rechaza desplazamientos inválidos sin aplicar un corte',()=>{
+ assert.equal(freeCaveFromScreenDrag({x:0,z:0,y:10},0,0,NaN,2,{x:1,z:0},{x:0,z:-1}),null);
+ assert.ok(editor.includes("freeCave?(cavePlaneModifierDown?'plane':'free'):'move'"));
+ assert.ok(editor.includes("session.action==='free'||session.action==='plane'"));
+ assert.ok(editor.includes("const ground=freeCave?null:"));
+ assert.ok(editor.includes("if(isCave)")===false || editor.includes("if(cave)n.y=translated.y"));
 });
