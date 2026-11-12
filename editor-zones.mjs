@@ -125,7 +125,7 @@ export function createZoneEditor({scene,view,camera,live,heightAt,snapshot,persi
   if(editVertices&&selected){
    const z=items().find(z=>z.id===selected);
    const index=z?.points.findIndex(p=>screenDistance(p,e)<15)??-1;
-   if(index>=0){snapshot();dragging={id:selected,index,pointer:e.pointerId};try{view.setPointerCapture(e.pointerId)}catch(_){}return;}
+   if(index>=0){snapshot();dragging={id:selected,index,pointer:e.pointerId,original:z.points.map(norm)};try{view.setPointerCapture(e.pointerId)}catch(_){}return;}
   }
   const p=pointerPoint(e);if(!p)return;
   if(pending.length>=3&&screenDistance(pending[0],e)<16){close();return;}
@@ -148,7 +148,7 @@ export function createZoneEditor({scene,view,camera,live,heightAt,snapshot,persi
   if(!dragging||dragging.pointer!==e.pointerId)return;
   e.stopImmediatePropagation();
   const zone=items().find(z=>z.id===dragging.id);
-  if(zone&&!valid(zone.points)){toast('Movimiento inválido: se conserva la geometría anterior');}
+  if(zone&&!valid(zone.points)){zone.points=dragging.original;toast('Movimiento inválido: se restauran los vértices anteriores');}
   persist();dragging=null;refreshAll();
  }
  view.addEventListener('pointerdown',down,true);
