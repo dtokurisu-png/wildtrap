@@ -434,6 +434,11 @@ function updateStatus(){
  $('modelVertexEditToggle').textContent=mode==='meshEdit'?'✓ Finalizar edición de vértices':'✣ Editar vértices del modelo';
  $('snapCaveToTerrain').disabled=!cave||picked?.rotationLocks?.y===true;
  if(editable){
+  const layers=normalizedMeshLayers(picked.editorMeshLayers);
+  for(const layer of ['Faces','Edges','Vertices','Xray'])
+   $('model'+layer).checked=layers[layer.toLowerCase()];
+ }
+ if(editable){
   const locks=picked.rotationLocks||{};
   // The saved XYZ lock buttons apply to movement AND rotation.
   $('prefabX').disabled=locks.x===true;
@@ -647,12 +652,14 @@ if(window.__workspaceLayout?.getState().workspace==='structures')prefabGallery.o
 $('openPrefabGallery').onclick=()=>prefabGallery.open();
 holesEditor=createTerrainHoles({
  scene,terrainGeo,terrain,live,heightAt,refreshTerrain,snapshot,persist,toast,$,
+ terrainIsIntangible:()=>live.settings?.terrainIntangible===true,
  getModelRoots:()=>[...renderedNodes].flatMap(([id,roots])=>
   live.nodes.find(n=>n.id===id&&!n.editorHidden&&!n.editorIntangible)?
    roots.filter(root=>root.userData.sharedAsset).map(root=>({id,root})):[]),
  renderCuts:!recoveryMode,nextUndoSerial
 });
-terrainInspector=createTerrainMeshInspector({scene,camera,view,terrain,$});
+terrainInspector=createTerrainMeshInspector({scene,camera,view,terrain,$,
+ isSelected:()=>terrainPropertiesSelected});
 window.__terrainMeshInspector=terrainInspector;
 const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
  resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
@@ -667,6 +674,11 @@ vertexEditor=createMeshVertexEditor({
  getMode:()=>mode,snapshot,draw,persist,toast
 });
 window.__meshEditor=vertexEditor;
+objectMeshOverlays=createObjectMeshOverlays({
+ getNodes:()=>live.nodes,getRoots:id=>renderedNodes.get(id)||[]
+});
+window.__objectMeshOverlays=objectMeshOverlays;
+updateMeshInspection();
 // XYZ markers are camera controls, independent of an object's XYZ locks.
 const axesSvg=$('axisGizmoSvg'),axisViewButtons=[...document.querySelectorAll('[data-view-axis]')];
 let axisTick=0;
@@ -751,18 +763,12 @@ $('closeHoleContour').onclick=()=>holesEditor.closePolygon();
 $('stopTest').onclick=()=>preview.stop();
 $('localFarolera').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview.fromFile(file);e.target.value=''});
 function setNodeSelection(ids){
+ terrainPropertiesSelected=false;
  selectedIds.clear();
  for(const id of ids)if(live.nodes.some(n=>n.id===id))selectedIds.add(id);
  selectedId=[...selectedIds].at(-1)??null;
- updateSelectionHighlights();updateStatus();
- if(mode==='meshEdit'){
-  const node=live.nodes.find(n=>n.id===selectedId);
-  if(node?.kind==='prefab'){
-   $('meshTarget').value='model';
-   meshPreviewNodeId=node.id;
-  }
-  updateMeshInspection();
- }
+ if(mode==='meshEdit'&&!live.nodes.some(n=>n.id===selectedId&&n.kind==='prefab'))setMode('move');
+ updateSelectionHighlights();updateStatus();updateMeshInspection();
 }
 function pointerRay(e){
  const bounds=view.getBoundingClientRect();
@@ -845,12 +851,11 @@ function marqueeHits(x,y){
 }
 // Vertex picking owns the left button while Ver malla is active.
 view.addEventListener('pointerdown',e=>{
- if(mode!=='meshEdit'||preview.active||preview.busy)return;
- if($('meshTarget').value==='terrain'){
-  if(terrainInspector?.inspect(e)){
-   e.preventDefault();e.stopImmediatePropagation();
-  }
- }else vertexEditor?.pointerdown(e);
+ if(preview.active||preview.busy||e.button!==0)return;
+ if(mode==='meshEdit')vertexEditor?.pointerdown(e);
+ else if(terrainPropertiesSelected&&live.settings?.terrainMeshVisible&&mode!=='holePaint'){
+  if(terrainInspector?.inspect(e)){e.preventDefault();e.stopImmediatePropagation()}
+ }
 },true);
 view.addEventListener('pointermove',e=>{
  if(mode==='meshEdit')vertexEditor?.pointermove(e);
@@ -1158,6 +1163,17 @@ for(const btn of document.querySelectorAll('[data-rotation-lock]')){
   updateStatus();persist();
  });
 }
+$('snapCaveToTerrain').addEventListener('click',()=>{
+ const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab'&&isFreeCave(n.prefabId));
+ if(!node){toast('Selecciona una cueva para igualar su altura al terreno');return}
+ if(node.rotationLocks?.y===true){toast('Desbloquea Y para ajustar la altura de la cueva');return}
+ const targetY=heightAt(node.x,node.z)-(Number(node.scaleAnchorOffsetY)||0);
+ if(Math.abs(prefabWorldY(node,heightAt)-targetY)<.00001){toast('La cueva ya está a la altura del terreno');return}
+ snapshot();
+ node.y=targetY;node.offsetY=0;
+ draw();persist();
+ toast('Altura igualada al terreno. Puedes mover la cueva libremente después.');
+});
 $('anchorScaleY').addEventListener('change',e=>{
  const n=live.nodes.find(x=>x.id===selectedId&&x.kind==='prefab');if(!n)return;
  snapshot();n.anchorScaleY=e.target.checked;updateStatus();persist();
