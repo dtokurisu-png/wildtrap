@@ -1,0 +1,47 @@
+name: Verificar cámara 3D y última vista guardada
+on:
+  push:
+    branches: [main, feat/persist-last-3d-camera-v0.9.18]
+    paths:
+      - 'editor.mjs'
+      - 'editor-camera-state.mjs'
+      - 'index.html'
+      - 'tests/editor-camera-state.test.mjs'
+      - 'tests/editor-camera-persistence-smoke.html'
+      - 'tests/browser-editor-camera-persistence.mjs'
+      - '.github/workflows/editor-camera-persistence-tests.yml'
+  workflow_dispatch:
+jobs:
+  persist-3d-camera:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxis y normalización de cámara
+        run: |
+          node --check editor.mjs
+          node --check editor-camera-state.mjs
+          node --test tests/editor-camera-state.test.mjs
+          node --test tests/prefab-gestures.test.mjs
+      - name: Servidor local
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-camera-http.log 2>&1 &
+          sleep 2
+      - name: Cámara 3D predeterminada, guardado y recarga real en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-editor-camera-persistence.mjs
+      - name: Regresiones del editor y vistas XYZ
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-startup.mjs
+          node tests/browser-axis-view-locks.mjs
+          node tests/browser-cave-free-y.mjs
+          node tests/browser-object-mesh-properties.mjs
+          node tests/browser-terrain-mesh.mjs
+          node tests/browser-phase3-tool-controls.mjs
+          node tests/browser-phase4-mesh.mjs
