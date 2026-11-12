@@ -66,6 +66,16 @@
   const draft=JSON.parse(localStorage.getItem(draftKey)||'null');
   assert(draft?.editorCamera&&sameVector(draft.editorCamera.position,custom.position),
    'El borrador de escenario no contiene la posición de cámara');
+  step='no sobrescribir actualizaciones ajenas del escenario';
+  // Simulate another tab/recovery process updating the world JSON after
+  // the camera-only save was scheduled but before its timer fires.
+  w.__editorCamera.restore(w.__editorCamera.getState());
+  const externallyUpdated=JSON.parse(localStorage.getItem(draftKey));
+  externallyUpdated.externalRevision='preservar-cortes-y-datos';
+  localStorage.setItem(draftKey,JSON.stringify(externallyUpdated));
+  await delay(950);
+  assert(JSON.parse(localStorage.getItem(draftKey))?.externalRevision==='preservar-cortes-y-datos',
+   'El autosave de cámara sobrescribió un borrador actualizado desde fuera');
   step='recargar el editor y recuperar la última vista';
   // An iframe keeps the SAME WindowProxy across navigation; compare the
   // document and the editor-camera controller instance instead.
@@ -77,6 +87,8 @@
     ?frame.contentWindow:null);
   d=frame.contentDocument;
   const reopened=w.__editorCamera.getState();
+  assert(JSON.parse(localStorage.getItem(draftKey))?.externalRevision==='preservar-cortes-y-datos',
+   'Al recargar se sobrescribió una actualización externa de borrador');
   assert(sameVector(reopened.position,saved.position),'Al reiniciar se perdió posición XYZ');
   assert(sameVector(reopened.target,saved.target),'Al reiniciar se perdió el centro');
   assert(sameVector(reopened.up,saved.up),'Al reiniciar se perdió la inclinación');
