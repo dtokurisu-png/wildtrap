@@ -1,3 +1,4 @@
+import {normalizedLocks} from './mesh-deform.mjs';
 // Per-vertex anchors and sculpt operations are instance-local, not GLB edits.
 // All coordinates here are either model-root-local or WORLD as named.
 const validVec=v=>Array.isArray(v)&&v.length===3&&v.every(n=>typeof n==='number'&&Number.isFinite(n)&&Math.abs(n)<1e7);
@@ -28,13 +29,13 @@ export function cleanSculptStamps(stamps){
   validVec(s.center)&&validVec(s.normal)&&Number.isFinite(s.radius)&&s.radius>.02&&s.radius<=500&&
   Number.isFinite(s.strength)&&s.strength>.00001&&s.strength<=100
  ).map(s=>({mode:s.mode,center:s.center.slice(),normal:s.normal.slice(),
-  radius:s.radius,strength:s.strength}));
+  radius:s.radius,strength:s.strength,locked:normalizedLocks(s.locked)}));
 }
-export function sculptRootPoints(points,stamps,locked=[]){
+export function sculptRootPoints(points,stamps,locked=[],meshKey='0'){
  const safe=cleanSculptStamps(stamps);
- const locks=new Set(locked);
  const result=points.map(p=>p.slice());
  for(const stamp of safe){
+  const locks=new Set(stamp.locked?.[String(meshKey)]||locked);
   const [cx,cy,cz]=stamp.center,[nx,ny,nz]=stamp.normal;
   const normalLength=Math.hypot(nx,ny,nz)||1;
   const normal=[nx/normalLength,ny/normalLength,nz/normalLength];
