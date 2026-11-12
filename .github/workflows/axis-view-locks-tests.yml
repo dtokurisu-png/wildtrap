@@ -1,7 +1,7 @@
 name: Validar vistas XYZ y bloqueos de ejes
 on:
   push:
-    branches: [main, fix/axis-view-locks-v0.9.16]
+    branches: [main]
     paths:
       - 'editor.mjs'
       - 'index.html'
