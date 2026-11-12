@@ -17,7 +17,8 @@
   const interval=setInterval(()=>{
    if(busy||document.body.dataset.result!=='PENDING')return;
    const d=frame.contentDocument,w=frame.contentWindow;
-   if(!d?.querySelector('#boot[hidden]')||!w.__workspaceLayout||!w.__terrainMeshInspector){
+   if(!d?.querySelector('#boot[hidden]')||!w.__workspaceLayout||!w.__terrainMeshInspector||
+      !d.getElementById('holeCounter')?.textContent.includes('1 cortes 3D')){
     if(Date.now()-start>25000){clearInterval(interval);fail('inicio',Error('El editor no arrancó'))}
     return;
    }
@@ -36,8 +37,10 @@
     step='topología real';
     const info=w.__terrainMeshInspector.getState();
     assert(info.active&&info.visible,'No activó inspector');
-    assert(info.triangles>10000&&info.triangles<32768,
-     'No refleja la malla realmente cortada: '+info.triangles);
+    assert(info.triangles>10000&&info.vertices>16641,
+     'No refleja la malla realmente recortada: '+JSON.stringify(info)+
+      ' / cortes: '+d.getElementById('holeCounter').textContent+
+      ' / reconstrucción: '+d.getElementById('holeMeshStats').textContent);
     assert(info.activeVertices>10000,'No expone vértices activos de terreno');
     assert(info.drawn===3,'No dibujó caras, aristas y vértices como capas independientes');
     assert(d.getElementById('terrainMeshStats').textContent.includes('caras triangulares'),
