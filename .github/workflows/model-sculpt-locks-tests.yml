@@ -1,0 +1,53 @@
+name: Validar esculpido de modelos y bloqueo normal/total
+on:
+  push:
+    branches: [main, fix/mesh-sculpt-locked-vertices-v0.9.19]
+    paths:
+      - 'mesh-vertex-freeze.mjs'
+      - 'mesh-vertex-editor.mjs'
+      - 'prefab-library.mjs'
+      - 'editor.mjs'
+      - 'index.html'
+      - 'editor-workspace.js'
+      - 'tests/mesh-vertex-freeze.test.mjs'
+      - 'tests/locked-vertices-sculpt-smoke.html'
+      - 'tests/browser-locked-vertices-sculpt.mjs'
+      - 'tests/phase4-mesh-smoke.html'
+      - '.github/workflows/model-sculpt-locks-tests.yml'
+  workflow_dispatch:
+jobs:
+  model-vertex-locks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxis y anclas de vértices
+        run: |
+          node --check editor.mjs
+          node --check prefab-library.mjs
+          node --check mesh-vertex-editor.mjs
+          node --check mesh-vertex-freeze.mjs
+          node --test tests/mesh-vertex-freeze.test.mjs
+          node --test tests/mesh-deform.test.mjs
+          node --test tests/prefab-gestures.test.mjs
+      - name: Servidor de escena
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-sculpt-http.log 2>&1 &
+          sleep 2
+      - name: Bloqueos y esculpido GLB reales en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-locked-vertices-sculpt.mjs
+      - name: Regresiones de GLB, malla, recortes, cámaras y escenario
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-phase4-mesh.mjs
+          node tests/browser-object-mesh-properties.mjs
+          node tests/browser-cave-free-y.mjs
+          node tests/browser-axis-view-locks.mjs
+          node tests/browser-editor-camera-persistence.mjs
+          node tests/browser-terrain-mesh.mjs
