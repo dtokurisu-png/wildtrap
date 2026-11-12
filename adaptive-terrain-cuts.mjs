@@ -7,7 +7,7 @@ const EPS=1e-7;
 // Never silently discard old cuts or put uncut source triangles back.
 // Complicated cut/restore cycles still have a per-triangle complexity guard,
 // reported to the caller so an incomplete cut cannot be saved as successful.
-const MAX_FRAGMENTS_PER_TRIANGLE=240;
+const MAX_FRAGMENTS_PER_TRIANGLE=2048;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
