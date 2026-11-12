@@ -1,0 +1,104 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP · cámara 3D persistente</title></head>
+<body data-result="PENDING"><div id="result">Comprobando cámara 3D y guardado de la última vista…</div>
+<script>
+(async()=>{
+ const result=document.getElementById('result');
+ const assert=(ok,msg)=>{if(!ok)throw Error(msg)};
+ const fail=(step,e)=>{document.body.dataset.result='FAIL';result.textContent='FAIL '+step+': '+(e?.message||e)};
+ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ const wait=async(pred,ms=27000)=>{
+  const started=Date.now();
+  while(Date.now()-started<ms){
+   try{const value=pred();if(value)return value}catch(_){}
+   await delay(200);
+  }
+  throw Error('Editor no listo después de '+ms+' ms');
+ };
+ const equal=(a,b,t=.01)=>Math.abs(a-b)<t;
+ const sameVector=(a,b)=>a.every((n,i)=>equal(n,b[i],.025));
+ const cameraKey='wildtrap-editor-draft-safe-v1-camera-v1';
+ const draftKey='wildtrap-editor-draft-safe-v1';
+ let step='inicialización';
+ try{
+  localStorage.removeItem(cameraKey);
+  localStorage.setItem(draftKey,JSON.stringify({
+   version:3,size:630,resolution:129,heights:Array(129*129).fill(0),
+   nodes:[],objectGroups:[],holes:[],cuts3d:[],nextId:1,settings:{heightMax:120}
+  }));
+  const frame=document.createElement('iframe');
+  frame.style.width='1400px';frame.style.height='880px';frame.src='../?safe=1';
+  document.body.append(frame);
+  let w=await wait(()=>frame.contentDocument?.querySelector('#boot[hidden]')&&
+   frame.contentWindow.__editorCamera&&frame.contentDocument.getElementById('status').textContent.includes('0 elementos')
+    ?frame.contentWindow:null);
+  let d=frame.contentDocument;
+  step='vista predeterminada inclinada';
+  const start=w.__editorCamera.getState();
+  assert(d.getElementById('viewType').textContent==='Vista 3D','El arranque no es Vista 3D');
+  assert(sameVector(start.position,[300,330,350]),
+   'La cámara inicial no está en la vista 3D existente: '+JSON.stringify(start));
+  assert(start.enableRotate===true,'La vista 3D no permite rotación');
+  step='vistas manuales y guardado automático';
+  d.querySelector('[data-view-axis="x"]').click();
+  assert(d.getElementById('viewType').textContent==='Vista lateral X','X no cambia la vista');
+  await wait(()=>{
+   const raw=localStorage.getItem(cameraKey);
+   return raw&&JSON.parse(raw).label==='Vista lateral X';
+  },8000);
+  // Move to a non-axis, arbitrary user-created camera view and simulate wheel zoom.
+  step='posición, centro, inclinación y zoom arbitrarios';
+  const custom={position:[120,210,-255],target:[35,31,-18],up:[0,1,0],
+   viewSpan:360,zoom:1.35,enableRotate:true,label:'Vista 3D'};
+  assert(w.__editorCamera.restore(custom),'No se puede configurar una vista personalizada');
+  const viewport=d.getElementById('viewport');
+  viewport.dispatchEvent(new w.WheelEvent('wheel',{
+   bubbles:true,cancelable:true,deltaY:-250,deltaMode:0
+  }));
+  await delay(1600);
+  const saved=JSON.parse(localStorage.getItem(cameraKey)||'null');
+  assert(saved&&sameVector(saved.position,custom.position),'No guardó posición XYZ');
+  assert(sameVector(saved.target,custom.target),'No guardó el punto de enfoque');
+  assert(sameVector(saved.up,custom.up),'No guardó orientación de cámara');
+  assert(equal(saved.zoom,1.35),'No guardó zoom de cámara');
+  assert(saved.viewSpan<custom.viewSpan-10,'No guardó zoom de rueda del ratón');
+  const draft=JSON.parse(localStorage.getItem(draftKey)||'null');
+  assert(draft?.editorCamera&&sameVector(draft.editorCamera.position,custom.position),
+   'El borrador de escenario no contiene la posición de cámara');
+  step='recargar el editor y recuperar la última vista';
+  const old=w;
+  frame.src='../?safe=1&reload-camera=1';
+  w=await wait(()=>frame.contentDocument?.querySelector('#boot[hidden]')&&
+   frame.contentWindow!==old&&frame.contentWindow.__editorCamera?frame.contentWindow:null);
+  d=frame.contentDocument;
+  const reopened=w.__editorCamera.getState();
+  assert(sameVector(reopened.position,saved.position),'Al reiniciar se perdió posición XYZ');
+  assert(sameVector(reopened.target,saved.target),'Al reiniciar se perdió el centro');
+  assert(sameVector(reopened.up,saved.up),'Al reiniciar se perdió la inclinación');
+  assert(equal(reopened.viewSpan,saved.viewSpan,.2),'Al reiniciar se perdió el zoom de rueda');
+  assert(equal(reopened.zoom,saved.zoom),'Al reiniciar se perdió zoom interno');
+  assert(d.getElementById('viewType').textContent==='Vista 3D','No restauró el tipo de vista 3D');
+  step='importar un JSON con la cámara guardada';
+  const importedCamera={
+   version:1,position:[5,670,12],target:[5,10,12],up:[0,0,-1],
+   viewSpan:460,zoom:1,enableRotate:false,label:'Vista cenital'
+  };
+  const importedDraft={...draft,editorCamera:importedCamera};
+  const file=new w.File([JSON.stringify(importedDraft)],'cambio-camara.json',{type:'application/json'});
+  const transfer=new w.DataTransfer();transfer.items.add(file);
+  const input=d.getElementById('importJSON');input.files=transfer.files;
+  input.dispatchEvent(new w.Event('change',{bubbles:true}));
+  await wait(()=>w.__editorCamera.getState().label==='Vista cenital',9000);
+  const imported=w.__editorCamera.getState();
+  assert(sameVector(imported.position,importedCamera.position),
+   'Importar JSON no restauró posición de cámara');
+  assert(equal(imported.viewSpan,460),'Importar JSON no restauró el encuadre');
+  assert(imported.enableRotate===false,'Importar JSON no restauró el estado de rotación');
+  assert(JSON.parse(localStorage.getItem(cameraKey)||'null')?.label==='Vista cenital',
+   'El importado no reemplazó el último guardado de cámara');
+  assert(!localStorage.getItem('wildtrap-editor-draft-v1-camera-v1'),
+   'Modo seguro modificó la cámara del escenario normal');
+  document.body.dataset.result='PASS';
+  result.textContent='PASS · 3D inicial, orientación XYZ, zoom, recarga e importación JSON';
+ }catch(e){fail(step,e)}
+})();
+</script></body></html>
