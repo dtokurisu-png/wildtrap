@@ -70,6 +70,53 @@
     assert(!w.__terrainMeshInspector.getState().visible,'Ojo ocultó arena pero dejó overlay suelto');
     eye.click();
     assert(w.__terrainMeshInspector.getState().visible,'No restauró la malla del terreno');
+    step='malla visible con cuchillo';
+    d.querySelector('[data-workspace="knife"]').click();
+    assert(w.__workspaceLayout.getState().workspace==='knife','No activó la tijera');
+    assert(w.__terrainMeshInspector.getState().active&&w.__terrainMeshInspector.getState().visible,
+     'La malla desapareció al escoger la tijera');
+    const keep=d.getElementById('knifeMeshToggle');
+    assert(keep.getAttribute('aria-pressed')==='true','No se conservó la capa al cambiar de herramienta');
+    assert(d.getElementById('knifeMeshTarget').value==='terrain','Cuchillo no mantuvo terreno como referencia');
+    // Reenable the layers from the knife panel, without switching tools.
+    d.getElementById('knifeLayerEdges').checked=true;
+    d.getElementById('knifeLayerEdges').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(d.getElementById('terrainEdges').checked,'El control de aristas del cuchillo no se sincronizó');
+    d.getElementById('knifeLayerXray').checked=true;
+    d.getElementById('knifeLayerXray').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(d.getElementById('terrainXray').checked,'Rayos X del cuchillo no están conectados');
+    step='recortar con malla activa';
+    const before=w.__terrainMeshInspector.getState();
+    const click=(cx,cy)=>{
+     canvas.dispatchEvent(new w.PointerEvent('pointerdown',{
+      bubbles:true,cancelable:true,clientX:cx,clientY:cy,button:0,buttons:1,pointerId:93,pointerType:'mouse'
+     }));
+     canvas.dispatchEvent(new w.PointerEvent('pointerup',{
+      bubbles:true,cancelable:true,clientX:cx,clientY:cy,button:0,buttons:0,pointerId:93,pointerType:'mouse'
+     }));
+    };
+    click(x-38,y-28);click(x+38,y-28);click(x+35,y+28);
+    assert(d.getElementById('holeSelectionCount').textContent.startsWith('3 vértices'),
+     'Clic en malla visible no llegó al cuchillo: '+d.getElementById('holeSelectionCount').textContent);
+    d.getElementById('closeHoleContour').click();
+    assert(!d.getElementById('createHole').disabled,'El contorno no se cerró');
+    d.getElementById('createHole').click();
+    assert(d.getElementById('holeCounter').textContent.includes('2 cortes 3D'),
+     'El recorte no se aplicó mientras la malla estaba activa: '+d.getElementById('holeCounter').textContent+
+     ' / '+d.getElementById('toast').textContent);
+    const after=w.__terrainMeshInspector.getState();
+    assert(after.active&&after.visible&&after.vertices!==before.vertices,
+     'Las caras y vértices de la malla no se actualizaron después del corte: '+
+     JSON.stringify({before,after}));
+    assert(w.__workspaceLayout.getState().workspace==='knife',
+     'Al crear un agujero se perdió la herramienta Cuchillo');
+    step='interruptor de malla con cuchillo activo';
+    keep.click();
+    assert(!w.__terrainMeshInspector.getState().active&&keep.getAttribute('aria-pressed')==='false',
+     'No se puede ocultar la malla sin desactivar la tijera');
+    keep.click();
+    assert(w.__terrainMeshInspector.getState().active&&keep.getAttribute('aria-pressed')==='true',
+     'No se puede restaurar la malla con la tijera activa');
     step='modo alternativo GLB';
     d.getElementById('meshTarget').value='model';
     d.getElementById('meshTarget').dispatchEvent(new Event('change',{bubbles:true}));
