@@ -294,3 +294,21 @@ En la sección **Cuchillo → Malla visible durante el recorte** puedes usar el 
 Mientras el cuchillo está activo, **solo el cuchillo recibe los clics del escenario**, sin seleccionar vértices accidentalmente. En modo GLB, se conserva la última instancia seleccionada como referencia aunque el cuchillo limpie la selección para comenzar el trazado. El panel de deformación de vértices no se puede utilizar durante un corte. Al crear, restaurar o deshacer un agujero, el inspector del terreno reconstruye y dibuja de inmediato las aristas y caras de la geometría real resultante, sin tener que volver a entrar en Malla. El modo Play oculta temporalmente las capas de depuración y las restaura al regresar a edición.
 
 Pruebas: el navegador comprueba ahora que una arena recortada mantiene la malla al entrar en Cuchillo, que el trazado poligonal sigue recibiendo tres clics, que se puede crear un agujero con la capa activa y ver inmediatamente la nueva geometría, y que los interruptores de visualización funcionan sin abandonar el cuchillo. Otra prueba comprueba que los GLB seleccionados permanecen visibles como referencia y que sus vértices no se pueden editar accidentalmente durante un corte.
+
+
+## v0.9.15 — Primera capa de ajustes: corregir movimiento Y libre de cuevas
+
+**Problema reproducido:** el clic y arrastre normal de las tres cuevas GLB dependía de un raycast contra el terreno, que solo cambiaba X/Z. Por ello arrastrar verticalmente el cursor no modificaba Y; el gesto de altura estaba oculto tras Alt+Shift. No existía un bloqueo por colisión física entre la cueva y la arena en el editor: la restricción provenía de proyectar el ratón sobre la superficie.
+
+**Comportamiento corregido para las tres cuevas (rocosa, piedra y estilizada):**
+
+- **Clic y arrastrar sin modificadores:** desplazar horizontalmente el cursor mueve la cueva lateralmente en el plano X/Z según la orientación de la cámara; moverlo hacia arriba eleva **Y absoluta**, hacia abajo la disminuye. Las coordenadas se calculan desde la posición original al inicio del gesto, no desde la intersección con el terreno.
+- **Mantener Espacio antes de iniciar el arrastre:** mover la cueva sobre el plano X/Z, ajustando su profundidad adelante/atrás sin cambiar Y; ambos ejes siguen la cámara. No hay colisiones con el terreno ni un salto de altura al atravesar laderas, paredes o agujeros.
+- **Alt + arrastrar** sigue rotando, **Shift + arrastrar** sigue escalando, y **Alt + Shift + arrastrar** conserva el ajuste vertical explícito previo.
+- Las cuevas almacenan su altura absoluta en `node.y`. Los proyectos antiguos que guardaban `offsetY` se migran a altura absoluta al primer arrastre. El historial Ctrl+Z y guardado automático continúan funcionando.
+- Las montañas y los objetos no habilitados como cuevas libres mantienen el movimiento anterior ligado al terreno; esta corrección no cambia su comportamiento.
+- La geometría de la cueva puede quedar visualmente detrás de la pared cuando se mueve hacia el interior: eso es oclusión por profundidad de dibujo, **no colisión** y no obliga a posicionarla de nuevo sobre la superficie.
+
+**Validaciones:** `tests/prefab-gestures.test.mjs` comprueba Y directa y profundidad X/Z por separado; `tests/browser-cave-free-y.mjs` arrastra una cueva GLB real en Chrome por encima y por debajo de Y=0, prueba Espacio+arrastrar, verifica X/Z independientes de Y y revisa la altura guardada. Se mantienen regresiones de arranque y mallas anteriores.
+
+**Siguientes capas pendientes (no incluidas en v0.9.15):** botones Malla individual y por grupo desde Objetos; controles de caras/aristas/vértices integrados en Propiedades/Estructuras y eliminación de la herramienta Malla independiente de la barra izquierda; Intangible del terreno y oclusión correcta sin ver a través de otros objetos; ajuste puntual de la altura de una cueva a la superficie del terreno sin fijarla ni bloquear posteriormente su movimiento.
