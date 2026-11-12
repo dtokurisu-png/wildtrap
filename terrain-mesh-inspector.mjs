@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // Viewer for the ACTUAL triangulated arena, not the uncut base heightfield.
 // The visible geometry changes after each cut; all overlays are rebuilt only
 // when terrain.geometry changes. Nothing here changes the saved scenario.
-export function createTerrainMeshInspector({scene,camera,view,terrain,$}){
+export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelected=()=>false}){
  const overlay=new THREE.Group();
  overlay.name='WILDTRAP Terrain mesh X-ray inspection';
  overlay.userData.editorOnly=true;
@@ -28,7 +28,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$}){
   items.length=0;
  }
  function display(){
-  controls.hidden=!active;
+  controls.hidden=!isSelected();
   overlay.visible=active&&terrain.visible;
   if(!active)return;
   const xray=$('terrainXray').checked;
