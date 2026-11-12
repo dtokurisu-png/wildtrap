@@ -55,17 +55,33 @@ export function sculptRootPoints(points,stamps,locked=[],meshKey='0'){
     p[0]-=normal[0]*delta*factor;p[1]-=normal[1]*delta*factor;p[2]-=normal[2]*delta*factor;
    }else affected.push({i,falloff});
   }
-  if(before)for(const {i,falloff} of affected){
-   const p=before[i],neighbors=[0,0,0];let count=0;
-   const radius2=(stamp.radius*.35)**2;
+  if(before&&affected.length){
+   // Spatial hash: smoothing a dense GLB must not compare every active
+   // vertex against EVERY other vertex (quadratic lockups).
+   const near=stamp.radius*.35,nearSq=near*near,inv=1/Math.max(.00001,near);
+   const key=(x,y,z)=>x+','+y+','+z;
+   const cells=new Map(),grid=[];
    for(let j=0;j<before.length;j++){
-    const other=before[j],d2=(p[0]-other[0])**2+(p[1]-other[1])**2+(p[2]-other[2])**2;
-    if(d2>radius2)continue;
-    neighbors[0]+=other[0];neighbors[1]+=other[1];neighbors[2]+=other[2];count++;
+    const p=before[j],x=Math.floor(p[0]*inv),y=Math.floor(p[1]*inv),z=Math.floor(p[2]*inv);
+    grid[j]=[x,y,z];
+    const token=key(x,y,z),cell=cells.get(token)||[];
+    cell.push(j);cells.set(token,cell);
    }
-   if(count<2)continue;
-   const t=Math.min(.65,stamp.strength*.04*falloff);
-   for(let k=0;k<3;k++)result[i][k]+=(neighbors[k]/count-p[k])*t;
+   for(const {i,falloff} of affected){
+    const p=before[i],neighbors=[0,0,0];let count=0;
+    const [x,y,z]=grid[i];
+    for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)for(let c=-1;c<=1;c++){
+     for(const j of cells.get(key(x+a,y+b,z+c))||[]){
+      const other=before[j];
+      const d2=(p[0]-other[0])**2+(p[1]-other[1])**2+(p[2]-other[2])**2;
+      if(d2>nearSq)continue;
+      neighbors[0]+=other[0];neighbors[1]+=other[1];neighbors[2]+=other[2];count++;
+     }
+    }
+    if(count<2)continue;
+    const t=Math.min(.65,stamp.strength*.04*falloff);
+    for(let k=0;k<3;k++)result[i][k]+=(neighbors[k]/count-p[k])*t;
+   }
   }
  }
  return result;
