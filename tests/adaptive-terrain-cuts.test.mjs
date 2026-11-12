@@ -92,14 +92,17 @@ test('cortes serializados en el JSON conservan exactamente los vértices',()=>{
 
 test('25 recortes en la misma celda no descartan los primeros 18 ni dejan triángulos originales',()=>{
  const base=cliff();
- const stamps=Array.from({length:25},(_,i)=>stamp(i*.19,30,0,.32,'cut'));
- const early=buildAdaptiveTerrain(base,[],stamps.slice(0,18),10,2);
+ // 25 operations on the same heightmap cell: the first removes one area,
+ // 24 repeat a SECOND area. The old FIFO cap discarded the FIRST cut.
+ const stamps=[stamp(-3,30,0,.65,'cut'),
+  ...Array.from({length:24},()=>stamp(3,30,0,.65,'cut'))];
+ const early=buildAdaptiveTerrain(base,[],stamps.slice(-18),10,2);
  const full=buildAdaptiveTerrain(base,[],stamps,10,2);
  assert.ok(full&&early);
  assert.equal(full.stats.incomplete,false);
  assert.equal(full.stats.limitedFragments,0);
  assert.ok(area(full)<area(early)-.3,
-  'Los cortes posteriores al decimoctavo deben continuar eliminando superficie');
+  'El corte antiguo en la primera zona debe permanecer, aunque haya 24 operaciones posteriores en la misma celda');
  const repeated=buildAdaptiveTerrain(base,[],[...stamps,...stamps],10,2);
  assert.equal(repeated.stats.incomplete,false);
  assert.ok(Math.abs(area(repeated)-area(full))<.0001,
