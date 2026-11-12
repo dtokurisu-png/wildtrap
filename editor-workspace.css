@@ -297,3 +297,23 @@ body.testing #axisGizmo{display:none}
 }
 .scene-terrain-edit:hover{background:#31634d}
 #workspaceObjectProperties.is-terrain .workspace-empty{display:none!important}
+
+/* v0.9.14 — visualization layer independent from polygon knife tool. */
+.knife-mesh-overlay{
+ display:flex;flex-direction:column;gap:8px;margin:11px 0 8px;
+ padding:10px;border:1px solid #68a999;border-radius:9px;
+ background:#163b32;
+}
+.knife-mesh-overlay>button{
+ width:100%;font-weight:750;background:#265c49;border:1px solid #72a98e;
+}
+.knife-mesh-overlay>button[aria-pressed="true"]{
+ border-color:#00ffdf;color:#e5fff9;background:#186956;
+}
+.knife-mesh-overlay>label{font-size:11px;color:#d1fae9;display:flex;flex-direction:column;gap:5px}
+#knifeMeshTarget{
+ padding:8px 6px;min-width:0;width:100%;border-radius:6px;
+ color:#d6fff1;background:#1a4336;border:1px solid #648d7c;
+}
+.knife-mesh-overlay .terrain-mesh-toggles{margin:0}
+.knife-mesh-overlay>.hint{margin:0;font-size:10px;line-height:1.5}
