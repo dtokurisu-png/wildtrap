@@ -54,7 +54,7 @@ export function objectTree(nodes,groups=[],lookup=()=>null){
  const byType=new Map(types.map((x,i)=>[SCENE_CATEGORIES[i].id,x]));
  for(const node of listed){
   const info={id:node.id,label:sceneObjectName(node,lookup),
-   type:categoryForNode(node),hidden:node.editorHidden===true,intangible:node.editorIntangible===true};
+   type:categoryForNode(node),hidden:node.editorHidden===true,intangible:node.editorIntangible===true,meshVisible:node.editorMeshVisible===true};
   const custom=groupIds.has(node.groupId)?byGroup.get(node.groupId):null;
   (custom||byType.get(info.type)).objects.push(info);
  }
