@@ -112,7 +112,11 @@
     const saved=JSON.parse(localStorage.getItem('wildtrap-editor-draft-safe-v1')||'{}');
     const cave=saved.nodes?.find(n=>n.id===901);
     assert(cave?.rotationLocks?.y===true&&cave?.rotationLocks?.z===true&&cave?.rotationLocks?.x===false,
-     'Los bloqueos no se persistieron correctamente');
+     'Los bloqueos no se persistieron correctamente: '+JSON.stringify({
+      rotationLocks:cave?.rotationLocks,selected:d.getElementById('selected')?.textContent,
+      savedNodes:saved.nodes?.map(n=>({id:n.id,rotationLocks:n.rotationLocks})),
+      camera:saved.editorCamera?.label
+     }));
     assert(near(cave?.y,raised,.04),'La altura bloqueada no se preservó en JSON');
     document.body.dataset.result='PASS';
     output.textContent='PASS · clic XYZ orienta cámara; locks X/Y/Z respetados en arrastre normal, Espacio y rotación';
