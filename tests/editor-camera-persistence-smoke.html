@@ -59,7 +59,9 @@
   assert(saved&&sameVector(saved.position,custom.position),'No guardó posición XYZ');
   assert(sameVector(saved.target,custom.target),'No guardó el punto de enfoque');
   assert(sameVector(saved.up,custom.up),'No guardó orientación de cámara');
-  assert(equal(saved.zoom,1.35),'No guardó zoom de cámara');
+  const actualZoom=w.__editorCamera.getState().zoom;
+  assert(equal(saved.zoom,actualZoom,.02),
+   'No guardó el zoom efectivo después de la rueda: '+saved.zoom+' frente a '+actualZoom);
   assert(saved.viewSpan<custom.viewSpan-10,'No guardó zoom de rueda del ratón');
   const draft=JSON.parse(localStorage.getItem(draftKey)||'null');
   assert(draft?.editorCamera&&sameVector(draft.editorCamera.position,custom.position),
