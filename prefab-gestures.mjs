@@ -68,3 +68,15 @@ export function freeCaveFromScreenDrag(
   y:plane?y:y+pixelsUp*elev
  };
 }
+
+// The existing per-object XYZ lock buttons constrain BOTH translation and
+// rotation. This preserves the saved rotationLocks JSON format and prevents
+// free-cave dragging from silently bypassing a locked axis.
+export function constrainTranslationAxes(original,next,locks={}){
+ const a=original||{},b=next||{};
+ return {
+  x:locks.x===true?a.x:b.x,
+  y:locks.y===true?a.y:b.y,
+  z:locks.z===true?a.z:b.z
+ };
+}
