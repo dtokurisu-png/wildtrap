@@ -368,3 +368,26 @@ El flujo **Validar controles Malla, Intangible y altura de cuevas** prueba el nu
 - **Botones XYZ y las vistas Vista / Cenital:** siguen funcionando; los cambios desde esos botones también se guardan. No se han alterado los bloqueos de posición y rotación de los objetos ni la malla del terreno.
 
 Pruebas en `tests/editor-camera-state.test.mjs` y `tests/browser-editor-camera-persistence.mjs`: arranque 3D, recorte de zoom con rueda, guardado de posición/enfoque/inclinación, recarga y restauración exactas, importación de JSON y aislamiento del borrador seguro. Además pasan las regresiones anteriores de GLB, X/Y/Z, malla y cuchillo.
+
+
+## v0.9.19 — Esculpir GLB con bloqueos de vértices reales
+
+Se habilita **Esculpir** para un modelo 3D GLB seleccionado, no solo para el terreno. Elige el modelo desde Objetos de escena, activa **Esculpir** y usa los mismos pinceles **Subir, Bajar, Nivelar y Suavizar** directamente sobre su superficie. Con un GLB seleccionado, los pinceles solo cambian ese GLB y nunca alteran el terreno bajo él. Si no hay GLB seleccionado, los pinceles conservan su función de esculpir el terreno. Los radios e intensidades siguen la escala física del modelo; las pinceladas se guardan como `node.meshSculptOps` y se reaplican antes de los recortes.
+
+### Bloqueo normal frente a bloqueo total
+
+Dentro de **Propiedades de malla → Editar vértices**, selecciona los puntos y pulsa **Bloquear vértices**. Son restricciones de la geometría por índice (no simples marcas de color). Las coordenadas de referencia se almacenan en `node.vertexLockAnchors` para cada malla de la instancia GLB. Se conservan después de **Finalizar edición de vértices** y al exportar/importar el escenario. Las otras instancias del mismo GLB no heredan esos bloqueos.
+
+- **Bloqueo normal:** no permite escalar, esculpir ni deformar los vértices fijados. Se compensan al realizar **Shift + arrastrar** para escalar o al cambiar la escala numérica. La parte libre del modelo sí se escala. Los vértices bloqueados acompañan el movimiento y rotación del modelo completo; nunca necesitan el botón de escalado especial de versiones anteriores.
+- **Activar bloqueo total:** casilla disponible en el panel de edición cuando existe algún vértice bloqueado. Congela las posiciones de los puntos bloqueados en **coordenadas del mundo**. Aunque muevas, gires o escales el modelo, permanecen fijados exactamente en sus posiciones anteriores. Al desactivarla vuelven al bloqueo normal, tomando las coordenadas actuales como referencia.
+- **Desbloquear vértices:** vuelve a permitir modificarlos con el esculpido, el escalado y las transformaciones. El bloqueo queda guardado al pulsar el botón, aunque salgas después de la edición.
+
+Cuando existen vértices bloqueados, **Anclar base Y al escalar** queda subordinado a esos bloqueos: no desplazamos involuntariamente el modelo para preservar la base mientras estábamos protegiendo puntos concretos.
+
+### Interfaz simplificada
+
+Se ha eliminado el botón **Mostrar malla del objeto** que duplicaba el botón ◫ de Objetos de escena. La visibilidad de la topología se sigue controlando desde la fila del objeto o del grupo; las propiedades solo permiten elegir **Caras, Aristas, Vértices y Rayos X**. También se ha retirado **Deformar vértices libres**, su eje/factor y **Aplicar escala libre**: usa ahora el escalado normal del objeto y sus bloqueos. Los escenarios antiguos que incluyan `meshScaleOps` siguen siendo compatibles para no borrar deformaciones existentes.
+
+Las operaciones Esculpir y las deformaciones se aplican **a una instancia**, sin alterar el GLB fuente compartido ni sus materiales. Se conserva el recorte de modelos, las mallas por objeto/grupo, el modo Cuchillo y la última posición guardada de la cámara.
+
+**Pruebas:** `tests/mesh-vertex-freeze.test.mjs` valida los anclajes normales, totales y la exclusión de vértices bloqueados de cada pincel. `tests/browser-locked-vertices-sculpt.mjs` carga un GLB real en Chrome, fija puntos, escala mediante la UI y Shift + arrastrar, comprueba posiciones mundiales con y sin bloqueo total, gira el modelo, esculpe vértices libres y confirma que el terreno y los datos guardados no cambian indebidamente. El flujo de CI mantiene las regresiones de malla, cámara, cuevas y herramientas.
