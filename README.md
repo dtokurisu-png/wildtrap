@@ -283,3 +283,14 @@ La herramienta Malla ahora tiene un selector entre **Terreno de la arena** y **M
 - El flujo de validación incluye regresión de las cuatro fases de interfaz, cuchillo, mapa con recortes, pruebas GLB y arranque normal/recuperación.
 
 Si una cara continúa apareciendo, abre Malla → Terreno, pulsa esa cara para consultar sus índices y revisa el indicador de estado del cuchillo. Una captura junto con el JSON exportado del escenario permitirá reproducir exactamente la geometría.
+
+
+## v0.9.14 — Malla visible mientras recortas con el cuchillo
+
+La visualización de la malla ya no está limitada a la herramienta **Malla**. Ahora es una capa independiente de la herramienta de edición activa: después de abrir **Malla → Terreno de la arena** (o un GLB seleccionado), cambia a **Cuchillo** y las caras, aristas y vértices siguen visibles en el escenario. El contorno amarillo del cuchillo se dibuja por encima de la referencia.
+
+En la sección **Cuchillo → Malla visible durante el recorte** puedes usar el botón **◫ Mostrar malla mientras recorto** para activar o desactivar la capa, escoger entre **Terreno de la arena** y **Modelo GLB seleccionado**, y cambiar **Caras**, **Aristas**, **Vértices** y **Rayos X**. Las casillas reflejan exactamente el estado de los controles en **Malla**; no existen dos configuraciones independientes. La opción **Mantener malla visible al usar la tijera u otra herramienta** controla si la capa permanece al abandonar la herramienta Malla.
+
+Mientras el cuchillo está activo, **solo el cuchillo recibe los clics del escenario**, sin seleccionar vértices accidentalmente. En modo GLB, se conserva la última instancia seleccionada como referencia aunque el cuchillo limpie la selección para comenzar el trazado. El panel de deformación de vértices no se puede utilizar durante un corte. Al crear, restaurar o deshacer un agujero, el inspector del terreno reconstruye y dibuja de inmediato las aristas y caras de la geometría real resultante, sin tener que volver a entrar en Malla. El modo Play oculta temporalmente las capas de depuración y las restaura al regresar a edición.
+
+Pruebas: el navegador comprueba ahora que una arena recortada mantiene la malla al entrar en Cuchillo, que el trazado poligonal sigue recibiendo tres clics, que se puede crear un agujero con la capa activa y ver inmediatamente la nueva geometría, y que los interruptores de visualización funcionan sin abandonar el cuchillo. Otra prueba comprueba que los GLB seleccionados permanecen visibles como referencia y que sus vértices no se pueden editar accidentalmente durante un corte.
