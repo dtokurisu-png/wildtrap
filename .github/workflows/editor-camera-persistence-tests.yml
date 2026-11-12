@@ -1,7 +1,7 @@
 name: Verificar cámara 3D y última vista guardada
 on:
   push:
-    branches: [main, feat/persist-last-3d-camera-v0.9.18]
+    branches: [main]
     paths:
       - 'editor.mjs'
       - 'editor-camera-state.mjs'
