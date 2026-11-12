@@ -779,7 +779,7 @@ function currentEditorCamera(){
   label:$('viewType').textContent
  });
 }
-function flushCameraSave(){
+function flushCameraSave({saveDraft=true}={}){
  if(!cameraReadyToSave||testingScene||preview.active||preview.busy)return;
  if(cameraSaveTimer!==null){clearTimeout(cameraSaveTimer);cameraSaveTimer=null}
  const state=currentEditorCamera();
@@ -790,13 +790,19 @@ function flushCameraSave(){
  catch(_){/* The full draft/export remains a fallback when storage is full. */}
  // Camera-only full-draft writes use their OWN timer and never call
  // persist(), which would postpone an unrelated terrain/object edit.
- if(cameraDraftTimer!==null)clearTimeout(cameraDraftTimer);
- cameraDraftTimer=setTimeout(()=>{
-  cameraDraftTimer=null;
-  try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(_){
-   // The tiny camera key was already committed above.
-  }
- },680);
+ if(saveDraft){
+  if(cameraDraftTimer!==null)clearTimeout(cameraDraftTimer);
+  // Optimistic concurrency: never clobber a draft changed by another tab,
+  // an import/recovery workflow or a queued world autosave.
+  const expectedWorldDraft=localStorage.getItem(draftKey);
+  cameraDraftTimer=setTimeout(()=>{
+   cameraDraftTimer=null;
+   try{
+    if(localStorage.getItem(draftKey)!==expectedWorldDraft)return;
+    localStorage.setItem(draftKey,JSON.stringify(live));
+   }catch(_){/* The camera key above is already safe. */}
+  },680);
+ }
 }
 function scheduleCameraSave(){
  if(!cameraReadyToSave||testingScene||preview.active||preview.busy)return;
@@ -847,10 +853,10 @@ window.addEventListener('pagehide',()=>{
  // Persist ONLY the camera key immediately. Do not overwrite the world JSON:
  // a separate editor tab, recovery tool or imported cut draft may have changed
  // that JSON since this page last read it (e.g. the 85-cut recovery scenario).
- if(cameraReadyToSave)flushCameraSave();
+ if(cameraReadyToSave)flushCameraSave({saveDraft:false});
 });
 document.addEventListener('visibilitychange',()=>{
- if(document.hidden&&cameraReadyToSave)flushCameraSave();
+ if(document.hidden&&cameraReadyToSave)flushCameraSave({saveDraft:false});
 });
 window.__editorCamera={
  getState:currentEditorCamera,
