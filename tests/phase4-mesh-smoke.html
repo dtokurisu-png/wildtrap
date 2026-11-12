@@ -116,15 +116,14 @@
     assert(model?.vertexLockAnchors&&Object.keys(model.vertexLockAnchors).length,
      'No guardó las coordenadas de los anclajes de vértices');
     assert(saved?.nodes.find(n=>n.id===901)?.editorIntangible===false,'No restauró estado tangible');
-    const stateBeforeUnlock=w.__meshEditor.getState();
-    const disabledUnlock=d.getElementById('meshUnlockVertices').disabled;
+    // Re-entering vertex edit intentionally clears the temporary selection;
+    // saved LOCKS persist. Select vertices again before unlocking.
+    d.getElementById('meshSelectAll').click();
+    assert(w.__meshEditor.getState().selected>0,
+     'No se pueden volver a seleccionar vértices después de terminar edición');
     d.getElementById('meshUnlockVertices').click();
     assert(w.__meshEditor.getState().locked===0,
-     'No desbloqueó vértices: '+JSON.stringify({
-      before:stateBeforeUnlock,after:w.__meshEditor.getState(),
-      buttonDisabled:disabledUnlock,
-      persistedLocks:w.__meshProbe.node(902)?.vertexLocks
-     }));
+     'Los vértices que se seleccionaron de nuevo no se desbloquearon');
     d.getElementById('undo').click();
     assert(w.__meshEditor.getState().locked>0,'Ctrl+Z no restauró el último conjunto de vértices bloqueados');
     assert(d.getElementById('meshEditControls')?.hidden===false,'Deshacer cerró inesperadamente propiedades de malla');
