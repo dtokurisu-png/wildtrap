@@ -8,15 +8,17 @@ import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17'
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.17';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.12';
-import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.17';
-import {constrainedRotation} from './mesh-deform.mjs?v=0.9.12';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.19';
+import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.19';
+import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
+import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.19';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
+const sculptTools={raise:1,lower:1,flatten:1,smooth:1};
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
@@ -432,8 +434,6 @@ function updateStatus(){
  $('transformConstraints').hidden=!editable;
  $('meshEditControls').hidden=!editable;
  $('terrainMeshControls').hidden=!terrainPropertiesSelected;
- $('objectMeshToggle').setAttribute('aria-pressed',String(picked?.editorMeshVisible===true));
- $('objectMeshToggle').textContent=picked?.editorMeshVisible?'◫ Ocultar malla del objeto':'◫ Mostrar malla del objeto';
  $('modelVertexEditToggle').setAttribute('aria-pressed',String(mode==='meshEdit'));
  $('modelVertexEditToggle').textContent=mode==='meshEdit'?'✓ Finalizar edición de vértices':'✣ Editar vértices del modelo';
  $('snapCaveToTerrain').disabled=!cave||picked?.rotationLocks?.y===true;
@@ -462,6 +462,11 @@ function updateStatus(){
   for(const id of ['prefabX','prefabZ','prefabOffsetY','prefabRotation','prefabRotationX','prefabRotationZ'])$(id).disabled=true;
  }
  vertexEditor?.updateInfo();
+ const modelSculptActive=sculptTools[mode]&&picked?.kind==='prefab';
+ if($('sculptTargetHint'))$('sculptTargetHint').textContent=modelSculptActive?
+  'Esculpiendo '+(prefabById(picked.prefabId)?.name||picked.prefabId)+
+   ': solo se modifica su malla. Los vértices bloqueados no se afectan.':
+  'Sin un GLB seleccionado se esculpe el terreno. Selecciona un modelo en Objetos de escena para esculpir su malla.';
  $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
  sceneObjectManager?.render();
 }
@@ -480,9 +485,6 @@ function updateMeshInspection(){
  objectMeshOverlays?.refresh({skipId:editing?selectedId:null,testingScene});
  $('terrainMeshControls').hidden=!terrainPropertiesSelected;
 }
-$('objectMeshToggle').addEventListener('click',()=>{
- if(selectedId!==null)commitObjectMeshVisibility([selectedId],!live.nodes.find(n=>n.id===selectedId)?.editorMeshVisible);
-});
 $('modelVertexEditToggle').addEventListener('click',()=>{
  const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
  if(!node){toast('Selecciona un modelo GLB para editar vértices');return}
