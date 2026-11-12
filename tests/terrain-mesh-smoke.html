@@ -1,0 +1,81 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP arena mesh regression</title></head>
+<body data-result="PENDING"><div id="result">Validando terreno y malla visible</div><script>
+(()=>{
+ const assert=(ok,msg)=>{if(!ok)throw Error(msg)};
+ const fail=(step,error)=>{document.body.dataset.result='FAIL';document.getElementById('result').textContent='FAIL '+step+': '+error.message};
+ try{
+  const draft={version:3,size:630,resolution:129,
+   heights:Array(129*129).fill(0),nodes:[],objectGroups:[],
+   holes:[],cuts3d:[{
+    op:'cut',shape:'polygon',center:[0,0,0],normal:[0,1,0],
+    polygon:[[-13,-13],[13,-13],[13,13],[-13,13]],depth:4
+   }],nextId:1,settings:{heightMax:120}};
+  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
+  const frame=document.createElement('iframe');frame.id='app';frame.width=1440;frame.height=900;
+  frame.src='../?safe=1';document.body.append(frame);
+  const start=Date.now();let busy=false;
+  const interval=setInterval(()=>{
+   if(busy||document.body.dataset.result!=='PENDING')return;
+   const d=frame.contentDocument,w=frame.contentWindow;
+   if(!d?.querySelector('#boot[hidden]')||!w.__workspaceLayout||!w.__terrainMeshInspector){
+    if(Date.now()-start>25000){clearInterval(interval);fail('inicio',Error('El editor no arrancó'))}
+    return;
+   }
+   busy=true;clearInterval(interval);
+   let step='gestor';
+   try{
+    const row=d.querySelector('.scene-terrain-group');
+    assert(row,'Falta fila Escenario · Terreno');
+    const edit=row.querySelector('.scene-terrain-edit');
+    assert(edit,'Falta el botón Ver malla de la arena');
+    edit.click();
+    const panel=d.getElementById('terrainMeshControls');
+    assert(w.__workspaceLayout.getState().workspace==='mesh','No abrió herramienta Malla');
+    assert(d.getElementById('meshTarget').value==='terrain','No escogió terreno');
+    assert(!panel.hidden,'Panel terreno no visible');
+    step='topología real';
+    const info=w.__terrainMeshInspector.getState();
+    assert(info.active&&info.visible,'No activó inspector');
+    assert(info.triangles>10000&&info.triangles<32768,
+     'No refleja la malla realmente cortada: '+info.triangles);
+    assert(info.activeVertices>10000,'No expone vértices activos de terreno');
+    assert(info.drawn===3,'No dibujó caras, aristas y vértices como capas independientes');
+    assert(d.getElementById('terrainMeshStats').textContent.includes('caras triangulares'),
+     'No mostró conteo de caras');
+    assert(d.getElementById('terrainFaces').checked&&d.getElementById('terrainEdges').checked&&
+     d.getElementById('terrainVertices').checked,'Faltan capas activas');
+    step='seleccionar cara auténtica';
+    const canvas=d.getElementById('viewport'),rect=canvas.getBoundingClientRect();
+    const x=rect.left+rect.width*.7,y=rect.top+rect.height*.55;
+    canvas.dispatchEvent(new w.PointerEvent('pointerdown',{
+     bubbles:true,cancelable:true,clientX:x,clientY:y,button:0,pointerId:92,pointerType:'mouse'
+    }));
+    assert(d.getElementById('terrainFaceInfo').textContent.includes('Cara #'),
+     'El inspector no identificó el triángulo pulsado: '+d.getElementById('terrainFaceInfo').textContent);
+    assert(d.getElementById('terrainFaceInfo').textContent.includes('vértices'),
+     'Faltan índices de los 3 vértices de cara');
+    step='capas visibles';
+    d.getElementById('terrainEdges').checked=false;
+    d.getElementById('terrainEdges').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(!d.getElementById('terrainEdges').checked,'No desactivó líneas');
+    d.getElementById('terrainXray').checked=false;
+    d.getElementById('terrainXray').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(!d.getElementById('terrainXray').checked,'No desactivó rayos X');
+    step='ocultar y mostrar terreno';
+    const eye=row.querySelector('.scene-group-eye');
+    eye.click();
+    assert(!w.__terrainMeshInspector.getState().visible,'Ojo ocultó arena pero dejó overlay suelto');
+    eye.click();
+    assert(w.__terrainMeshInspector.getState().visible,'No restauró la malla del terreno');
+    step='modo alternativo GLB';
+    d.getElementById('meshTarget').value='model';
+    d.getElementById('meshTarget').dispatchEvent(new Event('change',{bubbles:true}));
+    assert(!w.__terrainMeshInspector.getState().active,'La malla del terreno no se desactivó al escoger GLB');
+    assert(w.__meshEditor.getState().active,'No se conservó el editor GLB anterior');
+    document.body.dataset.result='PASS';
+    document.getElementById('result').textContent='PASS · arena recortada: caras, aristas, vértices, ojo, rayos X y selector';
+   }catch(e){fail(step,e)}
+  },165);
+ }catch(e){fail('preparación',e)}
+})();
+</script></body></html>
