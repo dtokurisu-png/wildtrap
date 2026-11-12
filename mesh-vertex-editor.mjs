@@ -338,6 +338,11 @@ export function createMeshVertexEditor({
  updateInfo();
  return {setActive,rebuild,beforeDraw:clearVisuals,dispose,updateInfo,
   pointerdown,pointermove,pointerup,ensureAnchors,hasGesture:()=>Boolean(gesture),
+  debugSelectFirst:()=>{
+   if(!active||!samples.length)return null;
+   const first=samples[0];selectChanged(matchingKeys(first));
+   return {key:first.key,index:first.index,selected:[...selected]};
+  },
   getState:()=>({active,currentId,points:samples.length,selected:selected.size,
    locked:Object.values(normalizedLocks(getSelectedNode()?.vertexLocks)).reduce((a,b)=>a+b.length,0),
    operations:cleanVertexOperations(getSelectedNode()?.meshScaleOps).length+
