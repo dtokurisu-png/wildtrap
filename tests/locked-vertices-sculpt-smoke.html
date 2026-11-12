@@ -70,6 +70,34 @@
     const changed=before.map(item=>({...item,now:probe(first.key,item.i)}))
      .filter(item=>distance(item.v,item.now)>1);
     assert(changed.length>0,'La escala no modificó ningún vértice libre');
+    step='Shift + clic y arrastrar escala sin mover el vértice bloqueado';
+    const view=d.getElementById('viewport'),rect=view.getBoundingClientRect();
+    const pointer=(type,x,y,shiftKey=false)=>{
+     const event=new w.PointerEvent(type,{bubbles:true,cancelable:true,composed:true,
+      pointerId:86,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1,
+      clientX:x,clientY:y,shiftKey});
+     (type==='pointerup'?w:view).dispatchEvent(event);
+    };
+    let hit=null;
+    const mx=rect.left+rect.width/2,my=rect.top+rect.height/2;
+    for(let dy=-120;dy<=120&&!hit;dy+=10)
+     for(let dx=-150;dx<=150;dx+=10){
+      const x=mx+dx,y=my+dy;
+      pointer('pointermove',x,y);
+      const hint=d.getElementById('modelHoverIndicator');
+      if(hint?.style.display==='block'&&hint.textContent.includes('Cueva')){
+       hit={x,y};break;
+      }
+     }
+    assert(hit,'No se puede localizar el GLB para Shift + arrastrar');
+    const previousScale=w.__meshProbe.node(901).scale;
+    pointer('pointerdown',hit.x,hit.y,true);
+    pointer('pointermove',hit.x,hit.y-65,true);
+    pointer('pointerup',hit.x,hit.y-65,true);
+    assert(w.__meshProbe.node(901).scale>previousScale*1.2,
+     'Shift + arrastrar no modificó la escala del modelo');
+    assert(same(probe(first.key,first.index),lockedBefore),
+     'Shift + arrastrar movió vértices bloqueados normales');
     step='bloqueo normal permite trasladar TODO el objeto';
     applyX(40);
     const movedLocked=probe(first.key,first.index);
@@ -86,6 +114,10 @@
     applyX(80);
     assert(same(probe(first.key,first.index),worldFrozen),
      'El bloqueo TOTAL se movió cuando el modelo cambió X');
+    d.getElementById('prefabRotation').value='37';
+    d.getElementById('applyPrefab').click();
+    assert(same(probe(first.key,first.index),worldFrozen),
+     'El bloqueo TOTAL se movió al girar el modelo en Y');
     step='esculpir objeto, no terreno';
     const groundBefore=JSON.stringify(JSON.parse(localStorage.getItem(draftKey)||'{}').heights||[]);
     d.querySelector('[data-workspace="sculpt"]').click();
