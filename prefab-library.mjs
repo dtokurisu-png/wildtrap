@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {buildAdaptiveModel} from './adaptive-model-cuts.mjs?v=0.9.8';
 import {applyVertexOperations,cleanVertexOperations} from './mesh-deform.mjs?v=0.9.12';
+import {normalizedVertexAnchors,normalAnchorRootPoint,cleanSculptStamps,sculptRootPoints} from './mesh-vertex-freeze.mjs?v=0.9.19';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
@@ -75,6 +76,70 @@ export function createPrefabLibrary(onChange=()=>{}){
     }
    });
   }
+  // Sculpt stamps are replayed over this INSTANCE only, in mesh-root
+  // coordinates. Locked vertex indices are captured at the stroke time,
+  // so a later lock does not undo previously sculpted geometry.
+  const sculptStamps=cleanSculptStamps(node.meshSculptOps);
+  if(sculptStamps.length){
+   root.updateMatrixWorld(true);
+   const inverseRoot=root.matrixWorld.clone().invert();
+   root.traverse(child=>{
+    if(!child.isMesh||child.isSkinnedMesh||child.userData.wildtrapMeshKey===undefined)return;
+    const key=child.userData.wildtrapMeshKey,original=child.geometry;
+    const attr=original.getAttribute('position');if(!attr)return;
+    const meshToRoot=inverseRoot.clone().multiply(child.matrixWorld);
+    const rootToMesh=meshToRoot.clone().invert();
+    const temp=new THREE.Vector3();
+    const points=Array.from({length:attr.count},(_,i)=>
+     temp.set(attr.getX(i),attr.getY(i),attr.getZ(i)).applyMatrix4(meshToRoot).toArray());
+    const shaped=sculptRootPoints(points,sculptStamps,[],key);
+    const converted=original.clone(),out=converted.getAttribute('position');
+    for(let i=0;i<shaped.length;i++){
+     temp.set(...shaped[i]).applyMatrix4(rootToMesh);
+     out.setXYZ(i,temp.x,temp.y,temp.z);
+    }
+    out.needsUpdate=true;converted.computeVertexNormals();
+    converted.computeBoundingSphere();converted.computeBoundingBox();
+    child.geometry=converted;
+    child.userData.wildtrapGeneratedSculptGeometry=converted;
+   });
+  }
+  // Final vertex constraints counteract transforms on the model root.
+  // Normal locks resist scaling but follow whole-object translation/rotation.
+  // Total locks are WORLD-space anchors and also resist translation/rotation.
+  // Apply before cuts so the cutter sees the actual constrained geometry.
+  const vertexAnchors=normalizedVertexAnchors(node.vertexLockAnchors);
+  if(Object.keys(vertexAnchors).length){
+   root.updateMatrixWorld(true);
+   const inverseRoot=root.matrixWorld.clone().invert();
+   const currentScale=Math.max(.01,Number(node.scale)||1);
+   root.traverse(child=>{
+    if(!child.isMesh||child.isSkinnedMesh)return;
+    const entries=vertexAnchors[child.userData.wildtrapMeshKey];
+    if(!entries)return;
+    const original=child.geometry,attr=original.getAttribute('position');
+    if(!attr)return;
+    const meshToRoot=inverseRoot.clone().multiply(child.matrixWorld);
+    const rootToMesh=meshToRoot.clone().invert();
+    const worldToMesh=child.matrixWorld.clone().invert();
+    const converted=original.clone(),out=converted.getAttribute('position');
+    const vec=new THREE.Vector3();let adjusted=0;
+    for(const [indexText,anchor] of Object.entries(entries)){
+     const index=Number(indexText);
+     if(!Number.isInteger(index)||index<0||index>=out.count)continue;
+     const local= node.vertexTotalLock===true?
+      vec.fromArray(anchor.world).applyMatrix4(worldToMesh):
+      vec.fromArray(normalAnchorRootPoint(anchor,currentScale)).applyMatrix4(rootToMesh);
+     out.setXYZ(index,local.x,local.y,local.z);adjusted++;
+    }
+    if(adjusted){
+     out.needsUpdate=true;converted.computeVertexNormals();
+     converted.computeBoundingSphere();converted.computeBoundingBox();
+     child.geometry=converted;
+     child.userData.wildtrapGeneratedAnchorGeometry=converted;
+    }else converted.dispose();
+   });
+  }
   // Cut against the current deformed geometry while retaining the uncut
   // instance buffer for picking through an existing opening.
   const rootCuts=applyCuts&&Array.isArray(node.cuts3d)?node.cuts3d:[];
@@ -142,6 +207,13 @@ export function createPrefabLibrary(onChange=()=>{}){
    if(generated){generated.dispose();delete child.userData.wildtrapGeneratedCutGeometry;}
    const deformed=child.userData?.wildtrapGeneratedDeformGeometry;
    if(deformed){deformed.dispose();delete child.userData.wildtrapGeneratedDeformGeometry;}
+   for(const [key,field] of [
+    ['wildtrapGeneratedSculptGeometry','Sculpt'],
+    ['wildtrapGeneratedAnchorGeometry','Anchor']
+   ]){
+    const generated=child.userData?.[key];
+    if(generated){generated.dispose();delete child.userData[key]}
+   }
    for(const mat of child.userData?.wildtrapGeneratedMaterials||[])mat?.dispose?.();
    delete child.userData.wildtrapGeneratedMaterials;
   });
