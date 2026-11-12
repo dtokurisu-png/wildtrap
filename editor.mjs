@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {createZoneEditor} from './editor-zones.mjs?v=0.9.20';
+// El editor de zonas se carga después del motor principal; un módulo opcional no bloquea la apertura.
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
 import {createPlaytest} from './playtest.mjs?v=0.9.12';
@@ -529,7 +529,7 @@ function setMode(v){
  $('openPrefabGallery').classList.toggle('active',v==='prefab');
  updateStatus();
 }
-zoneTool=createZoneEditor({scene,view,camera,live,heightAt,snapshot,persist,toast,isActive:()=>mode==='zones',isBlocked:()=>testingScene||preview.active||preview.busy});
+// Zone editor initializes after boot; see initializeZoneTool below.
 const tools={raise:1,lower:1,flatten:1,smooth:1};
 // Alt + clic derecho: horizontal cambia radio, vertical cambia intensidad.
 // Captura el puntero antes de OrbitControls, selección y esculpido.
@@ -1621,6 +1621,22 @@ $('loadPublished').onclick=()=>{if(confirm('¿Abrir el mapa publicado en GitHub?
 function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();if(++axisTick%5===0)refreshAxisGizmo();renderer.render(scene,preview.frame()||camera)}
 animate();
 window.__editorReady?.();
+// La zona se carga en diferido: si falla, se mantiene intacto el editor original.
+async function initializeZoneTool(){
+ try{
+  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.21');
+  zoneTool=createZoneEditor({scene,view,camera,live,heightAt,snapshot,persist,toast,
+   isActive:()=>mode==='zones',
+   isBlocked:()=>testingScene||preview.active||preview.busy});
+  zoneTool.refreshAll();
+ }catch(error){
+  console.error('Error inicializando el Creador de zonas:',error);
+  const button=document.querySelector('[data-tool="zones"]');
+  if(button){button.disabled=true;button.textContent='⚠ Zonas no disponibles';}
+  toast('Falló la carga de zonas: '+(error?.message||error));
+ }
+}
+void initializeZoneTool();
 if(safeMode)toast('Modo seguro: el borrador habitual queda intacto. Tus cambios se guardan aparte.');
 if(recoveryMode){
  const warning=$('recoveryPanel');
