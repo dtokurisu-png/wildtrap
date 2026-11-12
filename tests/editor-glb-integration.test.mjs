@@ -8,6 +8,8 @@ const code=fs.readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
 const world=JSON.parse(fs.readFileSync(new URL('../assets/terrain/wildtrap-world.json',import.meta.url),'utf8'));
 const controlIds=[...html.matchAll(/id="([^"]+)"/g)].map(m=>m[1]);
 const refs=[...code.matchAll(/\$\('([^']+)'\)/g)].map(m=>m[1]);
+const workspace=fs.readFileSync(new URL('../editor-workspace.js',import.meta.url),'utf8');
+const dynamicallyCreatedIds=[...workspace.matchAll(/\.id='([^']+)'/g)].map(m=>m[1]);
 
 test('biblioteca contiene exactamente una montaña y tres cuevas GLB existentes',()=>{
  assert.equal(PREFABS.length,4);
@@ -20,7 +22,9 @@ test('biblioteca contiene exactamente una montaña y tres cuevas GLB existentes'
 });
 test('sin control roto, botones duplicados ni paneles antiguos',()=>{
  assert.deepEqual(controlIds.filter((id,i)=>controlIds.indexOf(id)!==i),[]);
- assert.deepEqual([...new Set(refs.filter(id=>!controlIds.includes(id)))],[]);
+ assert.deepEqual([...new Set(refs.filter(id=>
+  !controlIds.includes(id)&&!dynamicallyCreatedIds.includes(id)))],[],
+  'Los controles deben existir en HTML o ser creados en el workspace al arrancar');
  assert.ok(!html.includes('Importar mapa de alturas'));
  assert.ok(!html.includes('Cueva bajo el terreno'));
  assert.ok(!html.includes('Fase 1'));
