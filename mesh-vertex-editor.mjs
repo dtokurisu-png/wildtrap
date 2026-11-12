@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {normalizedLocks,cleanVertexOperations} from './mesh-deform.mjs?v=0.9.12';
+import {normalizedVertexAnchors} from './mesh-vertex-freeze.mjs?v=0.9.19';
 
 // Real GLB vertex editor: x-ray points / wireframe, rectangular vertex selection,
 // locked-vertex persistence, and deformation of the remaining vertices.
@@ -52,7 +53,7 @@ export function createMeshVertexEditor({
   // controls must stay hidden so the cutter exclusively receives pointer input.
   controls.hidden=node?.kind!=='prefab';
   const canEdit=active&&getMode()==='meshEdit';
-  for(const id of ['meshLockVertices','meshUnlockVertices','meshScaleApply','meshResetDeform']){
+  for(const id of ['meshLockVertices','meshUnlockVertices','meshResetDeform']){
    const button=$(id);if(button)button.disabled=!supports||!canEdit||(id==='meshLockVertices'||id==='meshUnlockVertices'?selected.size===0:false);
   }
   const locks=normalizedLocks(node?.vertexLocks);
@@ -60,6 +61,8 @@ export function createMeshVertexEditor({
   setText('meshVertexCount',samples.length+(samples.length>=maxPoints?' (límite visual)':''));
   setText('meshVertexSelected',selected.size);
   setText('meshVertexLocked',totalLocked);
+  $('meshTotalLock').disabled=!supports||!canEdit||totalLocked===0;
+  $('meshTotalLock').checked=node?.vertexTotalLock===true;
   for(const id of ['meshSelectAll','meshDeselect'])$(id).disabled=!supports||!canEdit;
   setText('meshEditHelp',!active?'Pulsa «Editar vértices del modelo» para seleccionar y deformar sus puntos':
    !node?'Selecciona un modelo GLB desde Objetos':
@@ -243,9 +246,42 @@ export function createMeshVertexEditor({
   else chooseByPoint(e);
   return true;
  }
+ // Capture the exact vertex positions when locking. Anchors are stored per
+ // mesh and stable vertex index, and survive closing the vertex editor.
+ function captureAnchors(node,root,locks,existing={},recapture=false){
+  const anchors=normalizedVertexAnchors(existing);
+  root.updateMatrixWorld(true);
+  const worldToRoot=root.matrixWorld.clone().invert();
+  root.traverse(mesh=>{
+   if(!mesh.isMesh||mesh.isSkinnedMesh||mesh.userData.wildtrapMeshKey===undefined)return;
+   const key=String(mesh.userData.wildtrapMeshKey),list=locks[key]||[];
+   if(!list.length)return;
+   const position=(mesh.userData.wildtrapSourceGeometry||mesh.geometry)?.getAttribute('position');
+   if(!position)return;
+   const out=anchors[key]||{},v=new THREE.Vector3(),w=new THREE.Vector3();
+   for(const index of list){
+    if(index>=position.count||(!recapture&&out[index]))continue;
+    v.set(position.getX(index),position.getY(index),position.getZ(index));
+    w.copy(v).applyMatrix4(mesh.matrixWorld);
+    out[index]={
+     root:w.clone().applyMatrix4(worldToRoot).toArray(),
+     world:w.toArray(),
+     scale:Math.max(.01,Number(node.scale)||1)
+    };
+   }
+   if(Object.keys(out).length)anchors[key]=out;
+  });
+  for(const [key,vertices] of Object.entries(anchors)){
+   const set=new Set(locks[key]||[]);
+   for(const index of Object.keys(vertices))if(!set.has(Number(index)))delete vertices[index];
+   if(!Object.keys(vertices).length)delete anchors[key];
+  }
+  return anchors;
+ }
  function mutateLocks(locked){
-  const node=getSelectedNode();
-  if(!active||!node||node.kind!=='prefab'||!selected.size)return;
+  const target=getTarget();
+  if(!active||!target||!selected.size)return;
+  const {node,root}=target;
   const current=normalizedLocks(node.vertexLocks);
   const buckets=new Map(Object.entries(current).map(([k,ids])=>[k,new Set(ids)]));
   let changed=false;
@@ -259,59 +295,42 @@ export function createMeshVertexEditor({
   if(!changed)return;
   const updated={};
   for(const [key,ids] of buckets)if(ids.size)updated[key]=[...ids].sort((a,b)=>a-b);
-  snapshot();node.vertexLocks=updated;persist();refreshColors();
- }
- function applyScale(){
-  const target=getTarget();
-  if(!active||!target){toast('Primero selecciona un modelo GLB tangible');return}
-  const {node,root}=target;
-  const ops=cleanVertexOperations(node.meshScaleOps);
-  if(ops.length>=24){toast('Máximo 24 deformaciones por modelo. Exporta o restaura antes de continuar.');return}
-  const factor=Number($('meshScaleFactor').value);
-  const axis=$('meshScaleAxis').value;
-  if(!Number.isFinite(factor)||factor<.1||factor>5||Math.abs(factor-1)<.00001){
-   toast('Elige un factor distinto de 1 entre 0.1 y 5');return;
-  }
-  const allBounds=new THREE.Box3();
-  root.updateMatrixWorld(true);
-  const invRoot=root.matrixWorld.clone().invert();
-  root.traverse(mesh=>{
-   if(!mesh.isMesh||mesh.isSkinnedMesh||mesh.userData.wildtrapMeshKey===undefined)return;
-   const pos=(mesh.userData.wildtrapSourceGeometry||mesh.geometry)?.getAttribute('position');
-   if(!pos)return;
-   const tr=invRoot.clone().multiply(mesh.matrixWorld);
-   const v=new THREE.Vector3();
-   for(let i=0;i<pos.count;i++){
-    v.set(pos.getX(i),pos.getY(i),pos.getZ(i)).applyMatrix4(tr);
-    allBounds.expandByPoint(v);
-   }
-  });
-  if(allBounds.isEmpty()){toast('Este modelo no contiene vértices editables');return}
-  const center=allBounds.getCenter(new THREE.Vector3());
-  const pivot=[center.x,node.anchorScaleY===true?allBounds.min.y:center.y,center.z];
-  const frozen=normalizedLocks(node.vertexLocks);
-  snapshot();
-  node.meshScaleOps=[...ops,{axis,factor,pivot,locked:frozen}];
+  snapshot();node.vertexLocks=updated;
+  node.vertexLockAnchors=captureAnchors(node,root,updated,node.vertexLockAnchors);
+  if(!Object.keys(updated).length)node.vertexTotalLock=false;
   draw();persist();
-  toast('Deformación aplicada: los vértices bloqueados se mantienen fijos');
+ }
+ function setTotalLock(){
+  const target=getTarget();if(!active||!target)return;
+  const {node,root}=target,locks=normalizedLocks(node.vertexLocks);
+  if(!Object.keys(locks).length){$('meshTotalLock').checked=false;return}
+  const enable=$('meshTotalLock').checked;
+  snapshot();
+  // Re-snapshot the current transformed vertex positions. Toggling normal to
+  // total fixes the current visible world positions, not an obsolete anchor.
+  node.vertexLockAnchors=captureAnchors(node,root,locks,node.vertexLockAnchors,true);
+  node.vertexTotalLock=enable;
+  draw();persist();
  }
  function resetDeformation(){
   const node=getSelectedNode();
-  if(!active||node?.kind!=='prefab'||!node.meshScaleOps?.length)return;
-  snapshot();node.meshScaleOps=[];draw();persist();
+  if(!active||node?.kind!=='prefab'||(!node.meshScaleOps?.length&&!node.meshSculptOps?.length))return;
+  snapshot();node.meshScaleOps=[];node.meshSculptOps=[];draw();persist();
  }
  $('meshLockVertices').addEventListener('click',()=>mutateLocks(true));
  $('meshUnlockVertices').addEventListener('click',()=>mutateLocks(false));
  $('meshSelectAll').addEventListener('click',()=>selectChanged([...vertexBuckets.values()].flat()));
  $('meshDeselect').addEventListener('click',()=>selectChanged([]));
- $('meshScaleApply').addEventListener('click',applyScale);
+ $('meshTotalLock').addEventListener('change',setTotalLock);
  $('meshResetDeform').addEventListener('click',resetDeformation);
  updateInfo();
  return {setActive,rebuild,beforeDraw:clearVisuals,dispose,updateInfo,
   pointerdown,pointermove,pointerup,hasGesture:()=>Boolean(gesture),
   getState:()=>({active,currentId,points:samples.length,selected:selected.size,
    locked:Object.values(normalizedLocks(getSelectedNode()?.vertexLocks)).reduce((a,b)=>a+b.length,0),
-   operations:cleanVertexOperations(getSelectedNode()?.meshScaleOps).length,
+   operations:cleanVertexOperations(getSelectedNode()?.meshScaleOps).length+
+    (Array.isArray(getSelectedNode()?.meshSculptOps)?getSelectedNode().meshSculptOps.length:0),
+   totalLock:getSelectedNode()?.vertexTotalLock===true,
    renderedEdges:disposables.filter(x=>x.kind==='edges').length,
    visibleEdges:disposables.filter(x=>x.kind==='edges'&&x.object.visible).length,
    visibleVertices:disposables.filter(x=>x.kind==='vertices'&&x.object.visible).length,
