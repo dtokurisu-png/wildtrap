@@ -64,7 +64,6 @@
   ['sculpt','▲','Esculpir','Esculpir terreno'],
   ['knife','✂','Cuchillo','Cuchillo poligonal'],
   ['structures','▦','Estruct.','Estructuras'],
-  ['mesh','◫','Malla','Ver y editar malla 3D'],
  ];
  const workspaceButtons=new Map();
  for(const [key,symbol,label,longLabel] of toolbarEntries){
@@ -101,10 +100,14 @@
  for(const note of modelNotes.slice(1))modelFields.append(note);
  objectEditor.append(selection,empty,modelFields);
  const constraints=$('transformConstraints'),meshControls=$('meshEditControls');
- const meshTargetPanel=$('meshTargetPanel'),terrainMeshControls=$('terrainMeshControls');
- if(!constraints||!meshControls||!meshTargetPanel||!terrainMeshControls)
+ const terrainMeshControls=$('terrainMeshControls');
+ if(!constraints||!meshControls||!terrainMeshControls)
   throw Error('Faltan controles de malla, terreno o transformación');
- objectEditor.append(constraints,meshTargetPanel,terrainMeshControls,meshControls);
+ objectEditor.append(constraints,terrainMeshControls,meshControls);
+ const showProperties=el('button','scene-manager-action','Propiedades y malla del modelo seleccionado');
+ showProperties.type='button';showProperties.id='structuresOpenObjectProperties';
+ showProperties.addEventListener('click',()=>activateTab('object'));
+ structureView.prepend(showProperties);
  // Galería GLB original, acoplada al área Estructuras: las cinco cámaras siguen
  // usando las vistas reales de cada archivo, sin modal ni segunda copia.
  const galleryRoot=$('prefabModal');
@@ -199,9 +202,9 @@
   currentWorkspace=key;
   for(const [name,button] of workspaceButtons)button.setAttribute('aria-pressed',String(name===key));
   for(const section of toolViews.querySelectorAll('.workspace-section'))section.hidden=section.dataset.workspaceContent!==key;
-  activateTab(key==='mesh'?'object':'tools');
+  activateTab('tools');
   if(triggerTool){
-   const mode={project:'move',sculpt:'raise',knife:'holePaint',structures:'move',mesh:'meshEdit'}[key];
+   const mode={project:'move',sculpt:'raise',knife:'holePaint',structures:'move'}[key];
    if(mode)document.querySelector('[data-tool="'+mode+'"]')?.click();
   }
   saveLayout();
@@ -234,7 +237,7 @@
  let previousSelectionLabel='';
  function syncSelection(){
   const label=selectedLabel.textContent||'';
-  const hasSelection=label.includes('ID ')||/\b\d+ elementos seleccionados/.test(label);
+  const hasSelection=label.includes('ID ')||label.includes('Terreno de la arena')||/\b\d+ elementos seleccionados/.test(label);
   objectEditor.classList.toggle('is-empty',!hasSelection);
   // Solo abrir la pestaña cuando cambia la selección. Una herramienta activa
   // no debe perder su propio panel por llamadas repetidas a updateStatus().
@@ -299,7 +302,7 @@
  });
  window.addEventListener('resize',applySizes);
  applySizes();
- selectWorkspace(['project','sculpt','knife','structures','mesh'].includes(saved?.workspace)?saved.workspace:'project',false);
+ selectWorkspace(['project','sculpt','knife','structures'].includes(saved?.workspace)?saved.workspace:'project',false);
  syncSelection();
  window.__workspaceLayout={
   open:key=>selectWorkspace(key,true),
