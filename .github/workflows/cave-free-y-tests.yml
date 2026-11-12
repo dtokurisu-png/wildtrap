@@ -1,0 +1,44 @@
+name: Validar movimiento vertical libre de cuevas
+on:
+  push:
+    branches: [main, fix/cave-free-vertical-drag-v0.9.15]
+    paths:
+      - 'prefab-gestures.mjs'
+      - 'editor.mjs'
+      - 'index.html'
+      - 'tests/prefab-gestures.test.mjs'
+      - 'tests/browser-cave-free-y.mjs'
+      - 'tests/cave-free-y-smoke.html'
+      - 'tests/browser-workspace.mjs'
+      - '.github/workflows/cave-free-y-tests.yml'
+  workflow_dispatch:
+jobs:
+  cave-free-y:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxis y transformaciones sin terreno
+        run: |
+          node --check editor.mjs
+          node --check prefab-gestures.mjs
+          node --test tests/prefab-gestures.test.mjs
+      - name: Servidor local
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-cave-y.log 2>&1 &
+          sleep 2
+      - name: Arrastrar cueva X/Y/Z libremente en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-cave-free-y.mjs
+      - name: Regresiones previas de escena, GLB y mallas
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-startup.mjs
+          node tests/browser-workspace.mjs
+          node tests/browser-phase4-mesh.mjs
+          node tests/browser-terrain-mesh.mjs
