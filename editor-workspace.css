@@ -298,26 +298,6 @@ body.testing #axisGizmo{display:none}
 .scene-terrain-edit:hover{background:#31634d}
 #workspaceObjectProperties.is-terrain .workspace-empty{display:none!important}
 
-/* v0.9.14 — visualization layer independent from polygon knife tool. */
-.knife-mesh-overlay{
- display:flex;flex-direction:column;gap:8px;margin:11px 0 8px;
- padding:10px;border:1px solid #68a999;border-radius:9px;
- background:#163b32;
-}
-.knife-mesh-overlay>button{
- width:100%;font-weight:750;background:#265c49;border:1px solid #72a98e;
-}
-.knife-mesh-overlay>button[aria-pressed="true"]{
- border-color:#00ffdf;color:#e5fff9;background:#186956;
-}
-.knife-mesh-overlay>label{font-size:11px;color:#d1fae9;display:flex;flex-direction:column;gap:5px}
-#knifeMeshTarget{
- padding:8px 6px;min-width:0;width:100%;border-radius:6px;
- color:#d6fff1;background:#1a4336;border:1px solid #648d7c;
-}
-.knife-mesh-overlay .terrain-mesh-toggles{margin:0}
-.knife-mesh-overlay>.hint{margin:0;font-size:10px;line-height:1.5}
-
 /* v0.9.16: the displayed XYZ markers are interactive camera shortcuts.
    Only the three marker buttons accept pointer events; the overlay never
    intercepts gestures on the 3D viewport. */
@@ -341,4 +321,26 @@ body.testing #axisGizmo{display:none}
 #axisGizmo>span{white-space:nowrap;font-size:9px;letter-spacing:.1px}
 @media(max-width:800px){
  #axisGizmo>.axis-view-button{width:24px;height:24px}
+}
+
+/* v0.9.17 — mesh controls belong to scene objects, groups, and the terrain. */
+.scene-object-mesh,.scene-group-mesh,.scene-terrain-edit{
+ flex:none;min-width:32px;padding:4px 5px;cursor:pointer;
+ background:#23483c;color:#a4d2bf;border:1px solid #587d6b;
+ border-radius:6px;font-size:11px;
+}
+.scene-object-mesh:hover,.scene-group-mesh:hover,.scene-terrain-edit:hover{background:#316e58}
+.scene-object-mesh.mesh-visible,.scene-group-mesh.mesh-visible,.scene-terrain-edit.mesh-visible,
+#objectMeshToggle[aria-pressed="true"],#modelVertexEditToggle[aria-pressed="true"]{
+ border-color:#00ffdf!important;color:#e4fff8!important;background:#176b56!important;
+}
+.scene-terrain-name{
+ flex:1;min-width:0;padding:8px 9px;text-align:left;background:transparent;
+ border:0;color:#b5f0d7;font-weight:600;font-size:12px;
+}
+.scene-terrain-name:hover{color:#fff;background:#2b5746}
+#terrainMeshControls[hidden],#meshEditControls[hidden],#transformConstraints[hidden]{display:none!important}
+#snapCaveToTerrain:disabled{opacity:.4;cursor:not-allowed}
+#modelVertexEditToggle:focus-visible,.scene-object-mesh:focus-visible,.scene-group-mesh:focus-visible{
+ outline:2px solid #e8fff4;outline-offset:2px
 }
