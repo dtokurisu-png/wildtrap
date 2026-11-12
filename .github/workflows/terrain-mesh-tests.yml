@@ -6,6 +6,8 @@ on:
       - 'adaptive-terrain-cuts.mjs'
       - 'terrain-holes.mjs'
       - 'terrain-mesh-inspector.mjs'
+      - 'mesh-vertex-editor.mjs'
+      - 'tests/phase4-mesh-smoke.html'
       - 'editor.mjs'
       - 'editor-workspace.js'
       - 'editor-workspace.css'
