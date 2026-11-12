@@ -12,7 +12,7 @@ import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.14';
 import {constrainedRotation} from './mesh-deform.mjs?v=0.9.12';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
-import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag} from './prefab-gestures.mjs?v=0.9.15';
+import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -394,6 +394,13 @@ function updateStatus(){
  $('transformConstraints').hidden=!editable;
  if(editable){
   const locks=picked.rotationLocks||{};
+  // The saved XYZ lock buttons apply to movement AND rotation.
+  $('prefabX').disabled=locks.x===true;
+  $('prefabZ').disabled=locks.z===true;
+  $('prefabOffsetY').disabled=!cave||locks.y===true;
+  $('prefabRotationX').disabled=locks.x===true;
+  $('prefabRotation').disabled=locks.y===true;
+  $('prefabRotationZ').disabled=locks.z===true;
   for(const axis of ['x','y','z']){
    const button=document.querySelector('[data-rotation-lock="'+axis+'"]');
    button.setAttribute('aria-pressed',String(locks[axis]===true));
@@ -401,7 +408,9 @@ function updateStatus(){
   }
   $('anchorScaleY').checked=picked.anchorScaleY===true;
  }
- if(!editable)$('prefabOffsetY').disabled=true;
+ if(!editable){
+  for(const id of ['prefabX','prefabZ','prefabOffsetY','prefabRotation','prefabRotationX','prefabRotationZ'])$(id).disabled=true;
+ }
  vertexEditor?.updateInfo();
  $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
  sceneObjectManager?.render();
@@ -876,7 +885,7 @@ function moveModelDrag(e){
  if(session.action==='height'){
   for(const item of session.nodes){
    const n=live.nodes.find(x=>x.id===item.id);
-   if(n?.kind==='prefab'&&isFreeCave(n.prefabId))
+   if(n?.kind==='prefab'&&isFreeCave(n.prefabId)&&n.rotationLocks?.y!==true)
     n.y=altitudeFromVerticalDrag(item.original.y,session.startY,e.clientY);
   }
  }else if(session.action==='scale'){
@@ -906,8 +915,9 @@ function moveModelDrag(e){
     session.horizontalUnits,session.verticalUnits,SIZE,
     session.action==='plane');
    if(!translated)continue;
-   n.x=translated.x;n.z=translated.z;
-   if(cave)n.y=translated.y;
+   const constrained=constrainTranslationAxes(orig,translated,n.rotationLocks);
+   n.x=constrained.x;n.z=constrained.z;
+   if(cave)n.y=constrained.y;
   }
  }else{
   const p=convertCoords(e);
@@ -916,7 +926,9 @@ function moveModelDrag(e){
   for(const item of session.nodes){
    const n=live.nodes.find(x=>x.id===item.id),orig=item.original;
    if(!n)continue;
-   Object.assign(n,translateNodeOnTerrain(orig,dx,dz,SIZE));
+   const translated=translateNodeOnTerrain(orig,dx,dz,SIZE),locks=n.rotationLocks||{};
+   if(Number.isFinite(translated.x)&&locks.x!==true)n.x=translated.x;
+   if(Number.isFinite(translated.z)&&locks.z!==true)n.z=translated.z;
    // Migrar una cueva antigua a Y absoluta en el primer arrastre;
    // nunca dejar que otra pendiente la vuelva a pegar al terreno.
    if(n.kind==='prefab'&&isFreeCave(n.prefabId))n.y=orig.y;
@@ -1110,12 +1122,13 @@ $('applyPrefab').onclick=()=>{
  for(const n of targets){
   // Hold a cave's absolute elevation even when the X/Z move crosses a slope.
   const worldY=isFreeCave(n.prefabId)?prefabWorldY(n,heightAt):null;
-  n.x=clamp(n.x+dx,-SIZE/2,SIZE/2);
-  n.z=clamp(n.z+dz,-SIZE/2,SIZE/2);
-  n.rotation=(n.rotation||0)+rotationDelta;
-  n.rotationX=(n.rotationX||0)+tiltDelta;
-  n.rotationZ=(n.rotationZ||0)+rollDelta;
-  if(isFreeCave(n.prefabId))n.y=worldY+heightDelta;
+  const locks=n.rotationLocks||{};
+  if(locks.x!==true)n.x=clamp(n.x+dx,-SIZE/2,SIZE/2);
+  if(locks.z!==true)n.z=clamp(n.z+dz,-SIZE/2,SIZE/2);
+  if(locks.y!==true)n.rotation=(n.rotation||0)+rotationDelta;
+  if(locks.x!==true)n.rotationX=(n.rotationX||0)+tiltDelta;
+  if(locks.z!==true)n.rotationZ=(n.rotationZ||0)+rollDelta;
+  if(isFreeCave(n.prefabId)&&locks.y!==true)n.y=worldY+heightDelta;
   else delete n.y; // Mountains and non-cave structures cannot float.
   n.offsetY=0;
   n.scale=clamp((n.scale||1)*scaleRatio,.05,15);
