@@ -383,18 +383,61 @@ function updateStatus(){
  $('pending').textContent=pending?'Primer punto fijado: selecciona el segundo':'';
  sceneObjectManager?.render();
 }
-function updateMeshInspection(){
- const enabled=mode==='meshEdit';
- const terrainMode=enabled&&$('meshTarget').value==='terrain';
- $('meshTargetPanel').hidden=!enabled;
- $('workspaceObjectProperties')?.classList.toggle('is-terrain',terrainMode);
- vertexEditor?.setActive(enabled&&!terrainMode);
- terrainInspector?.setActive(terrainMode);
+// Mesh visualization is an independent overlay; tools own pointer input.
+// In particular, polygon-knife clicks still place contour vertices while the
+// last selected terrain/GLB wireframe remains visible behind the yellow path.
+let meshOverlayPinned=false,meshPreviewNodeId=null;
+function syncKnifeMeshControls(){
+ const target=$('meshTarget').value;
+ $('knifeMeshTarget').value=target;
+ $('meshOverlayKeep').checked=meshOverlayPinned;
+ $('knifeMeshToggle').setAttribute('aria-pressed',String(meshOverlayPinned));
+ $('knifeMeshToggle').textContent=meshOverlayPinned?'◫ Malla visible · Ocultar':'◫ Mostrar malla mientras recorto';
+ const prefix=target==='terrain'?'terrain':'model';
+ for(const layer of ['Faces','Edges','Vertices','Xray'])
+  $('knifeLayer'+layer).checked=$(prefix+layer).checked;
 }
-$('meshTarget').addEventListener('change',updateMeshInspection);
+function updateMeshInspection(){
+ const editing=mode==='meshEdit',target=$('meshTarget').value;
+ const visible=!testingScene&&(editing||meshOverlayPinned);
+ const terrainMode=visible&&target==='terrain';
+ $('meshTargetPanel').hidden=!editing;
+ $('workspaceObjectProperties')?.classList.toggle('is-terrain',editing&&terrainMode);
+ vertexEditor?.setActive(visible&&!terrainMode);
+ terrainInspector?.setActive(terrainMode);
+ syncKnifeMeshControls();
+}
+function changeMeshTarget(value){
+ $('meshTarget').value=value;
+ if(value==='model'&&selectedId!==null)meshPreviewNodeId=selectedId;
+ updateMeshInspection();
+}
+$('meshTarget').addEventListener('change',()=>changeMeshTarget($('meshTarget').value));
+$('knifeMeshTarget').addEventListener('change',()=>{
+ meshOverlayPinned=true;
+ changeMeshTarget($('knifeMeshTarget').value);
+});
+$('meshOverlayKeep').addEventListener('change',()=>{
+ meshOverlayPinned=$('meshOverlayKeep').checked;updateMeshInspection();
+});
+$('knifeMeshToggle').addEventListener('click',()=>{
+ meshOverlayPinned=!meshOverlayPinned;updateMeshInspection();
+});
+for(const layer of ['Faces','Edges','Vertices','Xray']){
+ $('knifeLayer'+layer).addEventListener('change',()=>{
+  const prefix=$('meshTarget').value==='terrain'?'terrain':'model';
+  const source=$(prefix+layer);
+  source.checked=$('knifeLayer'+layer).checked;
+  source.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+}
 function setMode(v){
  if(v!=='prefab'&&armedPrefabId)clearPlacement();
  if(v==='holePaint'){
+  // Keep the selected GLB reference before the knife clears object selection.
+  // The visualization remains active; ONLY the cutter owns viewport clicks.
+  if(selectedId!==null&&live.nodes.some(n=>n.id===selectedId&&n.kind==='prefab'))
+   meshPreviewNodeId=selectedId;
   // The polygon knife is exclusive: no picking, selection or moving GLBs.
   if(dragSession)completeModelDrag({pointerId:dragSession.pointerId});
   pointerDown=false;marqueeStart=null;
@@ -407,6 +450,8 @@ function setMode(v){
  if(v==='meshEdit'&&mode!=='meshEdit'){
   const picked=live.nodes.find(n=>n.id===selectedId);
   $('meshTarget').value=picked?.kind==='prefab'?'model':'terrain';
+  if(picked?.kind==='prefab')meshPreviewNodeId=picked.id;
+  meshOverlayPinned=true;
  }
  mode=v;pending=null;
  cursor.visible=v!=='holePaint'&&v!=='meshEdit'&&!placementGhost;
@@ -568,7 +613,7 @@ const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heig
 });
 vertexEditor=createMeshVertexEditor({
  scene,camera,view,marquee:$('selectionMarquee'),$,
- getSelectedNode:()=>live.nodes.find(n=>n.id===selectedId),
+ getSelectedNode:()=>live.nodes.find(n=>n.id===(mode==='meshEdit'?(selectedId??meshPreviewNodeId):(meshPreviewNodeId??selectedId))),
  getRoot:id=>(renderedNodes.get(id)||[]).find(root=>root.userData.sharedAsset),
  getMode:()=>mode,snapshot,draw,persist,toast
 });
@@ -613,7 +658,10 @@ function setNodeSelection(ids){
  updateSelectionHighlights();updateStatus();
  if(mode==='meshEdit'){
   const node=live.nodes.find(n=>n.id===selectedId);
-  if(node?.kind==='prefab')$('meshTarget').value='model';
+  if(node?.kind==='prefab'){
+   $('meshTarget').value='model';
+   meshPreviewNodeId=node.id;
+  }
   updateMeshInspection();
  }
 }
