@@ -1496,6 +1496,16 @@ $('duplicatePrefab').onclick=()=>{
  const copy=structuredClone(n);delete copy.id;
  copy.x=clamp(copy.x+12,-SIZE/2+3,SIZE/2-3);
  copy.z=clamp(copy.z+8,-SIZE/2+3,SIZE/2-3);
+ // A duplicated model owns its own vertex anchors. Keep total locks at the
+ // duplicated location, never stretch the clone back to the original object.
+ if(copy.vertexTotalLock===true&&copy.vertexLockAnchors){
+  const dx=copy.x-n.x,dz=copy.z-n.z;
+  for(const mesh of Object.values(copy.vertexLockAnchors))
+   for(const anchor of Object.values(mesh))
+    if(Array.isArray(anchor?.world)&&anchor.world.length===3){
+     anchor.world[0]+=dx;anchor.world[2]+=dz;
+    }
+ }
  addNode(copy);toast('Modelo duplicado');
 };
 $('clearNodeSelection').onclick=()=>setNodeSelection([]);
