@@ -1,0 +1,59 @@
+name: Validar recortes repetidos y malla real de la arena
+on:
+  push:
+    branches: [main, fix/terrain-cuts-mesh-v0.9.13]
+    paths:
+      - 'adaptive-terrain-cuts.mjs'
+      - 'terrain-holes.mjs'
+      - 'terrain-mesh-inspector.mjs'
+      - 'editor.mjs'
+      - 'editor-workspace.js'
+      - 'editor-workspace.css'
+      - 'scene-object-manager.mjs'
+      - 'index.html'
+      - 'tests/adaptive-terrain-cuts.test.mjs'
+      - 'tests/browser-terrain-mesh.mjs'
+      - 'tests/terrain-mesh-smoke.html'
+      - 'tests/browser-workspace.mjs'
+      - '.github/workflows/terrain-mesh-tests.yml'
+  workflow_dispatch:
+jobs:
+  terrain-mesh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxis
+        run: |
+          node --check adaptive-terrain-cuts.mjs
+          node --check terrain-holes.mjs
+          node --check terrain-mesh-inspector.mjs
+          node --check editor.mjs
+          node --check editor-workspace.js
+          node --check scene-object-manager.mjs
+      - name: Geometría, cortes repetidos y triángulos completos
+        run: |
+          node --test tests/adaptive-terrain-cuts.test.mjs
+          node --test tests/polygon-knife.test.mjs
+          node --test tests/adaptive-model-cuts.test.mjs
+      - name: Servidor local
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-terrain-http.log 2>&1 &
+          sleep 2
+      - name: Inspector real de malla en Chromium
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-terrain-mesh.mjs
+      - name: Regresión de herramientas y recuperaciones
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-workspace.mjs
+          node tests/browser-scene-object-manager.mjs
+          node tests/browser-phase3-tool-controls.mjs
+          node tests/browser-phase4-mesh.mjs
+          node tests/browser-startup.mjs
+          node tests/browser-cut-recovery.mjs
