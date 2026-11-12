@@ -312,3 +312,14 @@ Pruebas: el navegador comprueba ahora que una arena recortada mantiene la malla 
 **Validaciones:** `tests/prefab-gestures.test.mjs` comprueba Y directa y profundidad X/Z por separado; `tests/browser-cave-free-y.mjs` arrastra una cueva GLB real en Chrome por encima y por debajo de Y=0, prueba Espacio+arrastrar, verifica X/Z independientes de Y y revisa la altura guardada. Se mantienen regresiones de arranque y mallas anteriores.
 
 **Siguientes capas pendientes (no incluidas en v0.9.15):** botones Malla individual y por grupo desde Objetos; controles de caras/aristas/vértices integrados en Propiedades/Estructuras y eliminación de la herramienta Malla independiente de la barra izquierda; Intangible del terreno y oclusión correcta sin ver a través de otros objetos; ajuste puntual de la altura de una cueva a la superficie del terreno sin fijarla ni bloquear posteriormente su movimiento.
+
+
+## v0.9.16 — Clic en los ejes XYZ y bloqueo de movimiento restaurado
+
+El indicador tridimensional de la esquina del escenario ahora permite cambiar de vista haciendo clic directamente en sus letras coloreadas: **X** muestra la vista lateral desde el eje +X, **Y** la vista superior desde +Y y **Z** la vista frontal desde +Z. Los botones siguen las posiciones de los ejes cuando se mueve la cámara; incluyen nombres accesibles y se pueden usar con teclado. La cámara mantiene su zoom y enfoca el modelo GLB seleccionado (si hay uno); de lo contrario conserva el centro actual. La vista superior vuelve a fijar la rotación de cámara como el antiguo botón Cenital, y las vistas lateral/frontal permiten rotar libremente al salir de la alineación.
+
+**Los botones XYZ del indicador solo cambian la cámara:** no bloquean ni desbloquean ninguna coordenada del modelo.
+
+Se ha corregido una regresión del movimiento libre de cuevas: los bloqueos de ejes guardados en `rotationLocks` seguían aplicándose a la rotación, pero no al nuevo arrastre del modelo. Ahora estos mismos tres botones de las propiedades del objeto bloquean su **posición y rotación** en el eje correspondiente: X fija desplazamiento X y rotación X; Y fija altura absoluta y rotación Y; Z fija profundidad y rotación Z. Se respetan en el movimiento normal, **Espacio + arrastrar** en el plano X/Z, **Alt + Shift** para altura y los campos numéricos. Los controles bloqueados aparecen desactivados y los desbloqueados mantienen el movimiento libre sin colisiones con el terreno. El estado anterior se conserva en el JSON y el historial.
+
+Las pruebas automatizadas `tests/prefab-gestures.test.mjs` y `tests/browser-axis-view-locks.mjs` comprueban los tres ejes de cámara, el enfoque de un GLB, la independencia de sus bloqueos, la altura Y con X bloqueado, el bloqueo Y y el movimiento Z en modo Espacio. Las regresiones de fases anteriores y arrastre libre sin bloqueos siguen ejecutándose.
