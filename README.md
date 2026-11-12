@@ -356,3 +356,15 @@ Selecciona una cueva GLB y abre **Objeto → Restricciones de transformación �
 Todos los estados nuevos son opcionales y siguen el formato de guardado existente (`node.editorMeshVisible`, `node.editorMeshLayers`, `settings.terrainMeshVisible`, `settings.terrainIntangible`, `node.y`). Los mapas antiguos no requieren migración. Los controles usan el mismo historial Ctrl+Z.
 
 El flujo **Validar controles Malla, Intangible y altura de cuevas** prueba el nuevo gestor con tres modelos GLB reales, grupos, malla sobre Cuchillo, propiedades editables, INT y altura, y ejecuta las pruebas de la vista de terreno, fases 3/4, editor GLB, eje XYZ, inicio y movimiento de cuevas.
+
+
+## v0.9.18 — Vista 3D predeterminada y última cámara guardada
+
+- **Inicio en vista 3D inclinada:** cuando aún no se ha guardado ninguna vista, WILDTRAP usa el mismo encuadre que el botón **Vista 3D**, en lugar de iniciar obligatoriamente con la cámara cenital.
+- **Recordar exactamente la cámara del editor:** guarda automáticamente coordenadas XYZ de la cámara, punto de enfoque de OrbitControls, orientación vertical, zoom y extensión de la proyección ortográfica, además del estado de rotación y la vista activa (3D, cenital, superior/lateral/frontal X/Y/Z).
+- **Última posición al reabrir:** después de mover la cámara o cambiar su zoom, el editor guarda un registro pequeño con un retardo de 520 ms y otro al ocultarse/cerrarse la pestaña. Al iniciar se restaura ese registro y, si falta, el registro incluido en el proyecto guardado. Una cámara inválida o de una versión antigua no bloquea el inicio.
+- **Escenario y JSON:** el borrador guardado y **Exportar JSON** incluyen `editorCamera`. **Importar JSON** con un estado válido devuelve el encuadre que tenía ese escenario al guardarse; los JSON antiguos sin cámara mantienen la vista actual. Los guardados de modo normal, seguro y recuperación utilizan claves de cámara independientes.
+- **Play independiente:** el movimiento de la cámara del personaje durante las pruebas no reemplaza ni guarda la posición de la cámara del editor. Al volver se recupera la vista de edición.
+- **Botones XYZ y las vistas Vista / Cenital:** siguen funcionando; los cambios desde esos botones también se guardan. No se han alterado los bloqueos de posición y rotación de los objetos ni la malla del terreno.
+
+Pruebas en `tests/editor-camera-state.test.mjs` y `tests/browser-editor-camera-persistence.mjs`: arranque 3D, recorte de zoom con rueda, guardado de posición/enfoque/inclinación, recarga y restauración exactas, importación de JSON y aislamiento del borrador seguro. Además pasan las regresiones anteriores de GLB, X/Y/Z, malla y cuchillo.
