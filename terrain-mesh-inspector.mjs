@@ -77,7 +77,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$}){
   })),null,null);
   // Shared BufferGeometry is NEVER owned or disposed by this overlay.
   faces.userData.terrainLayer='faces';
-  faces.renderOrder=27;
+  faces.renderOrder=8;
   // Record ownership of MATERIAL only (geometry belongs to editor).
   visuals.at(-1).material=faces.material;
   const wireGeometry=new THREE.WireframeGeometry(geometry);
@@ -85,13 +85,13 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$}){
    color:0x27ffe1,transparent:true,opacity:.73,depthTest:false,depthWrite:false
   });
   const edges=own(new THREE.LineSegments(wireGeometry,wireMaterial),wireGeometry,wireMaterial);
-  edges.userData.terrainLayer='edges';edges.renderOrder=30;edges.frustumCulled=false;
+  edges.userData.terrainLayer='edges';edges.renderOrder=10;edges.frustumCulled=false;
   const dotGeometry=new THREE.BufferGeometry();
   dotGeometry.setAttribute('position',new THREE.Float32BufferAttribute(dots,3));
   const dotMaterial=new THREE.PointsMaterial({color:0xffcf66,size:3.5,sizeAttenuation:false,
    depthTest:false,depthWrite:false});
   const points=own(new THREE.Points(dotGeometry,dotMaterial),dotGeometry,dotMaterial);
-  points.userData.terrainLayer='vertices';points.renderOrder=31;points.frustumCulled=false;
+  points.userData.terrainLayer='vertices';points.renderOrder=11;points.frustumCulled=false;
   statistics={triangles:indices.length/3,vertices:position.count,activeVertices:total,
    drawnVertices:dots.length/3};
   $('terrainMeshStats').textContent=
@@ -115,7 +115,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$}){
   fillGeo.setAttribute('position',new THREE.Float32BufferAttribute(corners.flatMap(p=>p.toArray()),3));
   const fillMat=new THREE.MeshBasicMaterial({color:0xffd277,transparent:true,opacity:.48,
    side:THREE.DoubleSide,depthTest:false,depthWrite:false});
-  const face=own(new THREE.Mesh(fillGeo,fillMat),fillGeo,fillMat,faceVisuals);face.renderOrder=38;
+  const face=own(new THREE.Mesh(fillGeo,fillMat),fillGeo,fillMat,faceVisuals);face.renderOrder=15;
   const linesGeo=new THREE.BufferGeometry();
   linesGeo.setAttribute('position',new THREE.Float32BufferAttribute([
    ...corners[0].toArray(),...corners[1].toArray(),
@@ -124,7 +124,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$}){
   const linesMat=new THREE.LineBasicMaterial({color:0xffa732,
    depthTest:false,depthWrite:false});
   const lines=own(new THREE.LineSegments(linesGeo,linesMat),linesGeo,linesMat,faceVisuals);
-  lines.renderOrder=39;
+  lines.renderOrder=16;
   const p=hit.point;
   setInfo('Cara #'+hit.faceIndex+' · vértices '+ids.join(', ')+
    ' · X '+p.x.toFixed(2)+' / Y '+p.y.toFixed(2)+' / Z '+p.z.toFixed(2)+
