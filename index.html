@@ -57,7 +57,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.19 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.20 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -94,6 +94,25 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <label>Altura máxima<input id="maxHeight" type="number" min="1" max="150" value="120"></label></div>
 </section>
 
+<section id="zonesPanel">
+<h2>◇ Creador de zonas · Terreno</h2>
+<p class="hint">Delimita regiones lógicas sin cortar la malla. Activa la herramienta y marca los vértices con clics. Cierra el contorno pulsando el primer punto o usando «Cerrar zona».</p>
+<button data-tool="zones" style="width:100%">◇ Activar Creador de zonas</button>
+<div class="grid2" style="margin-top:6px">
+<button id="zoneUndoPoint" disabled>↶ Último punto</button><button id="zoneClose" disabled>◇ Cerrar zona</button>
+</div>
+<button id="zoneCancel" style="width:100%;margin-top:6px">Cancelar contorno</button>
+<p class="hint" id="zonePendingCount">Haz clic en el terreno para comenzar</p>
+<h2>Zonas del escenario</h2>
+<div id="zoneList"></div>
+<div id="zoneProperties" hidden>
+<label>Nombre de la zona<input id="zoneName" type="text" maxlength="80" style="width:100%"></label>
+<p class="hint" id="zonePointCount"></p>
+<div class="grid2"><button id="zoneEditVertices">Editar vértices</button><button id="zoneDelete">Eliminar zona</button></div>
+<p class="hint">Las zonas se guardan en el JSON del escenario. Los acantilados llegarán en la fase 2.</p>
+</div>
+<p class="hint">Escape cancela el trazado. Retroceso elimina el último punto. Las zonas no alteran el terreno ni los recortes.</p>
+</section>
 <section id="holesPanel">
 <h2>✂ Cuchillo poligonal 3D · Terreno y modelos GLB</h2>
 <p class="hint"><b>Como el cuchillo de Blender:</b> activa el cuchillo y haz clic en la malla para colocar el primer vértice. Mueve el cursor: verás una línea uniendo el último punto con el cursor. Cada clic añade un vértice (sin pintar ni arrastrar). Haz clic en el <b>primer punto</b> para cerrar el circuito. Después pulsa <b>Crear agujero</b>. Se crea un solo recorte definido por tus esquinas, sin cientos de sellos de pincel.</p>
@@ -264,5 +283,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.19').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.20').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
