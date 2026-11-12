@@ -126,6 +126,7 @@ export function createZoneEditor({scene,view,camera,live,heightAt,snapshot,persi
    const z=items().find(z=>z.id===selected);
    const index=z?.points.findIndex(p=>screenDistance(p,e)<15)??-1;
    if(index>=0){snapshot();dragging={id:selected,index,pointer:e.pointerId,original:z.points.map(norm)};try{view.setPointerCapture(e.pointerId)}catch(_){}return;}
+   return; // Editing a zone cannot accidentally begin another polygon.
   }
   const p=pointerPoint(e);if(!p)return;
   if(pending.length>=3&&screenDistance(pending[0],e)<16){close();return;}
