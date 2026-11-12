@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.13';
+import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
 import {createPlaytest} from './playtest.mjs?v=0.9.12';
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.13';
-import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.14';
+import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17';
+import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.17';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.12';
-import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.14';
+import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.17';
 import {constrainedRotation} from './mesh-deform.mjs?v=0.9.12';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
@@ -27,6 +28,11 @@ const orbit=new OrbitControls(camera,view);orbit.enableDamping=true;orbit.screen
 orbit.mouseButtons={LEFT:null,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
 const terrainGeo=new THREE.PlaneGeometry(SIZE,SIZE,N-1,N-1);terrainGeo.rotateX(-Math.PI/2);
 const material=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide});
+const intangibleTerrainMaterial=material.clone();
+intangibleTerrainMaterial.transparent=true;
+intangibleTerrainMaterial.opacity=.24;
+intangibleTerrainMaterial.depthTest=true;
+intangibleTerrainMaterial.depthWrite=false;
 const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';scene.add(terrain);
 const surface=new THREE.Group();scene.add(surface);
 const interiors=new THREE.Group();scene.add(interiors);
@@ -39,7 +45,7 @@ const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasi
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
 const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],objectGroups:[],holes:[],cuts3d:[],nextId:1,settings:{heightMax:120}};
-let holesEditor=null,vertexEditor=null,terrainInspector=null,testingScene=false;
+let holesEditor=null,vertexEditor=null,terrainInspector=null,objectMeshOverlays=null,testingScene=false;
 // Modo seguro usa otro espacio local: nunca sobreescribe el proyecto habitual.
 const flags=new URLSearchParams(location.search);
 const safeMode=flags.has('safe'),recoveryMode=flags.has('recover');
@@ -51,7 +57,7 @@ let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeo
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
 // El gestor usa el historial del editor: no modifica la escena por su cuenta.
-let sceneObjectManager=null;
+let sceneObjectManager=null,terrainPropertiesSelected=false;
 function sceneGroups(){return cleanObjectGroups(live.objectGroups)}
 function pruneUnusedSceneGroups(){
  const active=new Set(live.nodes.filter(n=>categoryForNode(n)).map(n=>n.groupId));
@@ -69,6 +75,25 @@ function commitObjectVisibility(ids,show){
  if(!targets.length)return;
  snapshot();
  for(const node of targets)node.editorHidden=!show;
+ draw();persist();
+}
+function commitObjectMeshVisibility(ids,enabled){
+ const nodes=live.nodes.filter(n=>ids.includes(n.id)&&categoryForNode(n)&&Boolean(n.editorMeshVisible)!==enabled);
+ if(!nodes.length)return;
+ snapshot();
+ for(const n of nodes)n.editorMeshVisible=enabled;
+ draw();persist();
+}
+function commitTerrainMeshVisibility(enabled){
+ if(Boolean(live.settings?.terrainMeshVisible)===enabled)return;
+ snapshot();
+ live.settings.terrainMeshVisible=enabled;
+ updateMeshInspection();sceneObjectManager?.render();persist();
+}
+function commitTerrainIntangible(enabled){
+ if(Boolean(live.settings?.terrainIntangible)===enabled)return;
+ snapshot();
+ live.settings.terrainIntangible=enabled;
  draw();persist();
 }
 function commitObjectIntangible(ids,enabled){
@@ -111,14 +136,20 @@ sceneObjectManager=createSceneObjectManager({
  getNodes:()=>live.nodes,getGroups:()=>live.objectGroups||[],
  getSelection:()=>[...selectedIds],lookup:prefabById,
  select:ids=>{if(mode==='holePaint')setMode('move');setNodeSelection(ids)},
- setVisibility:commitObjectVisibility,setIntangible:commitObjectIntangible,group:commitObjectGroup,
- ungroup:commitObjectUngroup,rename:commitObjectRename,
+ setVisibility:commitObjectVisibility,setIntangible:commitObjectIntangible,
+ setMeshVisibility:commitObjectMeshVisibility,
+ group:commitObjectGroup,ungroup:commitObjectUngroup,rename:commitObjectRename,
  terrainIsVisible:()=>live.settings?.hideTerrainEditor!==true,
  setTerrainVisibility:commitTerrainVisibility,
- showTerrainMesh:()=>{
-  setNodeSelection([]);
-  $('meshTarget').value='terrain';
-  window.__workspaceLayout?.open('mesh');
+ terrainIsIntangible:()=>live.settings?.terrainIntangible===true,
+ setTerrainIntangible:commitTerrainIntangible,
+ terrainMeshIsVisible:()=>live.settings?.terrainMeshVisible===true,
+ setTerrainMeshVisibility:commitTerrainMeshVisibility,
+ selectTerrain:()=>{
+  selectedIds.clear();selectedId=null;
+  terrainPropertiesSelected=true;
+  updateSelectionHighlights();updateStatus();
+  window.__workspaceLayout?.activateTab('object');
  }
 });
 window.__sceneObjectManager=sceneObjectManager;
@@ -229,6 +260,7 @@ shape('',new THREE.BoxGeometry(5,6,2.2),0x10131c,radius*.25,height+3.5,1.5,group
 function resolvePoint(p){const a=p?.anchorId&&live.nodes.find(n=>n.id===p.anchorId&&n.kind==='anchor');return a?{x:a.x,z:a.z}:{x:p.x,z:p.z}}
 function snapPoint(x,z){let near=null,best=10;for(const n of live.nodes){if(n.kind!=='anchor')continue;const d=Math.hypot(n.x-x,n.z-z);if(d<best){best=d;near=n}}return near?{x:near.x,z:near.z,anchorId:near.id}:{x,z}}
 function draw(){
+objectMeshOverlays?.dispose();
 vertexEditor?.beforeDraw();
 renderedNodes.clear();
 for(const collection of [surface,interiors,cavePiecesLayer])while(collection.children.length){
@@ -267,8 +299,8 @@ if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
   if(n.editorIntangible&&!testingScene&&n.kind!=='prefab'){
    root.traverse(child=>{
     if(!child.isMesh)return;
-    const fade=m=>{m.transparent=true;m.opacity=Math.min(.26,m.opacity??1);m.depthWrite=false;m.depthTest=false;m.side=THREE.DoubleSide;return m};
-    child.renderOrder=12;
+    const fade=m=>{m.transparent=true;m.opacity=Math.min(.26,m.opacity??1);m.depthWrite=false;m.depthTest=true;m.side=THREE.DoubleSide;return m};
+    child.renderOrder=0;
     child.material=Array.isArray(child.material)?child.material.map(fade):fade(child.material);
    });
   }
@@ -276,8 +308,10 @@ if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
  renderedNodes.set(n.id,roots);
 }
 surface.visible=true;terrain.visible=live.settings?.hideTerrainEditor!==true;interiors.visible=false;
+terrain.material=live.settings?.terrainIntangible===true&&!testingScene?intangibleTerrainMaterial:material;
 updateSelectionHighlights();updateHoverHighlight();updateStatus();
 vertexEditor?.rebuild();terrainInspector?.refresh();
+objectMeshOverlays?.refresh({skipId:mode==='meshEdit'?selectedId:null,testingScene});
 }
 function updatePrefabLoadStatus(){
  if(!prefabLibrary)return;
