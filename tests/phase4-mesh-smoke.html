@@ -52,7 +52,7 @@
     const outlinerMesh=d.querySelector('[data-mesh-id="902"]');
     assert(outlinerMesh,'Falta el control de malla individual');
     outlinerMesh.click();
-    assert(outlinerMesh.getAttribute('aria-pressed')==='true','El botón no activó Malla');
+    assert(d.querySelector('[data-mesh-id="902"]').getAttribute('aria-pressed')==='true','El botón no activó Malla');
     assert(w.__objectMeshOverlays.getState().ids.includes(902),
       'No apareció la capa del modelo');
     assert(!d.getElementById('meshEditControls').hidden,
