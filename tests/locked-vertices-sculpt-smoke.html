@@ -112,8 +112,8 @@
     assert(stored?.vertexLockAnchors?.[first.key]?.[first.index]?.world,
      'No persistió la coordenada mundial de bloqueo total');
     assert(stored?.meshSculptOps?.length===1,'La pincelada no se guardó en JSON');
-    if(JSON.stringify(stored.heights||[])!==groundBefore){
-     const before=JSON.parse(groundBefore),after=stored.heights||[];
+    if(JSON.stringify(saved.heights||[])!==groundBefore){
+     const before=JSON.parse(groundBefore),after=saved.heights||[];
      const mismatches=[];
      for(let i=0;i<Math.min(before.length,after.length);i++)
       if(before[i]!==after[i]&&mismatches.length<8)
