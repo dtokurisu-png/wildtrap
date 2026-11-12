@@ -126,20 +126,20 @@ export function createMeshVertexEditor({
     vertexColors:true,depthTest:false,depthWrite:false,transparent:true,opacity:1});
    const cloud=new THREE.Points(cloudGeo,cloudMat);
    cloud.userData.editorOnly=true;cloud.renderOrder=62;cloud.frustumCulled=false;
-   mesh.add(cloud);disposables.push({object:cloud,geometry:cloudGeo,material:cloudMat,sampleRefs});
-   if(count<=11000){
-    const wireGeo=new THREE.WireframeGeometry(original);
-    const wireMat=new THREE.LineBasicMaterial({color:0x39ffd0,transparent:true,opacity:.25,
-     depthTest:false,depthWrite:false});
-    const lines=new THREE.LineSegments(wireGeo,wireMat);
-    lines.userData.editorOnly=true;lines.renderOrder=60;lines.frustumCulled=false;
-    mesh.add(lines);disposables.push({object:lines,geometry:wireGeo,material:wireMat});
-   }
+   mesh.add(cloud);disposables.push({object:cloud,geometry:cloudGeo,material:cloudMat,sampleRefs,kind:'vertices'});
+   // Edges reflect the ACTUAL cut topology. Dense GLBs can show full wireframe.
+   const wireGeo=new THREE.WireframeGeometry(mesh.geometry);
+   const wireMat=new THREE.LineBasicMaterial({color:0x39ffd0,transparent:true,opacity:.52,
+    depthTest:false,depthWrite:false});
+   const lines=new THREE.LineSegments(wireGeo,wireMat);
+   lines.userData.editorOnly=true;lines.renderOrder=60;lines.frustumCulled=false;
+   mesh.add(lines);disposables.push({object:lines,geometry:wireGeo,material:wireMat,kind:'edges'});
    // Mesh-specific materials, leaving all GLB cache materials untouched.
    const orig=mesh.material;
    const cloneMat=m=>{
     const clone=m.clone();clone.transparent=true;clone.opacity=Math.min(.26,m.opacity??1);
     clone.depthWrite=false;clone.side=THREE.DoubleSide;
+    clone.userData.wildtrapGhostOpacity=clone.opacity;
     return clone;
    };
    const clone=Array.isArray(orig)?orig.map(cloneMat):cloneMat(orig);
@@ -148,7 +148,24 @@ export function createMeshVertexEditor({
   });
   refreshColors();
   setText('meshMeshCount',meshCounter);
+  updateLayers();
  }
+ function updateLayers(){
+  const xray=$('modelXray').checked;
+  for(const item of disposables){
+   if(item.kind==='vertices')item.object.visible=$('modelVertices').checked;
+   if(item.kind==='edges')item.object.visible=$('modelEdges').checked;
+   if(item.kind==='vertices'||item.kind==='edges'){
+    item.material.depthTest=!xray;item.material.needsUpdate=true;
+   }
+  }
+  for(const {clone} of faded)for(const mat of (Array.isArray(clone)?clone:[clone])){
+   mat.opacity=$('modelFaces').checked?(mat.userData.wildtrapGhostOpacity??.26):0;
+   mat.depthTest=!xray;mat.depthWrite=false;mat.needsUpdate=true;
+  }
+ }
+ for(const id of ['modelFaces','modelEdges','modelVertices','modelXray'])
+  $(id).addEventListener('change',updateLayers);
  function setActive(value){
   active=Boolean(value);
   if(!active)dispose();
