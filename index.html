@@ -206,6 +206,12 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <section id="meshEditControls" hidden aria-label="Edición de malla 3D">
  <h2>Ver malla · Vértices a través del objeto</h2>
  <p class="hint" id="meshEditHelp">Selecciona un GLB para editar sus vértices.</p>
+ <div class="terrain-mesh-toggles">
+  <label><input id="modelFaces" type="checkbox" checked> Caras</label>
+  <label><input id="modelEdges" type="checkbox" checked> Aristas</label>
+  <label><input id="modelVertices" type="checkbox" checked> Vértices</label>
+  <label><input id="modelXray" type="checkbox" checked> Rayos X</label>
+ </div>
  <div class="mesh-stats"><span>Mallas: <b id="meshMeshCount">0</b></span><span>Vértices: <b id="meshVertexCount">0</b></span><span>Seleccionados: <b id="meshVertexSelected">0</b></span><span>Bloqueados: <b id="meshVertexLocked">0</b></span></div>
  <p class="hint">Clic: seleccionar un vértice (incluye los coincidentes); arrastra un rectángulo para seleccionar una zona. Ctrl + clic añade o elimina puntos. Se ven los vértices traseros.</p>
  <div class="grid2"><button id="meshSelectAll" type="button">Seleccionar todos</button><button id="meshDeselect" type="button">Deseleccionar</button></div>
