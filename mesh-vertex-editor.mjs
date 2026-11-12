@@ -50,16 +50,18 @@ export function createMeshVertexEditor({
   const supports=Boolean(node?.kind==='prefab'&&!node.editorHidden&&!node.editorIntangible&&getRoot(node.id));
   // Preview layers may remain on while the knife is active. Vertex mutation
   // controls must stay hidden so the cutter exclusively receives pointer input.
-  controls.hidden=!active||getMode()!=='meshEdit';
+  controls.hidden=node?.kind!=='prefab';
+  const canEdit=active&&getMode()==='meshEdit';
   for(const id of ['meshLockVertices','meshUnlockVertices','meshScaleApply','meshResetDeform']){
-   const button=$(id);if(button)button.disabled=!supports||(id==='meshLockVertices'||id==='meshUnlockVertices'?selected.size===0:false);
+   const button=$(id);if(button)button.disabled=!supports||!canEdit||(id==='meshLockVertices'||id==='meshUnlockVertices'?selected.size===0:false);
   }
   const locks=normalizedLocks(node?.vertexLocks);
   const totalLocked=Object.values(locks).reduce((sum,ids)=>sum+ids.length,0);
   setText('meshVertexCount',samples.length+(samples.length>=maxPoints?' (límite visual)':''));
   setText('meshVertexSelected',selected.size);
   setText('meshVertexLocked',totalLocked);
-  setText('meshEditHelp',!active?'Activa Malla para editar vértices':
+  for(const id of ['meshSelectAll','meshDeselect'])$(id).disabled=!supports||!canEdit;
+  setText('meshEditHelp',!active?'Pulsa «Editar vértices del modelo» para seleccionar y deformar sus puntos':
    !node?'Selecciona un modelo GLB desde Objetos':
    node.kind!=='prefab'?'Este objeto procedimental no tiene una malla GLB editable':
    node.editorIntangible?'Desactiva Intangible antes de editar esta malla':
