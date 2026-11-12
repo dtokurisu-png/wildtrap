@@ -844,14 +844,10 @@ orbit.addEventListener('change',()=>{
 });
 // Pagehide and tab switching commit the last camera even after a short gesture.
 window.addEventListener('pagehide',()=>{
+ // Persist ONLY the camera key immediately. Do not overwrite the world JSON:
+ // a separate editor tab, recovery tool or imported cut draft may have changed
+ // that JSON since this page last read it (e.g. the 85-cut recovery scenario).
  if(cameraReadyToSave)flushCameraSave();
- // On a rapid reload, commit a pending terrain/object edit synchronously too.
- if(saveTimer!==null||cameraDraftTimer!==null){
-  if(saveTimer!==null)clearTimeout(saveTimer);
-  if(cameraDraftTimer!==null)clearTimeout(cameraDraftTimer);
-  saveTimer=null;cameraDraftTimer=null;
-  try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(_){}
- }
 });
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden&&cameraReadyToSave)flushCameraSave();
