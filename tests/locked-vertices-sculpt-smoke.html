@@ -112,8 +112,18 @@
     assert(stored?.vertexLockAnchors?.[first.key]?.[first.index]?.world,
      'No persistió la coordenada mundial de bloqueo total');
     assert(stored?.meshSculptOps?.length===1,'La pincelada no se guardó en JSON');
-    assert(JSON.stringify(stored.heights||[])===groundBefore,
-     'Esculpir objeto alteró el terreno original en vez de solo modificar el GLB');
+    if(JSON.stringify(stored.heights||[])!==groundBefore){
+     const before=JSON.parse(groundBefore),after=stored.heights||[];
+     const mismatches=[];
+     for(let i=0;i<Math.min(before.length,after.length);i++)
+      if(before[i]!==after[i]&&mismatches.length<8)
+       mismatches.push({index:i,before:before[i],after:after[i]});
+     throw Error('El mapa cambió: '+JSON.stringify({
+      originalLength:before.length,newLength:after.length,
+      beforeFirst:before.slice(0,6),afterFirst:after.slice(0,6),
+      mismatches,mode:w.__modelSculpt.getState(),sculptOps:stored.meshSculptOps?.length
+     }));
+    }
     document.body.dataset.result='PASS';
     out.textContent='PASS · bloqueo normal resiste escala, traslado permitido; bloqueo total fija mundo; esculpir GLB real sin tocar el terreno';
    }catch(e){fail(step,e)}
