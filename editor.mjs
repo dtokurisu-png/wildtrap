@@ -12,7 +12,7 @@ import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.14';
 import {constrainedRotation} from './mesh-deform.mjs?v=0.9.12';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
-import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag} from './prefab-gestures.mjs?v=0.9.7';
+import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag} from './prefab-gestures.mjs?v=0.9.15';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
@@ -123,6 +123,18 @@ sceneObjectManager=createSceneObjectManager({
 });
 window.__sceneObjectManager=sceneObjectManager;
 let armedPrefabId=null,placementGhost=null,placementWorldY=null,hoveredNodeId=null,dragSession=null;
+// Keep free cave XY elevation and XZ plane gestures independent of terrain.
+let cavePlaneModifierDown=false;
+window.addEventListener('keydown',e=>{
+ if(e.code!=='Space'||e.target?.matches?.('input,textarea,select,button,[contenteditable="true"]'))return;
+ if(testingScene)return;
+ cavePlaneModifierDown=true;
+ if(dragSession?.action==='free'||dragSession?.action==='plane'||
+  live.nodes.some(n=>selectedIds.has(n.id)&&n.kind==='prefab'&&isFreeCave(n.prefabId)))
+  e.preventDefault();
+},true);
+window.addEventListener('keyup',e=>{if(e.code==='Space')cavePlaneModifierDown=false},true);
+window.addEventListener('blur',()=>{cavePlaneModifierDown=false});
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
 const temp=new THREE.Vector3();
 const pos=(x,z)=>({x:clamp(x,-SIZE/2,SIZE/2),z:clamp(z,-SIZE/2,SIZE/2)});
@@ -338,9 +350,19 @@ function setHoverNode(node,event){
  const indicator=$('modelHoverIndicator');
  if(node&&!marqueeStart){
   const noun=node.kind==='prefab'?(prefabById(node.prefabId)?.name||'Modelo'):'Elemento';
-  const action=node.kind==='prefab'&&isFreeCave(node.prefabId)&&event.altKey&&event.shiftKey?'height':
-   node.kind==='prefab'&&event.altKey?'rotate':node.kind==='prefab'&&event.shiftKey?'scale':'move';
-   indicator.textContent=(action==='height'?'↕ Altura libre ':action==='rotate'?'⟳ Rotar ':action==='scale'?'↕ Escalar ':'✥ ')+noun+' · '+(action==='height'?'Alt + Shift + arrastrar':action==='rotate'?'Alt + arrastrar':action==='scale'?'Shift + arrastrar':'Clic y arrastrar');
+  const free=node.kind==='prefab'&&isFreeCave(node.prefabId);
+  const action=free&&event.altKey&&event.shiftKey?'height':
+   node.kind==='prefab'&&event.altKey?'rotate':
+   node.kind==='prefab'&&event.shiftKey?'scale':
+   free?(cavePlaneModifierDown?'plane':'free'):'move';
+  indicator.textContent=(action==='height'?'↕ Altura libre ':
+   action==='rotate'?'⟳ Rotar ':action==='scale'?'↕ Escalar ':
+   action==='plane'?'✥ Plano X/Z ':
+   action==='free'?'✥ Cueva libre ':'✥ ')+noun+' · '+
+   (action==='height'?'Alt + Shift + arrastrar':action==='rotate'?'Alt + arrastrar':
+   action==='scale'?'Shift + arrastrar':
+   action==='plane'?'Espacio + arrastrar: X/Z sin cambiar Y':
+   action==='free'?'Lateral: X/Z · arriba/abajo: Y · Espacio: profundidad':'Clic y arrastrar');
   indicator.style.left=Math.min(event.clientX+18,Math.max(0,innerWidth-220))+'px';
   indicator.style.top=Math.min(event.clientY+18,Math.max(0,innerHeight-42))+'px';
   indicator.style.display='block';
@@ -794,13 +816,27 @@ window.addEventListener('pointerup',e=>{
 function beginModelDrag(e,node){
  if(!selectedIds.has(node.id))setNodeSelection([node.id]);
  selectedId=node.id;
- const ground=convertCoords(e)||{x:node.x||0,z:node.z||0};
+ const freeCave=node.kind==='prefab'&&isFreeCave(node.prefabId);
+ // A free-cave drag does not intersect terrain on pointerdown OR pointermove.
+ const ground=freeCave?null:(convertCoords(e)||{x:node.x||0,z:node.z||0});
+ const screenRight=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+ const screenUp=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
+ const bounds=view.getBoundingClientRect();
+ const horizontalUnits=camera.isOrthographicCamera?
+  Math.max(.04,(camera.right-camera.left)/Math.max(.01,camera.zoom)/Math.max(1,bounds.width)):
+  Math.max(.04,2*camera.position.distanceTo(orbit.target)*
+   Math.tan(THREE.MathUtils.degToRad(camera.fov||50)/2)*camera.aspect/Math.max(1,bounds.width));
  dragSession={
   pointerId:e.pointerId,
   startX:e.clientX,startY:e.clientY,
-  ground:{x:ground.x,z:ground.z},
-  action:e.altKey&&e.shiftKey&&node.kind==='prefab'&&isFreeCave(node.prefabId)?'height':
-   e.altKey&&node.kind==='prefab'?'rotate':e.shiftKey&&node.kind==='prefab'?'scale':'move',
+  ground:ground?{x:ground.x,z:ground.z}:null,
+  screenRight:{x:screenRight.x,z:screenRight.z},
+  screenUp:{x:screenUp.x,z:screenUp.z},
+  horizontalUnits,verticalUnits:Math.max(.05,Math.min(.8,horizontalUnits*.45)),
+  action:e.altKey&&e.shiftKey&&freeCave?'height':
+   e.altKey&&node.kind==='prefab'?'rotate':
+   e.shiftKey&&node.kind==='prefab'?'scale':
+   freeCave?(cavePlaneModifierDown?'plane':'free'):'move',
   nodes:[...selectedIds].map(id=>live.nodes.find(n=>n.id===id)).filter(Boolean).map(n=>{
    const original=structuredClone(n);
    if(n.kind==='prefab'&&isFreeCave(n.prefabId))original.y=prefabWorldY(n,heightAt);
@@ -856,6 +892,22 @@ function moveModelDrag(e){
     e.clientX-session.startX,session.startY-e.clientY,n.rotationLocks||{});
    n.rotation=rotation.y;n.rotationX=rotation.x;n.rotationZ=rotation.z;
   }
+ }else if(session.action==='free'||session.action==='plane'){
+  // Move cave in absolute world space; no terrain collider or ray projection.
+  for(const item of session.nodes){
+   const n=live.nodes.find(x=>x.id===item.id),orig=item.original;
+   if(!n)continue;
+   const cave=n.kind==='prefab'&&isFreeCave(n.prefabId);
+   const baseY=cave?orig.y:heightAt(orig.x||0,orig.z||0);
+   const translated=freeCaveFromScreenDrag({...orig,y:baseY},
+    session.startX,session.startY,e.clientX,e.clientY,
+    session.screenRight,session.screenUp,
+    session.horizontalUnits,session.verticalUnits,SIZE,
+    session.action==='plane');
+   if(!translated)continue;
+   n.x=translated.x;n.z=translated.z;
+   if(cave)n.y=translated.y;
+  }
  }else{
   const p=convertCoords(e);
   if(!p)return;
@@ -870,6 +922,12 @@ function moveModelDrag(e){
   }
  }
  updateMovedPrefabs();
+ if(session.action==='free'||session.action==='plane'){
+  const moved=live.nodes.find(n=>n.id===session.nodes[0]?.id);
+  if(moved?.kind==='prefab')
+   $('coords').textContent='X '+moved.x.toFixed(1)+' · Z '+moved.z.toFixed(1)+
+    ' · altura Y '+prefabWorldY(moved,heightAt).toFixed(1);
+ }
  if(session.action==='scale'){
   for(const item of session.nodes){
    const n=live.nodes.find(x=>x.id===item.id);
