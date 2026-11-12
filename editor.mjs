@@ -767,6 +767,83 @@ window.__axisView={snap:snapCameraToAxis,state:()=>({
  view:$('viewType').textContent,enableRotate:orbit.enableRotate
 })};
 refreshAxisGizmo();
+// Persist the editor camera separately from the large world JSON so a simple
+// camera movement is not lost when reloading before a full autosave finishes.
+let cameraReadyToSave=false,cameraSaveTimer=null;
+function currentEditorCamera(){
+ return normalizeEditorCameraState({
+  position:camera.position.toArray(),
+  target:orbit.target.toArray(),
+  up:camera.up.toArray(),
+  viewSpan,zoom:camera.zoom,enableRotate:orbit.enableRotate,
+  label:$('viewType').textContent
+ });
+}
+function flushCameraSave(){
+ if(!cameraReadyToSave||testingScene||preview.active||preview.busy)return;
+ if(cameraSaveTimer!==null){clearTimeout(cameraSaveTimer);cameraSaveTimer=null}
+ const state=currentEditorCamera();
+ if(!state)return;
+ live.editorCamera=state;
+ // A tiny, mode-scoped write happens before the debounced full scene write.
+ try{localStorage.setItem(cameraKey,JSON.stringify(state))}
+ catch(_){/* The full draft/export remains a fallback when storage is full. */}
+ persist();
+}
+function scheduleCameraSave(){
+ if(!cameraReadyToSave||testingScene||preview.active||preview.busy)return;
+ if(cameraSaveTimer!==null)clearTimeout(cameraSaveTimer);
+ cameraSaveTimer=setTimeout(flushCameraSave,520);
+}
+function restoreEditorCamera(raw,{remember=false}={}){
+ const state=normalizeEditorCameraState(raw);
+ if(!state)return false;
+ const wasReady=cameraReadyToSave;
+ cameraReadyToSave=false;
+ const previousDamping=orbit.enableDamping;
+ orbit.enableDamping=false;
+ camera.position.fromArray(state.position);
+ camera.up.fromArray(state.up);
+ orbit.target.fromArray(state.target);
+ camera.zoom=state.zoom;
+ orbit.enableRotate=state.enableRotate;
+ viewSpan=state.viewSpan;
+ camera.lookAt(orbit.target);
+ resize();
+ orbit.update();
+ orbit.enableDamping=previousDamping;
+ $('viewType').textContent=state.label;
+ camera.updateMatrixWorld(true);
+ cameraReadyToSave=wasReady;
+ if(remember&&wasReady)flushCameraSave();
+ return true;
+}
+function updateCameraLabel(){
+ const label=$('viewType').textContent;
+ const axis=label==='Vista lateral X'?'x':label==='Vista superior Y'?'y':
+  label==='Vista frontal Z'?'z':null;
+ if(axis){
+  const direction=camera.position.clone().sub(orbit.target).normalize();
+  const axisVector=axis==='x'?new THREE.Vector3(1,0,0):
+   axis==='y'?new THREE.Vector3(0,1,0):new THREE.Vector3(0,0,1);
+  if(direction.dot(axisVector)<.9995)$('viewType').textContent='Vista 3D';
+ }
+}
+orbit.addEventListener('change',()=>{
+ if(!cameraReadyToSave||testingScene||preview.active||preview.busy)return;
+ updateCameraLabel();
+ scheduleCameraSave();
+});
+// Pagehide and tab switching commit the last camera even after a short gesture.
+window.addEventListener('pagehide',()=>{if(cameraReadyToSave)flushCameraSave()});
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden&&cameraReadyToSave)flushCameraSave();
+});
+window.__editorCamera={
+ getState:currentEditorCamera,
+ restore:state=>restoreEditorCamera(state,{remember:true}),
+ flush:flushCameraSave
+};
 $('test').onclick=()=>{
  testingScene=true;vertexEditor.setActive(false);terrainInspector.setActive(false);draw();
  void preview.start().then(()=>{
