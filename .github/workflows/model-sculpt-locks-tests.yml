@@ -1,7 +1,7 @@
 name: Validar esculpido de modelos y bloqueo normal/total
 on:
   push:
-    branches: [main, fix/mesh-sculpt-locked-vertices-v0.9.19]
+    branches: [main]
     paths:
       - 'mesh-vertex-freeze.mjs'
       - 'mesh-vertex-editor.mjs'
