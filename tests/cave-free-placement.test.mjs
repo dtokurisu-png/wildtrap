@@ -64,8 +64,9 @@ test('el movimiento y el editor de números no vuelven a anclar las cuevas',()=>
   'La altura libre se mantiene, sumando únicamente la corrección de anclaje del propio modelo');
  assert.ok(editor.includes('original.y=prefabWorldY(n,heightAt)'));
  assert.ok(editor.includes("n.y=altitudeFromVerticalDrag("));
- assert.ok(editor.includes('if(isFreeCave(n.prefabId)&&locks.y!==true)n.y=worldY+heightDelta'),
-   'Y absoluta se mantiene y se respeta cuando está bloqueada');
+ assert.ok(editor.includes('if(isFreeCave(n.prefabId)){')&&
+   editor.includes('if(locks.y!==true)n.y=worldY+heightDelta'),
+   'Las cuevas con Y bloqueado conservan su altura absoluta durante Aplicar');
  assert.ok(editor.includes("else delete n.y"));
  assert.ok(editor.includes("$('prefabOffsetY').disabled=!cave"));
  assert.ok(editor.includes("n.offsetY=0;"));
