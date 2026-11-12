@@ -3,7 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 // El editor de zonas se carga después del motor principal; un módulo opcional no bloquea la apertura.
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
-import {createPlaytest} from './playtest.mjs?v=0.9.12';
+// Playtest is loaded on demand. Broken external GLB/FBX cannot prevent the editor boot.
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.13';
 import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17';
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.17';
@@ -760,7 +760,7 @@ function setDefault3D(){
 // No saved view: start at the same angled 3D view as the existing Vista 3D button.
 setDefault3D();
 prefabLibrary=createPrefabLibrary(()=>{draw();updatePrefabLoadStatus()});
-void prefabLibrary.preload().then(()=>{draw();updatePrefabLoadStatus()});
+void prefabLibrary.preload().then(()=>{draw();updatePrefabLoadStatus()}).catch(error=>{console.error('Error en precarga de modelos:',error);toast('Algunos modelos no se pudieron precargar; el editor continúa')});
 updatePrefabLoadStatus();
 const prefabGallery=createPrefabGallery({
  library:prefabLibrary,
@@ -789,12 +789,27 @@ holesEditor=createTerrainHoles({
 terrainInspector=createTerrainMeshInspector({scene,camera,view,terrain,$,
  isSelected:()=>terrainPropertiesSelected});
 window.__terrainMeshInspector=terrainInspector;
-const preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
- resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
- onStop:()=>{
-  testingScene=false;draw();updateMeshInspection();
- }
-});
+// No network, FBX parser or animation adapter is required to open the editor.
+let preview={
+ active:false,busy:false,start:async()=>{},stop:()=>{},frame:()=>null,
+ resize:()=>{},fromFile:()=>{},sourceError:''
+};
+let previewLoad=null;
+async function ensurePreview(){
+ if(previewLoad)return previewLoad;
+ previewLoad=import('./playtest.mjs?v=0.9.22').then(({createPlaytest})=>{
+  preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
+   resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
+   onStop:()=>{testingScene=false;draw();updateMeshInspection();}
+  });
+  return preview;
+ }).catch(error=>{
+  previewLoad=null;
+  console.error('No se pudo preparar el modo Probar',error);
+  throw error;
+ });
+ return previewLoad;
+}
 vertexEditor=createMeshVertexEditor({
  scene,camera,view,marquee:$('selectionMarquee'),$,
  getSelectedNode:()=>live.nodes.find(n=>n.id===selectedId),
@@ -973,11 +988,23 @@ window.__editorCamera={
  restore:state=>restoreEditorCamera(state,{remember:true}),
  flush:flushCameraSave
 };
-$('test').onclick=()=>{
- testingScene=true;vertexEditor.setActive(false);terrainInspector.setActive(false);draw();
- void preview.start().then(()=>{
-  if(!preview.active){testingScene=false;draw();updateMeshInspection();}
- });
+$('test').onclick=async()=>{
+ if(testingScene||preview.busy)return;
+ $('test').disabled=true;
+ $('testModelStatus').textContent='Preparando modo Probar…';
+ try{
+  const test=await ensurePreview();
+  testingScene=true;vertexEditor.setActive(false);terrainInspector.setActive(false);draw();
+  await test.start();
+  if(!test.active){testingScene=false;draw();updateMeshInspection();}
+ }catch(error){
+  testingScene=false;
+  document.body.classList.remove('testing');
+  orbit.enabled=true;
+  $('testModelStatus').textContent='Error al preparar prueba: '+(error?.message||error);
+  toast('La prueba no pudo iniciarse; el editor permanece disponible');
+  draw();updateMeshInspection();
+ }finally{$('test').disabled=preview.busy;}
 };
 $('createHole').onclick=()=>{holesEditor.apply(true);draw()};
 $('restoreHole').onclick=()=>{holesEditor.apply(false);draw()};
@@ -985,7 +1012,12 @@ $('clearHoleSelection').onclick=()=>holesEditor.clearSelection();
 $('undoHolePoint').onclick=()=>holesEditor.removeLastPoint();
 $('closeHoleContour').onclick=()=>holesEditor.closePolygon();
 $('stopTest').onclick=()=>preview.stop();
-$('localFarolera').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview.fromFile(file);e.target.value=''});
+$('localFarolera').addEventListener('change',async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ try{(await ensurePreview()).fromFile(file)}
+ catch(error){toast('No se pudo preparar Farolera local: '+error.message)}
+ e.target.value='';
+});
 function setNodeSelection(ids){
  terrainPropertiesSelected=false;
  selectedIds.clear();
