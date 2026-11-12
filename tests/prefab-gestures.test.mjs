@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,freeCaveFromScreenDrag,MIN_PREFAB_SCALE,MAX_PREFAB_SCALE} from '../prefab-gestures.mjs';
+import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,freeCaveFromScreenDrag,constrainTranslationAxes,MIN_PREFAB_SCALE,MAX_PREFAB_SCALE} from '../prefab-gestures.mjs';
 
 const editor=fs.readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
 const library=fs.readFileSync(new URL('../prefab-library.mjs',import.meta.url),'utf8');
@@ -125,4 +125,23 @@ test('la función de movimiento libre rechaza desplazamientos inválidos sin apl
  assert.ok(editor.includes("session.action==='free'||session.action==='plane'"));
  assert.ok(editor.includes("const ground=freeCave?null:"));
  assert.ok(editor.includes("if(isCave)")===false || editor.includes("if(cave)n.y=translated.y"));
+});
+
+test('Bloqueos X/Y/Z se aplican al movimiento libre sin alterar la Y desbloqueada',()=>{
+ const original={x:12,y:37,z:-8},next={x:75,y:-15,z:19};
+ assert.deepEqual(constrainTranslationAxes(original,next,{x:true}),{x:12,y:-15,z:19});
+ assert.deepEqual(constrainTranslationAxes(original,next,{y:true}),{x:75,y:37,z:19});
+ assert.deepEqual(constrainTranslationAxes(original,next,{z:true}),{x:75,y:-15,z:-8});
+ assert.deepEqual(constrainTranslationAxes(original,next,{x:true,y:true,z:true}),original);
+ assert.deepEqual(constrainTranslationAxes(original,next,{}),next);
+ assert.deepEqual(original,{x:12,y:37,z:-8},'Las coordenadas originales no se deben modificar');
+});
+test('El editor respeta los bloqueos en Y directa, plano X/Z y altura auxiliar',()=>{
+ assert.ok(editor.includes('constrainTranslationAxes(orig,translated,n.rotationLocks)'));
+ assert.ok(editor.includes("n.rotationLocks?.y!==true"),'Alt+Shift debe respetar el bloqueo Y');
+ assert.ok(editor.includes("if(Number.isFinite(translated.x)&&locks.x!==true)"));
+ assert.ok(editor.includes("if(Number.isFinite(translated.z)&&locks.z!==true)"));
+ assert.ok(editor.includes("if(locks.x!==true)n.x=clamp(n.x+dx"));
+ assert.ok(editor.includes("if(locks.z!==true)n.z=clamp(n.z+dz"));
+ assert.ok(editor.includes('constrainedRotation('),'El bloqueo de rotación original no debe desaparecer');
 });
