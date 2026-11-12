@@ -1,10 +1,13 @@
-import {objectTree,sceneObjectCount,categoryForNode} from './scene-object-catalog.mjs?v=0.9.10';
+import {objectTree,sceneObjectCount,categoryForNode} from './scene-object-catalog.mjs?v=0.9.17';
 
 // Editor-only outliner. This component NEVER mutates live world data directly:
 // its host callbacks use the normal snapshot / draw / persist pipeline.
 export function createSceneObjectManager({
  root,hierarchyRoot,getNodes,getGroups,getSelection,lookup,select,setVisibility,setIntangible=()=>{},group,ungroup,rename,
- terrainIsVisible=()=>true,setTerrainVisibility=()=>{},showTerrainMesh=()=>{}
+ terrainIsVisible=()=>true,setTerrainVisibility=()=>{},
+ terrainIsIntangible=()=>false,setTerrainIntangible=()=>{},
+ terrainMeshIsVisible=()=>false,setTerrainMeshVisibility=()=>{},
+ setMeshVisibility=()=>{},selectTerrain=()=>{}
 }){
  if(!root||!hierarchyRoot)throw new Error('No se encontraron las ventanas Objetos y Jerarquía');
  const create=(tag,className,text)=>{
@@ -35,15 +38,20 @@ export function createSceneObjectManager({
  header.append(heading,actionBar,note);
  const terrainSection=create('section','scene-group scene-terrain-group');
  const terrainRow=create('div','scene-group-header');
- const terrainLabel=create('span','scene-terrain-name','▤  Escenario · Terreno');
+ const terrainLabel=create('button','scene-terrain-name','▤  Escenario · Terreno');
+ terrainLabel.type='button';
+ terrainLabel.title='Inspeccionar las propiedades de la malla del terreno';
+ terrainLabel.addEventListener('click',selectTerrain);
  const terrainEye=create('button','scene-group-eye','◉');
  terrainEye.type='button';
  terrainEye.addEventListener('click',()=>setTerrainVisibility(!terrainIsVisible()));
+ const terrainGhost=create('button','scene-group-intangible','INT');
+ terrainGhost.type='button';terrainGhost.dataset.terrainIntangible='true';
+ terrainGhost.addEventListener('click',()=>setTerrainIntangible(!terrainIsIntangible()));
  const meshButton=create('button','scene-terrain-edit','◫ Malla');
- meshButton.type='button';meshButton.title='Inspeccionar vértices, aristas y caras del terreno';
- meshButton.setAttribute('aria-label','Ver malla del terreno de la arena');
- meshButton.addEventListener('click',showTerrainMesh);
- terrainRow.append(terrainLabel,terrainEye,meshButton);terrainSection.append(terrainRow);
+ meshButton.type='button';meshButton.dataset.terrainMesh='true';
+ meshButton.addEventListener('click',()=>setTerrainMeshVisibility(!terrainMeshIsVisible()));
+ terrainRow.append(terrainLabel,terrainEye,terrainGhost,meshButton);terrainSection.append(terrainRow);
  const treeRoot=create('div','scene-tree');
  root.replaceChildren(header,terrainSection,treeRoot);
  const hierarchyTitle=create('h2','', 'Jerarquía de la escena');
@@ -60,6 +68,16 @@ export function createSceneObjectManager({
   terrainEye.title=terrainVisible?'Ocultar terreno (solo en el editor)':'Mostrar terreno';
   terrainEye.setAttribute('aria-label',terrainEye.title);
   terrainEye.classList.toggle('is-hidden',!terrainVisible);
+  const intangible=terrainIsIntangible();
+  terrainGhost.classList.toggle('is-intangible',intangible);
+  terrainGhost.setAttribute('aria-pressed',String(intangible));
+  terrainGhost.title=intangible?'Volver tangible el terreno':'Hacer intangible el terreno para seleccionar objetos detrás';
+  terrainGhost.setAttribute('aria-label',terrainGhost.title);
+  const mesh=terrainMeshIsVisible();
+  meshButton.setAttribute('aria-pressed',String(mesh));
+  meshButton.classList.toggle('mesh-visible',mesh);
+  meshButton.title=mesh?'Ocultar malla del terreno':'Mostrar malla del terreno (sin cambiar de herramienta)';
+  meshButton.setAttribute('aria-label',meshButton.title);
   const selected=new Set(getSelection());
   for(const button of treeRoot.querySelectorAll('[data-object-id]')){
    const active=selected.has(Number(button.dataset.objectId));
@@ -142,7 +160,15 @@ export function createSceneObjectManager({
    ghost.setAttribute('aria-label',ghost.title);
    ghost.setAttribute('aria-pressed',String(intangibleAll));
    ghost.addEventListener('click',()=>setIntangible(bucket.objects.map(obj=>obj.id),!intangibleAll));
-   heading.append(expand,eye,ghost);section.append(heading);
+   const allMesh=bucket.objects.every(obj=>obj.meshVisible);
+   const groupMesh=create('button','scene-group-mesh','◫');
+   groupMesh.type='button';groupMesh.dataset.groupMesh=bucket.id;
+   groupMesh.classList.toggle('mesh-visible',allMesh);
+   groupMesh.setAttribute('aria-pressed',String(allMesh));
+   groupMesh.title=allMesh?'Ocultar mallas de todo el grupo':'Mostrar mallas de todo el grupo';
+   groupMesh.setAttribute('aria-label',groupMesh.title);
+   groupMesh.addEventListener('click',()=>setMeshVisibility(bucket.objects.map(obj=>obj.id),!allMesh));
+   heading.append(expand,eye,ghost,groupMesh);section.append(heading);
    if(!collapsed[bucket.id]){
     const list=create('div','scene-group-items');
     for(const obj of bucket.objects){
@@ -170,7 +196,14 @@ export function createSceneObjectManager({
      ghost.title=(obj.intangible?'Volver tangible ':'Intangible: mostrar transparente e ignorar herramientas en ')+obj.label;
      ghost.setAttribute('aria-pressed',String(obj.intangible));
      ghost.addEventListener('click',()=>setIntangible([obj.id],!obj.intangible));
-     item.append(pick,visible,ghost);list.append(item);
+     const mesh=create('button','scene-object-mesh','◫');
+     mesh.type='button';mesh.dataset.meshId=String(obj.id);
+     mesh.classList.toggle('mesh-visible',obj.meshVisible);
+     mesh.setAttribute('aria-pressed',String(obj.meshVisible));
+     mesh.title=(obj.meshVisible?'Ocultar malla de ':'Mostrar malla de ')+obj.label;
+     mesh.setAttribute('aria-label',mesh.title);
+     mesh.addEventListener('click',()=>setMeshVisibility([obj.id],!obj.meshVisible));
+     item.append(pick,visible,ghost,mesh);list.append(item);
     }
     section.append(list);
    }
@@ -186,6 +219,7 @@ export function createSceneObjectManager({
   const state={
    buckets:objectTree(getNodes(),getGroups(),lookup),
    collapsed,terrainVisible:terrainIsVisible(),
+   terrainIntangible:terrainIsIntangible(),terrainMesh:terrainMeshIsVisible(),
   };
   const next=JSON.stringify(state);
   if(force||signature!==next){
