@@ -377,6 +377,7 @@ function updateStatus(){
  const picked=live.nodes.find(x=>x.id===selectedId);
  $('caveFreeMoveHelp').hidden=!(picked?.kind==='prefab'&&isFreeCave(picked.prefabId));
  $('selected').textContent=selectedIds.size>1?selectedIds.size+' elementos seleccionados':(picked?'ID '+picked.id+' · '+(picked.kind==='prefab'?prefabById(picked.prefabId)?.name||picked.prefabId:picked.kind):'Nada seleccionado');
+ const cave=picked?.kind==='prefab'&&isFreeCave(picked.prefabId);
  if(picked?.kind==='prefab'){
   if(!armedPrefabId)$('prefabType').value=picked.prefabId;
   $('prefabX').value=picked.x;
@@ -384,7 +385,6 @@ function updateStatus(){
   $('prefabRotation').value=((picked.rotation||0)*180/Math.PI).toFixed(1);
   $('prefabRotationX').value=((picked.rotationX||0)*180/Math.PI).toFixed(1);
   $('prefabRotationZ').value=((picked.rotationZ||0)*180/Math.PI).toFixed(1);
-  const cave=isFreeCave(picked.prefabId);
   $('prefabOffsetY').disabled=!cave;
   $('prefabHeightLabel').textContent=cave?'Altura libre Y (mundo)':'Altura Y (anclada al terreno)';
   $('prefabOffsetY').value=(prefabWorldY(picked,heightAt)+(Number(picked.scaleAnchorOffsetY)||0)).toFixed(2);
