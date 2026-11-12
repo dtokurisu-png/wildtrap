@@ -323,3 +323,36 @@ El indicador tridimensional de la esquina del escenario ahora permite cambiar de
 Se ha corregido una regresión del movimiento libre de cuevas: los bloqueos de ejes guardados en `rotationLocks` seguían aplicándose a la rotación, pero no al nuevo arrastre del modelo. Ahora estos mismos tres botones de las propiedades del objeto bloquean su **posición y rotación** en el eje correspondiente: X fija desplazamiento X y rotación X; Y fija altura absoluta y rotación Y; Z fija profundidad y rotación Z. Se respetan en el movimiento normal, **Espacio + arrastrar** en el plano X/Z, **Alt + Shift** para altura y los campos numéricos. Los controles bloqueados aparecen desactivados y los desbloqueados mantienen el movimiento libre sin colisiones con el terreno. El estado anterior se conserva en el JSON y el historial.
 
 Las pruebas automatizadas `tests/prefab-gestures.test.mjs` y `tests/browser-axis-view-locks.mjs` comprueban los tres ejes de cámara, el enfoque de un GLB, la independencia de sus bloqueos, la altura Y con X bloqueado, el bloqueo Y y el movimiento Z en modo Espacio. Las regresiones de fases anteriores y arrastre libre sin bloqueos siguen ejecutándose.
+
+
+## v0.9.17 — Malla por objeto y grupo, Intangible y altura puntual para cuevas
+
+La vista de topología **ya no tiene un botón exclusivo en la barra izquierda** ni un duplicado en el panel Cuchillo. Los botones **◫ Malla** del gestor **Objetos de la escena** son ahora las únicas acciones para encender o apagar la capa de malla:
+
+- **Terreno de la arena:** el botón de la fila *Escenario · Terreno* alterna el dibujo de la malla real del terreno. Haz clic en el nombre del terreno para abrir sus propiedades (Caras, Aristas, Vértices, Rayos X, recuento de triángulos y diagnóstico de caras). El botón **◉** independiente sigue controlando únicamente la visibilidad normal.
+- **Cada modelo 3D:** aparece **◫** junto a sus botones ◉ e **INT**. Solo cambia la malla de ese modelo, no su estado de selección ni la herramienta activa.
+- **Cada grupo de objetos:** aparece **◫** junto a ◉ e INT. Permite mostrar u ocultar las mallas de todas las instancias del grupo sin modificar otros grupos. Los cambios son reversibles con Ctrl+Z.
+
+El Cuchillo continúa funcionando **con cualquier combinación de mallas visibles** y recalcula la topología tras crear o restaurar un agujero, sin obligar a salir del modo recorte. Mientras uses Cuchillo, puedes abrir la pestaña Objetos y pulsar ◫ sobre cualquier objeto o el terreno.
+
+### Propiedades de los modelos (dentro de Estructuras / Objeto)
+
+Selecciona una instancia en **Objetos** o sobre el escenario. La pestaña **Objeto** del panel derecho contiene los parámetros X/Y/Z, rotación, escala, restricciones de ejes, y ahora también la sección **Modelo seleccionado · Propiedades de malla**. Allí están los controles de Caras, Aristas, Vértices, Rayos X, número de mallas/vértices, Seleccionar todos, Deseleccionar, Bloquear/Desbloquear vértices y deformación/restauración. **Editar vértices del modelo** activa temporalmente el modo interno de selección de vértices; al finalizar recuperas el movimiento normal. La opción no se activa durante un recorte; los botones ◫ sí están disponibles siempre. Estructuras incluye un acceso a esta pestaña Objeto.
+
+El modelo original GLB permanece sin modificaciones: la topología visible es una capa de depuración por instancia y las operaciones de deformación se guardan como datos del escenario.
+
+### Intangible sin atravesar otros objetos
+
+El botón **INT** sigue separándose de ◉ (ocultar) y de ◫ (ver malla). Un objeto intangible es semitransparente y no recibe selección ni cortes del Cuchillo; **su material conserva la prueba de profundidad** para que los objetos opacos interpuestos lo oculten normalmente, en lugar de dibujarse atravesándolos. El antiguo efecto obligatorio de Rayos X por ser intangible ha desaparecido. Puedes activar Rayos X explícitamente en la sección Malla.
+
+**Escenario · Terreno** también tiene su propio botón **INT**. Cuando está activo, el relieve se muestra semitransparente y deja seleccionar o cortar modelos situados detrás: el cortador ya no utiliza la malla original del terreno como objetivo. El terreno físico, su altura, los agujeros y el archivo JSON no se eliminan. Al desactivar INT, vuelve a ser opaco y recortable. Durante Play se mantiene la apariencia normal del terreno y de las instancias.
+
+### Igualar la altura de una cueva al terreno una sola vez
+
+Selecciona una cueva GLB y abre **Objeto → Restricciones de transformación → Igualar altura de la cueva a la superficie del terreno**. La acción copia la altura de la superficie del terreno en las coordenadas X/Z actuales, compensando el desplazamiento del anclaje de escala del modelo. **No activa anclaje**, no impide atravesar después el terreno ni modifica X/Z. Permanece disponible el movimiento vertical libre del ratón y el ajuste de profundidad con Espacio+arrastrar. Si Y está bloqueado, la acción está deshabilitada y la altura existente se conserva.
+
+### Compatibilidad y comprobaciones
+
+Todos los estados nuevos son opcionales y siguen el formato de guardado existente (`node.editorMeshVisible`, `node.editorMeshLayers`, `settings.terrainMeshVisible`, `settings.terrainIntangible`, `node.y`). Los mapas antiguos no requieren migración. Los controles usan el mismo historial Ctrl+Z.
+
+El flujo **Validar controles Malla, Intangible y altura de cuevas** prueba el nuevo gestor con tres modelos GLB reales, grupos, malla sobre Cuchillo, propiedades editables, INT y altura, y ejecuta las pruebas de la vista de terreno, fases 3/4, editor GLB, eje XYZ, inicio y movimiento de cuevas.
