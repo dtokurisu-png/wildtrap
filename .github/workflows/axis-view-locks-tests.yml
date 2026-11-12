@@ -1,0 +1,46 @@
+name: Validar vistas XYZ y bloqueos de ejes
+on:
+  push:
+    branches: [main, fix/axis-view-locks-v0.9.16]
+    paths:
+      - 'editor.mjs'
+      - 'index.html'
+      - 'editor-workspace.css'
+      - 'prefab-gestures.mjs'
+      - 'tests/prefab-gestures.test.mjs'
+      - 'tests/axis-view-locks-smoke.html'
+      - 'tests/browser-axis-view-locks.mjs'
+      - 'tests/browser-workspace.mjs'
+      - '.github/workflows/axis-view-locks-tests.yml'
+  workflow_dispatch:
+jobs:
+  xyz-locks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxis y bloqueos en movimientos GLB
+        run: |
+          node --check editor.mjs
+          node --check prefab-gestures.mjs
+          node --test tests/prefab-gestures.test.mjs
+          node --test tests/mesh-deform.test.mjs
+      - name: Servidor local
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-xyz-locks-http.log 2>&1 &
+          sleep 2
+      - name: Clic XYZ real, enfoque de cámara y bloqueo de cuevas en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-axis-view-locks.mjs
+      - name: Verificar fases anteriores y movimiento Y libre sin bloqueos
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: |
+          node tests/browser-cave-free-y.mjs
+          node tests/browser-workspace.mjs
+          node tests/browser-phase4-mesh.mjs
+          node tests/browser-startup.mjs
