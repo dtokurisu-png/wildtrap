@@ -278,6 +278,18 @@ export function createMeshVertexEditor({
   }
   return anchors;
  }
+ function ensureAnchors(id){
+  const node=getSelectedNode();
+  if(!node||node.id!==id||node.kind!=='prefab')return false;
+  const locks=normalizedLocks(node.vertexLocks),root=getRoot(id);
+  if(!root||!Object.keys(locks).length)return false;
+  const anchors=normalizedVertexAnchors(node.vertexLockAnchors);
+  const missing=Object.entries(locks).some(([key,ids])=>
+   ids.some(index=>!anchors[key]?.[index]));
+  if(!missing)return false;
+  node.vertexLockAnchors=captureAnchors(node,root,locks,anchors);
+  return true;
+ }
  function mutateLocks(locked){
   const target=getTarget();
   if(!active||!target||!selected.size)return;
@@ -325,7 +337,7 @@ export function createMeshVertexEditor({
  $('meshResetDeform').addEventListener('click',resetDeformation);
  updateInfo();
  return {setActive,rebuild,beforeDraw:clearVisuals,dispose,updateInfo,
-  pointerdown,pointermove,pointerup,hasGesture:()=>Boolean(gesture),
+  pointerdown,pointermove,pointerup,ensureAnchors,hasGesture:()=>Boolean(gesture),
   getState:()=>({active,currentId,points:samples.length,selected:selected.size,
    locked:Object.values(normalizedLocks(getSelectedNode()?.vertexLocks)).reduce((a,b)=>a+b.length,0),
    operations:cleanVertexOperations(getSelectedNode()?.meshScaleOps).length+
