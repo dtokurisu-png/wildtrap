@@ -650,25 +650,75 @@ vertexEditor=createMeshVertexEditor({
  getMode:()=>mode,snapshot,draw,persist,toast
 });
 window.__meshEditor=vertexEditor;
-// The 3D gizmo is camera-relative, keeping Y visibly vertical in the world.
-const axesSvg=$('axisGizmoSvg');let axisTick=0;
+// XYZ markers are camera controls, independent of an object's XYZ locks.
+const axesSvg=$('axisGizmoSvg'),axisViewButtons=[...document.querySelectorAll('[data-view-axis]')];
+let axisTick=0;
+function snapCameraToAxis(axis){
+ if(preview.active||preview.busy)return;
+ const direction={
+  x:new THREE.Vector3(1,0,0),
+  y:new THREE.Vector3(0,1,0),
+  z:new THREE.Vector3(0,0,1)
+ }[axis];
+ if(!direction)return;
+ const focus=orbit.target.clone();
+ const selected=live.nodes.find(n=>n.id===selectedId);
+ if(selected){
+  const root=(renderedNodes.get(selected.id)||[]).find(n=>n.userData?.sharedAsset);
+  if(root){
+   root.updateMatrixWorld(true);
+   const bounds=new THREE.Box3().setFromObject(root);
+   if(!bounds.isEmpty())bounds.getCenter(focus);
+   else focus.set(selected.x||0,prefabWorldY(selected,heightAt),selected.z||0);
+  }else if(Number.isFinite(selected.x)&&Number.isFinite(selected.z)){
+   focus.set(selected.x,selected.kind==='prefab'?prefabWorldY(selected,heightAt):heightAt(selected.x,selected.z),selected.z);
+  }
+ }
+ const distance=Math.max(60,camera.position.distanceTo(orbit.target));
+ camera.up.set(0,axis==='y'?0:1,axis==='y'?-1:0);
+ orbit.target.copy(focus);
+ camera.position.copy(focus).addScaledVector(direction,distance);
+ const previousDamping=orbit.enableDamping;
+ orbit.enableDamping=false;
+ orbit.enableRotate=axis!=='y';
+ camera.lookAt(focus);
+ orbit.update();
+ orbit.enableDamping=previousDamping;
+ camera.updateMatrixWorld(true);
+ $('viewType').textContent=axis==='y'?'Vista superior Y':axis==='x'?'Vista lateral X':'Vista frontal Z';
+ refreshAxisGizmo();
+}
 function refreshAxisGizmo(){
  const inverse=camera.quaternion.clone().invert();
+ const directionToCamera=camera.position.clone().sub(orbit.target).normalize();
  const directions=[
   {v:new THREE.Vector3(1,0,0),name:'X',color:'#ff7777'},
   {v:new THREE.Vector3(0,1,0),name:'Y',color:'#7ff4a4'},
   {v:new THREE.Vector3(0,0,1),name:'Z',color:'#78b7ff'}
  ];
- const center=56;
+ const width=axesSvg.clientWidth||112,height=axesSvg.clientHeight||110;
+ const size=width<100?24:30;
  const lines=directions.map(axis=>{
-  const v=axis.v.applyQuaternion(inverse);
-  const x=center+v.x*37,y=center-v.y*37;
+  const worldAxis=axis.v.clone(),v=axis.v.applyQuaternion(inverse);
+  const x=56+v.x*37,y=56-v.y*37;
+  const button=axisViewButtons.find(b=>b.dataset.viewAxis===axis.name.toLowerCase());
+  if(button){
+   button.style.left=(x*width/112-size/2).toFixed(2)+'px';
+   button.style.top=(y*height/110-size/2).toFixed(2)+'px';
+   button.setAttribute('aria-pressed',String(directionToCamera.dot(worldAxis)>.9999));
+  }
   return '<line x1="56" y1="56" x2="'+x.toFixed(2)+'" y2="'+y.toFixed(2)+'" stroke="'+axis.color+'" stroke-width="3.4" stroke-linecap="round"/>'+
    '<circle cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="9" fill="'+axis.color+'"/>'+
    '<text x="'+x.toFixed(2)+'" y="'+(y+4).toFixed(2)+'" font-size="12" text-anchor="middle" fill="#132b24" font-weight="bold">'+axis.name+'</text>';
  }).join('');
  axesSvg.innerHTML='<circle cx="56" cy="56" r="3" fill="#effff6"/>'+lines;
 }
+for(const button of axisViewButtons)
+ button.addEventListener('click',()=>snapCameraToAxis(button.dataset.viewAxis));
+window.__axisView={snap:snapCameraToAxis,state:()=>({
+ position:camera.position.toArray(),target:orbit.target.toArray(),up:camera.up.toArray(),
+ view:$('viewType').textContent,enableRotate:orbit.enableRotate
+})};
 refreshAxisGizmo();
 $('test').onclick=()=>{
  testingScene=true;vertexEditor.setActive(false);terrainInspector.setActive(false);draw();
