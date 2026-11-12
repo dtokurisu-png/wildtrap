@@ -87,6 +87,7 @@
     assert(same(probe(first.key,first.index),worldFrozen),
      'El bloqueo TOTAL se movió cuando el modelo cambió X');
     step='esculpir objeto, no terreno';
+    const groundBefore=JSON.stringify(JSON.parse(localStorage.getItem(draftKey)||'{}').heights||[]);
     d.querySelector('[data-workspace="sculpt"]').click();
     assert(w.__workspaceLayout.getState().workspace==='sculpt','No se pudo abrir Esculpir');
     assert(w.__modelSculpt.getState().selectedIsGLB,
@@ -111,7 +112,8 @@
     assert(stored?.vertexLockAnchors?.[first.key]?.[first.index]?.world,
      'No persistió la coordenada mundial de bloqueo total');
     assert(stored?.meshSculptOps?.length===1,'La pincelada no se guardó en JSON');
-    assert(stored.heights?.every(h=>h===0),'Esculpir objeto alteró el terreno');
+    assert(JSON.stringify(stored.heights||[])===groundBefore,
+     'Esculpir objeto alteró el terreno original en vez de solo modificar el GLB');
     document.body.dataset.result='PASS';
     out.textContent='PASS · bloqueo normal resiste escala, traslado permitido; bloqueo total fija mundo; esculpir GLB real sin tocar el terreno';
    }catch(e){fail(step,e)}
