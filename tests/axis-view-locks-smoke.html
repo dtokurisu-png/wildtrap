@@ -1,0 +1,123 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP · XYZ views and locks</title></head>
+<body data-result="PENDING"><div id="result">Comprobando indicadores XYZ y bloqueos</div><script>
+(()=>{
+ const output=document.getElementById('result');
+ const assert=(value,message)=>{if(!value)throw Error(message)};
+ const fail=(where,e)=>{document.body.dataset.result='FAIL';output.textContent='FAIL '+where+': '+e.message};
+ try{
+  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify({
+   version:3,size:630,resolution:129,heights:Array(129*129).fill(0),
+   nodes:[{id:901,kind:'prefab',prefabId:'rocky-cave',x:0,y:28,z:0,rotation:0,scale:1.4,
+    rotationLocks:{x:false,y:false,z:false}}],
+   objectGroups:[],holes:[],cuts3d:[],nextId:902,settings:{heightMax:120}
+  }));
+  const frame=document.createElement('iframe');frame.width=1440;frame.height=900;
+  frame.src='../?safe=1';document.body.append(frame);
+  let running=false;const start=Date.now();
+  const interval=setInterval(()=>{
+   if(running||document.body.dataset.result!=='PENDING')return;
+   const d=frame.contentDocument,w=frame.contentWindow;
+   if(!d?.querySelector('#boot[hidden]')||!w.__axisView||!w.__sceneObjectManager||
+      !d.querySelector('[data-object-id="901"]')||
+      !String(d.getElementById('prefabStatus')?.textContent).includes('4/4')){
+    if(Date.now()-start>27000){clearInterval(interval);fail('inicio',Error('No cargó la cueva o controles XYZ'))}
+    return;
+   }
+   running=true;clearInterval(interval);
+   let stage='vistas por ejes';
+   try{
+    const near=(a,b,e=.003)=>Math.abs(a-b)<=e;
+    const state=()=>w.__axisView.state();
+    const btn=axis=>d.querySelector('[data-view-axis="'+axis+'"]');
+    d.querySelector('[data-workspace="project"]').click();
+    d.querySelector('[data-object-id="901"]').click();
+    assert(['x','y','z'].every(axis=>btn(axis)),'Faltan los tres botones del indicador XYZ');
+    const lockedBefore=['x','y','z'].map(axis=>d.querySelector('[data-rotation-lock="'+axis+'"]').getAttribute('aria-pressed'));
+    for(const axis of ['x','y','z']){
+     btn(axis).click();
+     const p=state().position,t=state().target;
+     const length=Math.hypot(p[0]-t[0],p[1]-t[1],p[2]-t[2]);
+     const unit=[(p[0]-t[0])/length,(p[1]-t[1])/length,(p[2]-t[2])/length];
+     const expected={x:[1,0,0],y:[0,1,0],z:[0,0,1]}[axis];
+     assert(unit.every((v,i)=>near(v,expected[i])),
+      'Vista '+axis+' no alineada: '+JSON.stringify({unit,expected}));
+     assert(state().view.includes(axis.toUpperCase()),'El indicador de vista no cambió');
+     assert(btn(axis).getAttribute('aria-pressed')==='true','El marcador '+axis+' no se activó');
+     assert(near(t[0],0,1)&&near(t[2],0,1),
+      'La cámara se alejó del modelo seleccionado');
+     assert(state().enableRotate===(axis!=='y'),
+      'El modo de rotación de cámara es incorrecto para '+axis);
+    }
+    const after=['x','y','z'].map(axis=>d.querySelector('[data-rotation-lock="'+axis+'"]').getAttribute('aria-pressed'));
+    assert(JSON.stringify(after)===JSON.stringify(lockedBefore),'El clic en XYZ cambió los bloqueos de transformación');
+    stage='selección para arrastre';
+    const view=d.getElementById('viewport'),rect=view.getBoundingClientRect();
+    const pointer=(type,x,y,options={})=>{
+     const event=new w.PointerEvent(type,{bubbles:true,cancelable:true,composed:true,pointerId:81,
+      pointerType:'mouse',button:0,buttons:type==='pointerup'?0:(options.buttons??1),
+      clientX:x,clientY:y,altKey:!!options.altKey,shiftKey:!!options.shiftKey});
+     (type==='pointerup'?w:view).dispatchEvent(event);
+    };
+    const locate=()=>{
+     const midX=rect.left+rect.width/2,midY=rect.top+rect.height/2;
+     for(let dy=-150;dy<=150;dy+=9)for(let dx=-165;dx<=165;dx+=9){
+      const x=midX+dx,y=midY+dy;
+      if(x<rect.left+4||x>rect.right-4||y<rect.top+4||y>rect.bottom-4)continue;
+      pointer('pointermove',x,y,{buttons:0});
+      const hover=d.getElementById('modelHoverIndicator');
+      if(hover.style.display==='block'&&hover.textContent.includes('Cueva'))return{x,y};
+     }
+     return null;
+    };
+    const lock=axis=>d.querySelector('[data-rotation-lock="'+axis+'"]').click();
+    stage='bloqueo X y movimiento Y libre';
+    lock('x');
+    assert(d.getElementById('prefabX').disabled,'Bloquear X no deshabilita X en el inspector');
+    assert(d.getElementById('prefabRotationX').disabled,'Bloquear X no protege su rotación');
+    assert(!d.getElementById('prefabOffsetY').disabled,'Y debe seguir libre');
+    let hit=locate();assert(hit,'No hay geometría GLB seleccionable en vista frontal Z');
+    pointer('pointerdown',hit.x,hit.y);
+    pointer('pointermove',hit.x+55,hit.y-65);
+    const raised=Number(d.getElementById('prefabOffsetY').value);
+    assert(raised>29,'Y no subió con X bloqueado: '+raised);
+    assert(near(Number(d.getElementById('prefabX').value),0,.02),'Bloqueo X ignorado en arrastre');
+    pointer('pointerup',hit.x+55,hit.y-65);
+    stage='bloqueo Y y movimiento X libre';
+    lock('x');lock('y');
+    assert(d.getElementById('prefabOffsetY').disabled,'Bloquear Y no bloquea altura');
+    assert(d.getElementById('prefabRotation').disabled,'Bloquear Y no protege rotación Y');
+    hit=locate();assert(hit,'No se puede seleccionar cueva después de mover Y');
+    pointer('pointerdown',hit.x,hit.y);
+    pointer('pointermove',hit.x+65,hit.y-60);
+    const fixedY=Number(d.getElementById('prefabOffsetY').value);
+    const movedX=Number(d.getElementById('prefabX').value);
+    assert(near(fixedY,raised,.03),'Bloqueo Y ignorado: '+raised+' a '+fixedY);
+    assert(movedX>4,'Bloqueo Y no debería bloquear X libre: '+movedX);
+    pointer('pointerup',hit.x+65,hit.y-60);
+    stage='bloqueo Z con Espacio+arrastrar';
+    lock('z');
+    assert(d.getElementById('prefabZ').disabled,'Bloquear Z no bloqueó su posición');
+    hit=locate();assert(hit,'No se puede seleccionar cueva antes de arrastre plano');
+    w.dispatchEvent(new w.KeyboardEvent('keydown',{bubbles:true,cancelable:true,code:'Space',key:' '}));
+    pointer('pointerdown',hit.x,hit.y);
+    pointer('pointermove',hit.x,hit.y-66);
+    const fixedZ=Number(d.getElementById('prefabZ').value);
+    assert(near(fixedZ,0,.03),'Bloqueo Z ignorado en Espacio+arrastrar: '+fixedZ);
+    assert(near(Number(d.getElementById('prefabOffsetY').value),raised,.03),
+     'Arrastre plano no respeta bloqueo Y');
+    pointer('pointerup',hit.x,hit.y-66);
+    w.dispatchEvent(new w.KeyboardEvent('keyup',{bubbles:true,cancelable:true,code:'Space',key:' '}));
+    stage='bloqueos guardados e indicadores sin cambios de objeto';
+    await new Promise(resolve=>setTimeout(resolve,1000));
+    const saved=JSON.parse(localStorage.getItem('wildtrap-editor-draft-safe-v1')||'{}');
+    const cave=saved.nodes?.find(n=>n.id===901);
+    assert(cave?.rotationLocks?.y===true&&cave?.rotationLocks?.z===true&&cave?.rotationLocks?.x===false,
+     'Los bloqueos no se persistieron correctamente');
+    assert(near(cave?.y,raised,.04),'La altura bloqueada no se preservó en JSON');
+    document.body.dataset.result='PASS';
+    output.textContent='PASS · clic XYZ orienta cámara; locks X/Y/Z respetados en arrastre normal, Espacio y rotación';
+   }catch(e){fail(stage,e)}
+  },170);
+ }catch(e){fail('preparación',e)}
+})();
+</script></body></html>
