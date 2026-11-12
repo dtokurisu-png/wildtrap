@@ -769,6 +769,7 @@ function setNodeSelection(ids){
  selectedId=[...selectedIds].at(-1)??null;
  if(mode==='meshEdit'&&!live.nodes.some(n=>n.id===selectedId&&n.kind==='prefab'))setMode('move');
  updateSelectionHighlights();updateStatus();updateMeshInspection();
+ if(mode==='meshEdit')vertexEditor?.rebuild();
 }
 function pointerRay(e){
  const bounds=view.getBoundingClientRect();
@@ -1211,8 +1212,9 @@ $('applyPrefab').onclick=()=>{
   if(locks.y!==true)n.rotation=(n.rotation||0)+rotationDelta;
   if(locks.x!==true)n.rotationX=(n.rotationX||0)+tiltDelta;
   if(locks.z!==true)n.rotationZ=(n.rotationZ||0)+rollDelta;
-  if(isFreeCave(n.prefabId)&&locks.y!==true)n.y=worldY+heightDelta;
-  else delete n.y; // Mountains and non-cave structures cannot float.
+  if(isFreeCave(n.prefabId)){
+   if(locks.y!==true)n.y=worldY+heightDelta;
+  }else delete n.y; // A locked Y must NEVER erase a free cave's absolute height.
   n.offsetY=0;
   n.scale=clamp((n.scale||1)*scaleRatio,.05,15);
  }
