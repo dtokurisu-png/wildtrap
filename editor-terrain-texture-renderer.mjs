@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.25';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
-export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false}){
+export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false,isHoleAt=()=>false}){
  const SIZE=630, RES=768;
  const canvas=document.createElement('canvas');canvas.width=canvas.height=RES;
  const ctx=canvas.getContext('2d',{willReadFrequently:false});
@@ -121,6 +121,8 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    const scale=Math.max(.25,Number(slot.scale)||8);
    for(const f of faces){
     const tri=getFace(f);
+    const center=tri.reduce((a,p)=>[a[0]+p[0]/3,a[1]+p[1]/3,a[2]+p[2]/3],[0,0,0]);
+    if(isHoleAt(center[0],center[1],center[2]))continue;
     const a=new THREE.Vector3(...tri[0]),b=new THREE.Vector3(...tri[1]),c=new THREE.Vector3(...tri[2]);
     const normal=b.clone().sub(a).cross(c.clone().sub(a)).normalize();
     // Project walls along the dominant horizontal normal, never top-down.
@@ -130,6 +132,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
      uvs.push((useX?p[2]:p[0])*scale/SIZE,p[1]*scale/SIZE);
     }
    }
+   if(!verts.length)continue;
    const geometry=new THREE.BufferGeometry();
    geometry.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
