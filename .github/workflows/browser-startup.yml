@@ -6,6 +6,9 @@ on:
       - 'tests/browser-startup.mjs'
       - '.github/workflows/browser-startup.yml'
       - 'editor.mjs'
+      - 'biome-generator.mjs'
+      - 'editor-biome-generator.mjs'
+      - 'tests/biome-generator.mjs'
       - 'index.html'
       - 'prefab-library.mjs'
       - 'terrain-holes.mjs'
@@ -20,6 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Validar motor procedural de biomas
+        run: node tests/biome-generator.mjs
       - run: command -v google-chrome || command -v chromium
       - name: Iniciar servidor local de la revisión
         run: |
