@@ -140,6 +140,7 @@ const hiddenDebugMarkers=[];
     if(!actual.isEmpty()&&Number.isFinite(actual.min.y)){
       const center=actual.getCenter(new THREE.Vector3());
       visual.position.sub(new THREE.Vector3(center.x,actual.min.y,center.z));
+      console.info('WT Explorer avatar bounds', {height:actual.max.y-actual.min.y,scale:visual.scale.x});
     }else{
       // Geometry exists but world transforms are still malformed.
       // Present a diagnostic instead of silently starting an invisible avatar.
@@ -222,6 +223,7 @@ const hiddenDebugMarkers=[];
   return fetchModel().then(()=>{
     if(active)return;
     resetPosition();
+    if(mixer)setAnimation(activeClipIndex>=0?activeClipIndex:0);
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
