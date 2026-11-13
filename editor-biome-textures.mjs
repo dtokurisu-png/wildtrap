@@ -42,7 +42,7 @@ export function normalizeBiomeMaterials(raw){
  }
  return out;
 }
-export function createBiomeTextureEditor({live,snapshot,persist,toast}){
+export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=()=>{}}){
  const $=id=>document.getElementById(id);
  const root=$('texturePanel');if(!root)throw Error('Falta panel de texturizado');
  let biomeId=BIOMES[0].id,normalizedRef=null;
@@ -63,7 +63,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast}){
  select.value=biomeId;
  select.onchange=()=>{biomeId=select.value;render()};
  function mutate(fn){
-  snapshot();fn(model());persist();render();
+  snapshot();fn(model());persist();render();onChange();
  }
  const slots=$('textureSlots');
  function render(){
