@@ -17,4 +17,15 @@ assert.ok(near(movementHeading(0,-1),0));
 assert.ok(near(movementHeading(1,0),Math.PI/2));
 assert.ok(near(movementHeading(-1,0),-Math.PI/2));
 assert.equal(get().moving,false);
-console.log('PASS: W forward, S backward, A left, D right; orbit-independent normalized movement');
+// Camera-relative movement. At 90 degrees, W moves to +X and D to +Z.
+const yawRight=Math.PI/2;
+const wRight=movementAxes(new Set(['KeyW']),yawRight);
+const dRight=movementAxes(new Set(['KeyD']),yawRight);
+assert.ok(near(wRight.x,1)&&near(wRight.z,0),'W must follow camera yaw');
+assert.ok(near(dRight.x,0)&&near(dRight.z,1),'D must strafe right of camera');
+const opposite=movementAxes(new Set(['KeyS']),yawRight);
+assert.ok(near(opposite.x,-1)&&near(opposite.z,0));
+const diagCamera=movementAxes(new Set(['KeyW','KeyD']),yawRight);
+assert.ok(near(Math.hypot(diagCamera.x,diagCamera.z),1));
+
+console.log('PASS: W toward camera direction; A/D camera-relative strafe; normalized diagonals');
