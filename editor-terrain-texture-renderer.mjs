@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.25';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
-export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast}){
+export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false}){
  const SIZE=630, RES=768;
  const canvas=document.createElement('canvas');canvas.width=canvas.height=RES;
  const ctx=canvas.getContext('2d',{willReadFrequently:false});
+ const status=document.getElementById('textureRenderStatus');
  const surfaceMap=new THREE.CanvasTexture(canvas);
  surfaceMap.colorSpace=THREE.SRGBColorSpace;
  surfaceMap.anisotropy=4;
@@ -167,13 +168,14 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    blendZone(z,config,biomeIndex);active=true;
   }
   hasSurface=active;
+  if(status)status.textContent=active?'Texturas aplicadas a '+zones.length+' zonas. Acantilados con proyección vertical.':'Sin texturas de terreno para las zonas asignadas.';
   surfaceMap.needsUpdate=true;
   buildCliffs();apply();
  }
  function apply(){
   // Transparency is not used for terrain; only replace material when surface imagery exists.
-  terrain.material=hasSurface?(live.settings?.terrainIntangible?paintedGhost:painted):
-   (live.settings?.terrainIntangible?intangibleMaterial:material);
+  terrain.material=hasSurface?(live.settings?.terrainIntangible&&!isTesting()?paintedGhost:painted):
+   (live.settings?.terrainIntangible&&!isTesting()?intangibleMaterial:material);
   cliffLayer.visible=enabled&&hasCliffs&&terrain.visible;
  }
  function schedule(){
