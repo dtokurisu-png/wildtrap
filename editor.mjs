@@ -275,7 +275,7 @@ for(const collection of [surface,interiors,cavePiecesLayer])while(collection.chi
  const g=collection.children[0];collection.remove(g);
  // GLB instances share their immutable geometry and materials with the cache.
  if(g.userData.sharedAsset){prefabLibrary?.disposeInstance(g);continue;}
- g.traverse(m=>{m.geometry?.dispose();const mats=Array.isArray(m.material)?m.material:(m.material?[m.material]:[]);for(const mat of mats)mat?.dispose?.()});
+ g.traverse(m=>{m.geometry?.dispose();if(m.userData?.ownedSpawnMap)m.material?.map?.dispose();const mats=Array.isArray(m.material)?m.material:(m.material?[m.material]:[]);for(const mat of mats)mat?.dispose?.()});
 }
 for(const n of live.nodes){
  const layers=[surface,interiors,cavePiecesLayer];
@@ -289,7 +289,7 @@ if(n.kind==='playerSpawn'&&Number.isInteger(n.playerSlot)&&n.playerSlot>=1&&n.pl
  const c=document.createElement('canvas');c.width=128;c.height=64;const ctx=c.getContext('2d');
  ctx.fillStyle='#10362c';ctx.fillRect(8,8,112,45);ctx.font='bold 29px sans-serif';ctx.fillStyle='#ffffff';ctx.textAlign='center';ctx.fillText('J'+n.playerSlot,64,42);
  const map=new THREE.CanvasTexture(c);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map,depthTest:false}));
- sprite.position.y=13;sprite.scale.set(11,5.5,1);g.add(sprite);
+ sprite.position.y=13;sprite.scale.set(11,5.5,1);sprite.userData.ownedSpawnMap=true;g.add(sprite);
 }
 if(n.kind==='exit')marker(n.x,n.z,colours.exit,3);
 if(n.kind==='cave')caveModel(n);
