@@ -42,7 +42,7 @@ const hiddenDebugMarkers=[];
   if(imported)return imported;
   if(loadingPromise)return loadingPromise;
   const url=modelURL;
-  if(!url)throw Error('Primero selecciona el GLB propio de WILDTRAP. No se usará la Farolera de R.O.K.');
+  if(!url){say('Exploración sin personaje: puedes recorrer el mapa desde el spawn del Jugador 1.');return null;}
   loadingPromise=(async()=>{
     say('Cargando personaje local de WILDTRAP…');
     const abort=new AbortController();
@@ -152,7 +152,7 @@ const hiddenDebugMarkers=[];
     $('test').textContent='Probando…';
     resizeEditor();resize();
     clock.getDelta();
-    say('Modo Probar WILDTRAP · Jugador 1');
+    say(imported?'Modo Probar WILDTRAP · Jugador 1':'Exploración sin personaje · Spawn del Jugador 1');
   }).catch(err=>{
     busy=false;$('test').disabled=false;sourceError=err.message;
     say('Error: '+err.message);
