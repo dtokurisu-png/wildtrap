@@ -84,7 +84,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   }
   const zone=items().find(z=>z.id===selected);
   $('zoneProperties').hidden=!zone;
-  if(zone){$('zoneName').value=zone.name||'';$('zonePointCount').textContent=zone.points.length+' vértices';$('zoneBiome').value=zone.biomeId||'';}
+  if(zone){$('zoneName').value=zone.name||'';$('zonePointCount').textContent=zone.points.length+' vértices';$('zoneBiome').value=zone.biomeId||'';$('zoneBiomeLocked').checked=zone.biomeLocked===true;}
   $('zonePendingCount').textContent=pending.length?pending.length+' puntos pendientes · pulsa el primero para cerrar':'Haz clic en el terreno para comenzar';
   $('zoneClose').disabled=pending.length<3;
   $('zoneUndoPoint').disabled=!pending.length;
@@ -168,7 +168,8 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
  $('zoneName').onchange=e=>{const z=items().find(z=>z.id===selected);if(!z)return;snapshot();z.name=e.target.value.trim()||z.name;commit();refreshAll()};
  $('zoneDelete').onclick=()=>{if(!selected)return;const z=items().find(z=>z.id===selected);if(!z||!confirm('¿Eliminar '+z.name+'?'))return;snapshot();live.zones=items().filter(x=>x.id!==selected);selected=null;editVertices=false;cliffTool.onZoneChange();commit();refreshAll()};
  $('zoneEditVertices').onclick=()=>{editVertices=!editVertices;pending=[];hover=null;cliffTool.cancel();refreshAll();};
- $('zoneBiome').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;snapshot();zone.biomeId=e.target.value||null;commit();refreshAll();};
+ $('zoneBiome').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;snapshot();zone.biomeId=e.target.value||null;if(!zone.biomeId)zone.biomeLocked=false;commit();refreshAll();};
+ $('zoneBiomeLocked').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;if(e.target.checked&&!zone.biomeId){e.target.checked=false;toast('Asigna un bioma antes de bloquear la zona');return;}snapshot();zone.biomeLocked=e.target.checked;commit();refreshAll();};
  refreshAll();
  return {refresh,refreshAll,cancel,undoPoint:()=>{if(cliffTool.isDrawing())cliffTool.undo();else{pending.pop();hover=null;refreshAll()}},hasPending:()=>pending.length>0||cliffTool.isDrawing(),onModeChange:()=>{pending=[];hover=null;dragging=null;editVertices=false;cliffTool.cancel();refreshAll();}};
 }
