@@ -27,6 +27,8 @@ input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
 #playTop{position:absolute;left:16px;top:12px;background:#0b221bcf;border:1px solid #4b9079;border-radius:10px;padding:12px 16px;max-width:min(550px,calc(100vw - 32px));font-size:13px}
 #playTop strong{color:#9cffe0}
 #playBottom{position:absolute;left:16px;bottom:16px;color:#c8eee0;font-size:12px;background:#0b221bcf;padding:10px 12px;border-radius:8px}
+#playAnimationControls{position:absolute;right:16px;bottom:16px;pointer-events:auto;padding:8px 10px;border-radius:9px;background:#0b221bdc;border:1px solid #4b9079;color:#def8ec;max-width:50vw;font-size:12px}
+#playAnimationControls label{margin:0}#playAnimation{max-width:100%;min-width:220px;background:#1b3930;color:#eafff6;border:1px solid #6cb99c;padding:5px;border-radius:5px}
 #playReticle{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);pointer-events:none;opacity:.75}
 #playReticle:before,#playReticle:after{content:'';position:absolute;background:#d5fff1;box-shadow:0 0 4px #0b302b}
 #playReticle:before{width:18px;height:2px;left:0;top:8px}
@@ -61,7 +63,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.33 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.34 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -341,6 +343,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
   <button id="stopTest">Volver al editor · Esc</button>
   <div id="playReticle" aria-hidden="true"></div>
   <div id="playBottom">Explorador 1 WT · cámara en tercera persona · W sigue la dirección de la cámara</div>
+  <div id="playAnimationControls"><label>Animación del Explorador <select id="playAnimation" disabled><option value="-1">Cargando animaciones…</option></select></label></div>
 </div>
 <div id="boot"><div><h1>Iniciando editor WILDTRAP</h1><p id="bootMsg">Cargando motor gráfico…</p>
 <button onclick="location.reload()">Reintentar</button>
@@ -369,5 +372,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.33').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.34').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
