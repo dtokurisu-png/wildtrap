@@ -1,21 +1,23 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.29';
 // The user's own WT GLB and animation files will be supplied separately.
 // No R.O.K. model or animation is loaded.
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const forwardOf=yaw=>new THREE.Vector3(Math.sin(yaw),0,-Math.cos(yaw));
+const EXPLORER_URL='./assets/explorador%201%20wt.glb';
 
 export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,$,resizeEditor,onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const clock=new THREE.Clock();
  const player=new THREE.Group();
  player.name='WILDTRAPPlayer1';
- let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.12;
+ let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.26;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  let oldShow=null,oldShadow=null;
 const hiddenDebugMarkers=[];
  const keys=new Set();
- let modelURL=null;
+ let modelURL=EXPLORER_URL;
  let localURL=null,loadingPromise=null,sourceError='';
  const modelStatus=()=>$('testModelStatus');
  const say=(message)=>{modelStatus().textContent=message;};
@@ -33,18 +35,19 @@ const hiddenDebugMarkers=[];
  function resetPosition(){
   const s=positionSpawn(),ground=heightAt(s.x,s.z);
   player.position.set(s.x,ground,s.z);
-  yaw=0;pitch=.12;
+  yaw=0;pitch=.26;
   player.rotation.y=0;
-  camera.position.set(s.x+.7,ground+2.1,s.z+3.1);
-  camera.lookAt(s.x,ground+1.1,s.z-4);
+  const focus=new THREE.Vector3(s.x,ground+1.2,s.z);
+  camera.position.copy(focus).add(new THREE.Vector3(.45,Math.sin(pitch)*4.1,Math.cos(pitch)*4.1));
+  camera.lookAt(focus);
  }
  async function fetchModel(){
   if(imported)return imported;
   if(loadingPromise)return loadingPromise;
   const url=modelURL;
-  if(!url){say('Exploración sin personaje: puedes recorrer el mapa desde el spawn del Jugador 1.');return null;}
+  if(!url){say('Selecciona el GLB del Explorador 1 WT para comenzar la prueba.');return null;}
   loadingPromise=(async()=>{
-    say('Cargando personaje local de WILDTRAP…');
+    say('Cargando Explorador 1 WT desde assets…');
     const abort=new AbortController();
     const timer=setTimeout(()=>abort.abort(),22000);
     let bytes;
@@ -55,18 +58,18 @@ const hiddenDebugMarkers=[];
     }catch(err){throw Error('No se pudo cargar el modelo local: '+err.message+
       '. Puedes seleccionar el GLB local en el panel.');}
     finally{clearTimeout(timer)}
-    say('Preparando geometría, texturas y animación original…');
+    say('Preparando malla y materiales de Explorador 1 WT…');
     const gltf=await new GLTFLoader().parseAsync(bytes,url.startsWith('blob:')?'':url.slice(0,url.lastIndexOf('/')+1));
     if(!gltf.scene)throw Error('El archivo no contiene un modelo 3D');
     const visual=new THREE.Group();
-    visual.name='WTPlayerVisual';
+    visual.name='Explorador 1 WT';
     visual.add(gltf.scene);
     visual.updateMatrixWorld(true);
     const bounds=new THREE.Box3().setFromObject(gltf.scene),size=new THREE.Vector3();
     bounds.getSize(size);
     if(!Number.isFinite(size.y)||size.y<.01)throw Error('Escala GLB inválida');
-    // Character scaled for test terrain; original asset is unchanged.
-    const scale=clamp(1.09/size.y,.001,100);
+    // Normalize to an RPG human height, preserving proportions and GLB source.
+    const scale=clamp(1.8/size.y,.001,100);
     gltf.scene.scale.setScalar(scale);
     gltf.scene.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(gltf.scene);
@@ -112,8 +115,9 @@ const hiddenDebugMarkers=[];
   if(!active||!drag)return;
   const dx=event.clientX-lastX,dy=event.clientY-lastY;
   lastX=event.clientX;lastY=event.clientY;
-  yaw-=dx*.0048;
-  pitch=clamp(pitch+dy*.0034,-.24,.61);
+  // Camera orbit only: no forced character rotation or movement remapping.
+  yaw-=dx*.0032;
+  pitch=clamp(pitch+dy*.0025,-.18,.95);
   event.preventDefault();
  }
  function handleMouseUp(){drag=false}
@@ -179,34 +183,31 @@ const hiddenDebugMarkers=[];
  function frame(){
   if(!active)return null;
   const dt=Math.min(clock.getDelta(),.055);
-  const front=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);
-  const side=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);
-  const moving=front!==0||side!==0;
-  // Movement speeds for exploration.
-  const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?4.25:2.6;
-  // Movement relative to camera yaw, with normalized diagonals.
-  const f=forwardOf(yaw),right=new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw));
+  // Movement is fixed in the world: W -Z, S +Z, A -X, D +X.
+  // Mouse camera orbit is independent and never alters keyboard directions.
+  const move=movementAxes(keys),moving=move.moving;
+  const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?6.0:3.8;
   if(moving){
-    const move=f.multiplyScalar(front).addScaledVector(right,side).normalize();
     const nx=clamp(player.position.x+move.x*speed*dt,-live.size/2+3,live.size/2-3);
     const nz=clamp(player.position.z+move.z*speed*dt,-live.size/2+3,live.size/2-3);
     const ny=heightAt(nx,nz),dy=ny-player.position.y;
-    if(!isHoleAt(nx,ny,nz)&&dy<1.2&&dy>-2.2){
+    if(!isHoleAt(nx,ny,nz)&&dy<1.6&&dy>-2.5){
       player.position.set(nx,THREE.MathUtils.damp(player.position.y,ny,17,dt),nz);
-      const heading=Math.atan2(move.x,-move.z);
-      player.rotation.y+=Math.atan2(Math.sin(heading-player.rotation.y),Math.cos(heading-player.rotation.y))*Math.min(1,dt*11);
+      const heading=movementHeading(move.x,move.z);
+      player.rotation.y+=Math.atan2(Math.sin(heading-player.rotation.y),Math.cos(heading-player.rotation.y))*Math.min(1,dt*12);
     }
   }else player.position.y=THREE.MathUtils.damp(player.position.y,heightAt(player.position.x,player.position.z),17,dt);
   crossfade(moving);
   if(mixer)mixer.update(dt);
-  const camF=forwardOf(yaw),camR=new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw));
-  const desired=player.position.clone().addScaledVector(camF,-3.15).addScaledVector(camR,.75);
-  desired.y+=2.15+pitch*2.8;
-  desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+1.25);
-  camera.position.lerp(desired,1-Math.exp(-dt*14));
-  const look=player.position.clone().addScaledVector(camF,4.8);
-  look.y+=1.05-pitch*2.1;
-  camera.lookAt(look);
+  // Third-person orbit: smooth follow; stable focus on player's torso.
+  // Camera only controls view and future 3D aiming, not movement.
+  const focus=player.position.clone().add(new THREE.Vector3(0,1.2,0));
+  const back=forwardOf(yaw).multiplyScalar(-Math.cos(pitch)*4.1);
+  const desired=focus.clone().add(back).add(new THREE.Vector3(0,Math.sin(pitch)*4.1,0));
+  desired.addScaledVector(new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw)),.45);
+  desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+.7);
+  camera.position.lerp(desired,1-Math.exp(-dt*10));
+  camera.lookAt(focus);
   $('testCoords').textContent='X '+player.position.x.toFixed(1)+' · Z '+player.position.z.toFixed(1)+' · altura '+heightAt(player.position.x,player.position.z).toFixed(1);
   return camera;
  }
