@@ -19,6 +19,12 @@ console.log('EXPLORADOR WT GLB',{bytes:glb.length,scene:gltf.scene,
  meshes:gltf.meshes?.length||0,primitives:geometries.length,vertices:count,
  skins:gltf.skins?.length||0,animations:gltf.animations?.length||0,
  sourceExtents:extents.slice(0,10)});
+console.log('EXPLORADOR RIG',JSON.stringify({
+ nodes:(gltf.nodes||[]).map((n,i)=>({i,name:n.name,mesh:n.mesh,skin:n.skin,children:n.children,translation:n.translation,rotation:n.rotation,scale:n.scale})).slice(0,40),
+ scenes:gltf.scenes,
+ animationNames:(gltf.animations||[]).map(a=>({name:a.name,channels:a.channels?.length,targets:[...new Set((a.channels||[]).map(c=>c.target?.node))].slice(0,8)})),
+ minMax:meshes.map(p=>({min:accessors[p.attributes.POSITION]?.min,max:accessors[p.attributes.POSITION]?.max}))
+},null,2));
 assert.ok(meshes.length>0,'El GLB no contiene primitivas de malla');
 assert.ok(count>0,'El GLB contiene primitivas de geometría sin vértices');
 assert.ok((gltf.scenes||[]).length>0,'El GLB no contiene escenas');
