@@ -9,6 +9,7 @@ const EXPLORER_URL='./assets/explorador%201%20wt.glb';
 
 export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,$,resizeEditor,onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
+ const cameraFocus=new THREE.Vector3();
  const clock=new THREE.Clock();
  const player=new THREE.Group();
  player.name='WILDTRAPPlayer1';
@@ -38,6 +39,7 @@ const hiddenDebugMarkers=[];
   yaw=0;pitch=.26;
   player.rotation.y=0;
   const focus=new THREE.Vector3(s.x,ground+1.2,s.z);
+  cameraFocus.copy(focus);
   camera.position.copy(focus).add(new THREE.Vector3(.45,Math.sin(pitch)*4.1,Math.cos(pitch)*4.1));
   camera.lookAt(focus);
  }
@@ -70,7 +72,7 @@ const hiddenDebugMarkers=[];
     if(!Number.isFinite(size.y)||size.y<.01)throw Error('Escala GLB inválida');
     // Normalize to an RPG human height, preserving proportions and GLB source.
     const scale=clamp(1.8/size.y,.001,100);
-    gltf.scene.scale.setScalar(scale);
+    gltf.scene.scale.multiplyScalar(scale);
     gltf.scene.updateMatrixWorld(true);
     const box=new THREE.Box3().setFromObject(gltf.scene);
     const center=box.getCenter(new THREE.Vector3());
@@ -207,7 +209,8 @@ const hiddenDebugMarkers=[];
   desired.addScaledVector(new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw)),.45);
   desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+.7);
   camera.position.lerp(desired,1-Math.exp(-dt*10));
-  camera.lookAt(focus);
+  cameraFocus.lerp(focus,1-Math.exp(-dt*12));
+  camera.lookAt(cameraFocus);
   $('testCoords').textContent='X '+player.position.x.toFixed(1)+' · Z '+player.position.z.toFixed(1)+' · altura '+heightAt(player.position.x,player.position.z).toFixed(1);
   return camera;
  }
