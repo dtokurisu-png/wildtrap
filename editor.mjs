@@ -815,7 +815,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.36').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.37').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
    onStop:()=>{testingScene=false;draw();updateMeshInspection();}
