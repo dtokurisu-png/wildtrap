@@ -63,6 +63,12 @@ const hiddenDebugMarkers=[];
     say('Preparando malla y materiales de Explorador 1 WT…');
     const gltf=await new GLTFLoader().parseAsync(bytes,url.startsWith('blob:')?'':url.slice(0,url.lastIndexOf('/')+1));
     if(!gltf.scene)throw Error('El archivo no contiene un modelo 3D');
+    const assetInfo=gltf.parser?.json||{};
+    if(!Array.isArray(assetInfo.meshes)||assetInfo.meshes.length===0){
+      throw Error('El archivo contiene '+(assetInfo.skins?.length||0)+' esqueleto(s) y '+
+        (assetInfo.animations?.length||0)+' animaciones, pero 0 mallas. En Blender selecciona '+
+        'la malla y el Armature y exporta ambos como glTF Binary (.glb).');
+    }
     const visual=new THREE.Group();
     visual.name='Explorador 1 WT';
     visual.add(gltf.scene);
