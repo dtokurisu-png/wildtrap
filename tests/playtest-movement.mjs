@@ -25,6 +25,19 @@ for(const yaw of [-Math.PI,-Math.PI/2,-.8,0,.75,Math.PI/2,Math.PI]){
  assert.ok(Math.cos(heading-yaw)>.999999);
 }
 
+// The actual Explorer rig faces +Z. The visual child has a PI rotation,
+// and its parent receives NEGATIVE heading. Verify the visible forward
+// vector equals the movement vector, not merely that heading equals yaw.
+for(const yaw of [-Math.PI,-Math.PI/2,-1.2,-.4,0,.4,1.2,Math.PI/2,Math.PI]){
+ for(const code of ['KeyW','KeyA','KeyS','KeyD']){
+  const movement=movementAxes(new Set([code]),yaw);
+  const parentRotation=-movementHeading(movement.x,movement.z);
+  const worldFacing=parentRotation+Math.PI;
+  const visibleForward={x:Math.sin(worldFacing),z:Math.cos(worldFacing)};
+  assert.ok(near(visibleForward.x,movement.x)&&near(visibleForward.z,movement.z),
+   'Explorer must visually face travel direction: '+code+' at '+yaw);
+ }
+}
 // Camera-relative movement. At 90 degrees, W moves to +X and D to +Z.
 const yawRight=Math.PI/2;
 const wRight=movementAxes(new Set(['KeyW']),yawRight);
