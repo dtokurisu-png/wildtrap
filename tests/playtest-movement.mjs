@@ -17,6 +17,14 @@ assert.ok(near(movementHeading(0,-1),0));
 assert.ok(near(movementHeading(1,0),Math.PI/2));
 assert.ok(near(movementHeading(-1,0),-Math.PI/2));
 assert.equal(get().moving,false);
+// W direction and animation facing must coincide at every camera yaw.
+for(const yaw of [-Math.PI,-Math.PI/2,-.8,0,.75,Math.PI/2,Math.PI]){
+ const run=movementAxes(new Set(['KeyW']),yaw);
+ const heading=movementHeading(run.x,run.z);
+ assert.ok(Math.abs(Math.sin(heading-yaw))<1e-9);
+ assert.ok(Math.cos(heading-yaw)>.999999);
+}
+
 // Camera-relative movement. At 90 degrees, W moves to +X and D to +Z.
 const yawRight=Math.PI/2;
 const wRight=movementAxes(new Set(['KeyW']),yawRight);
