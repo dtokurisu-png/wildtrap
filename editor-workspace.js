@@ -6,8 +6,8 @@
  const side=document.getElementById('side');
  if(!side||document.getElementById('workspaceTopbar'))return;
  const sections=Array.from(side.children).filter(el=>el.tagName==='SECTION');
- if(sections.length!==8)throw new Error('Estructura del editor no reconocida: se esperaban 8 secciones');
- const [project,sculpt,textures,zones,knife,logic,models,selection]=sections;
+ if(sections.length!==9)throw new Error('Estructura del editor no reconocida: se esperaban 9 secciones');
+ const [project,sculpt,spawns,textures,zones,knife,logic,models,selection]=sections;
  const title=side.querySelector(':scope > h1');
  const subtitle=side.querySelector(':scope > small');
  const help=Array.from(side.children).find(el=>el.classList.contains('hint'));
@@ -65,6 +65,7 @@
   ['knife','✂','Cuchillo','Cuchillo poligonal'],
   ['zones','◇','Zonas','Creador de zonas del escenario'],
   ['textures','▧','Texturas','Biblioteca de texturas por bioma'],
+  ['spawns','⌖','Spawns','Spawns de jugadores y enemigos'],
   ['structures','▦','Estruct.','Estructuras'],
  ];
  const workspaceButtons=new Map();
@@ -85,7 +86,13 @@
  const toolViews=el('div');toolViews.id='workspaceToolViews';
  const structureView=el('div','workspace-section');structureView.dataset.workspaceContent='structures';
  structureView.append(logic,models);
- for(const [key,node] of [['project',project],['sculpt',sculpt],['knife',knife],['zones',zones],['textures',textures]]){
+ // Existing spawn tools are real buttons: move, never clone, to the spawn workspace.
+ const oldSpawnControls=document.getElementById('spawnsLegacyButtons');
+ for(const kind of ['tree','wallspawn','spawn']){
+  const button=logic.querySelector('[data-tool="'+kind+'"]');
+  if(button)oldSpawnControls.append(button);
+ }
+ for(const [key,node] of [['project',project],['sculpt',sculpt],['knife',knife],['zones',zones],['textures',textures],['spawns',spawns]]){
   node.classList.add('workspace-section');node.dataset.workspaceContent=key;
   node.hidden=key!=='project';toolViews.append(node);
  }
@@ -206,7 +213,7 @@
   for(const section of toolViews.querySelectorAll('.workspace-section'))section.hidden=section.dataset.workspaceContent!==key;
   activateTab('tools');
   if(triggerTool){
-   const mode={project:'move',sculpt:'raise',knife:'holePaint',zones:'zones',textures:'textures',structures:'move'}[key];
+   const mode={project:'move',sculpt:'raise',knife:'holePaint',zones:'zones',textures:'textures',spawns:'playerSpawn',structures:'move'}[key];
    if(mode)document.querySelector('[data-tool="'+mode+'"]')?.click();
   }
   saveLayout();
@@ -304,7 +311,7 @@
  });
  window.addEventListener('resize',applySizes);
  applySizes();
- selectWorkspace(['project','sculpt','knife','zones','textures','structures'].includes(saved?.workspace)?saved.workspace:'project',false);
+ selectWorkspace(['project','sculpt','knife','zones','textures','spawns','structures'].includes(saved?.workspace)?saved.workspace:'project',false);
  syncSelection();
  window.__workspaceLayout={
   open:key=>selectWorkspace(key,true),
