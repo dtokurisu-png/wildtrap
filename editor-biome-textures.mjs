@@ -45,11 +45,13 @@ export function normalizeBiomeMaterials(raw){
 export function createBiomeTextureEditor({live,snapshot,persist,toast}){
  const $=id=>document.getElementById(id);
  const root=$('texturePanel');if(!root)throw Error('Falta panel de texturizado');
- let biomeId=BIOMES[0].id;
+ let biomeId=BIOMES[0].id,normalizedRef=null;
  function ensure(){
-  if(!live.biomeMaterials||typeof live.biomeMaterials!=='object')live.biomeMaterials=defaults();
-  for(const b of BIOMES)if(!live.biomeMaterials[b.id]?.slots)live.biomeMaterials[b.id]=defaults()[b.id];
-  return live.biomeMaterials;
+  if(live.biomeMaterials!==normalizedRef){
+   live.biomeMaterials=normalizeBiomeMaterials(live.biomeMaterials);
+   normalizedRef=live.biomeMaterials;
+  }
+  return normalizedRef;
  }
  function model(){return ensure()[biomeId]}
  function element(tag,cls,text){
