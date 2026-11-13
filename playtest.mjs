@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.29';
+import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.33';
 // The user's own WT GLB and animation files will be supplied separately.
 // No R.O.K. model or animation is loaded.
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -10,10 +10,12 @@ const EXPLORER_URL='./assets/explorador%201%20wt.glb';
 export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,$,resizeEditor,onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const cameraFocus=new THREE.Vector3();
+ const CAMERA_DISTANCE=6.3,CAMERA_HEIGHT=1.65;
+ const cameraRay=new THREE.Raycaster();
  const clock=new THREE.Clock();
  const player=new THREE.Group();
  player.name='WILDTRAPPlayer1';
- let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.26;
+ let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  let oldShow=null,oldShadow=null;
 const hiddenDebugMarkers=[];
@@ -36,11 +38,11 @@ const hiddenDebugMarkers=[];
  function resetPosition(){
   const s=positionSpawn(),ground=heightAt(s.x,s.z);
   player.position.set(s.x,ground,s.z);
-  yaw=0;pitch=.26;
+  yaw=0;pitch=.22;
   player.rotation.y=0;
-  const focus=new THREE.Vector3(s.x,ground+1.2,s.z);
+  const focus=new THREE.Vector3(s.x,ground+CAMERA_HEIGHT,s.z);
   cameraFocus.copy(focus);
-  camera.position.copy(focus).add(new THREE.Vector3(.45,Math.sin(pitch)*4.1,Math.cos(pitch)*4.1));
+  camera.position.copy(focus).add(new THREE.Vector3(.45,Math.sin(pitch)*CAMERA_DISTANCE,Math.cos(pitch)*CAMERA_DISTANCE));
   camera.lookAt(focus);
  }
  async function fetchModel(){
@@ -244,9 +246,9 @@ const hiddenDebugMarkers=[];
  function frame(){
   if(!active)return null;
   const dt=Math.min(clock.getDelta(),.055);
-  // Movement is fixed in the world: W -Z, S +Z, A -X, D +X.
-  // Mouse camera orbit is independent and never alters keyboard directions.
-  const move=movementAxes(keys),moving=move.moving;
+  // W goes where the camera faces; A/D strafe left/right relative to its yaw.
+  // The camera never moves the player without keyboard input.
+  const move=movementAxes(keys,yaw),moving=move.moving;
   const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?6.0:3.8;
   if(moving){
     const nx=clamp(player.position.x+move.x*speed*dt,-live.size/2+3,live.size/2-3);
@@ -260,15 +262,27 @@ const hiddenDebugMarkers=[];
   }else player.position.y=THREE.MathUtils.damp(player.position.y,heightAt(player.position.x,player.position.z),17,dt);
   crossfade(moving);
   if(mixer)mixer.update(dt);
-  // Third-person orbit: smooth follow; stable focus on player's torso.
-  // Camera only controls view and future 3D aiming, not movement.
-  const focus=player.position.clone().add(new THREE.Vector3(0,1.2,0));
-  const back=forwardOf(yaw).multiplyScalar(-Math.cos(pitch)*4.1);
-  const desired=focus.clone().add(back).add(new THREE.Vector3(0,Math.sin(pitch)*4.1,0));
+  // Third-person follow: keep the Explorer visible, above and behind him.
+  // Aim uses the camera center; yaw is independent from avatar heading.
+  const focus=player.position.clone().add(new THREE.Vector3(0,CAMERA_HEIGHT,0));
+  const horizontal=forwardOf(yaw).multiplyScalar(-Math.cos(pitch)*CAMERA_DISTANCE);
+  const desired=focus.clone().add(horizontal).add(new THREE.Vector3(0,Math.sin(pitch)*CAMERA_DISTANCE,0));
   desired.addScaledVector(new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw)),.45);
-  desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+.7);
-  camera.position.lerp(desired,1-Math.exp(-dt*10));
-  cameraFocus.lerp(focus,1-Math.exp(-dt*12));
+  // Prevent camera sinking into terrain while following steep slopes.
+  desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+1.25);
+  // Camera obstruction: move in front of intervening terrain meshes, not into them.
+  const rayDirection=desired.clone().sub(focus);
+  const rayDistance=rayDirection.length();
+  if(rayDistance>0.001){
+    cameraRay.set(focus,rayDirection.multiplyScalar(1/rayDistance));
+    cameraRay.far=rayDistance;
+    const collisions=cameraRay.intersectObject(terrain,false);
+    if(collisions.length&&collisions[0].distance<rayDistance-.1){
+      desired.copy(focus).addScaledVector(cameraRay.ray.direction,Math.max(2.25,collisions[0].distance-.35));
+    }
+  }
+  camera.position.lerp(desired,1-Math.exp(-dt*11));
+  cameraFocus.lerp(focus,1-Math.exp(-dt*14));
   camera.lookAt(cameraFocus);
   $('testCoords').textContent='X '+player.position.x.toFixed(1)+' · Z '+player.position.z.toFixed(1)+' · altura '+heightAt(player.position.x,player.position.z).toFixed(1);
   return camera;
