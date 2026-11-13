@@ -277,8 +277,13 @@ const hiddenDebugMarkers=[];
     const ny=heightAt(nx,nz),dy=ny-player.position.y;
     if(!isHoleAt(nx,ny,nz)&&dy<1.6&&dy>-2.5){
       player.position.set(nx,THREE.MathUtils.damp(player.position.y,ny,17,dt),nz);
+      // Turn the entire avatar with the direction of travel on the same
+      // frame as movement. The exported GLB's +Z correction remains on
+      // the visual child, while this parent rotation follows camera yaw.
+      // Do not smooth the heading: smoothing made the running animation
+      // point sideways/backwards whenever the camera turned while W was held.
       const heading=movementHeading(move.x,move.z);
-      player.rotation.y+=Math.atan2(Math.sin(heading-player.rotation.y),Math.cos(heading-player.rotation.y))*Math.min(1,dt*12);
+      player.rotation.y=heading;
     }
   }else player.position.y=THREE.MathUtils.damp(player.position.y,heightAt(player.position.x,player.position.z),17,dt);
   setMovingAnimation(keys.has('KeyW')||keys.has('ArrowUp'));
