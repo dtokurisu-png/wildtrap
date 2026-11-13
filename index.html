@@ -57,7 +57,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.27 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.28 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -94,6 +94,28 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <label>Altura máxima<input id="maxHeight" type="number" min="1" max="150" value="120"></label></div>
 </section>
 
+<section id="playerSpawnsPanel">
+<h2>⌖ Spawns y enemigos</h2>
+<button data-tool="playerSpawn" type="button" style="width:100%">⌖ Colocar spawn del jugador</button>
+<p class="hint">Define hasta seis puntos de aparición. Los marcadores son posiciones de referencia: cada personaje se crea al entrar a la partida, no durante la edición.</p>
+<label>Jugador a configurar
+<select id="playerSpawnSlot" style="width:100%;background:#1e4034;color:#fff;border:1px solid #598071;padding:8px;border-radius:6px">
+<option value="1">Jugador 1 (modo Probar)</option><option value="2">Jugador 2</option>
+<option value="3">Jugador 3</option><option value="4">Jugador 4</option>
+<option value="5">Jugador 5</option><option value="6">Jugador 6</option>
+</select></label>
+<div class="grid2">
+<button id="playerSpawnPlace" type="button">⌖ Colocar / mover</button>
+<button id="playerSpawnRemove" type="button">Eliminar punto</button>
+</div>
+<p class="hint" id="playerSpawnStatus">Selecciona un jugador y pulsa Colocar / mover; haz clic en el mapa.</p>
+<div id="playerSpawnList"></div>
+<h2>Otros spawns existentes</h2>
+<div id="spawnsLegacyButtons" class="grid"></div>
+<p class="hint">Spawn árbol, Spawn muro y Respawn ahora están aquí. El modo Probar prioriza la posición del jugador 1; si todavía no existe, conserva el Respawn antiguo.</p>
+<h2>Enemigos</h2>
+<p class="hint">Las reglas de enemigos por bioma se configurarán al completar el biosistema. Los spawns de jugadores ya pueden utilizarse para explorar el mapa.</p>
+</section>
 <section id="texturePanel">
 <h2>▧ Texturizado · Materiales por bioma</h2>
 <button data-tool="textures" type="button" style="width:100%">▧ Activar Texturizado</button>
@@ -190,8 +212,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="grid">
 <button data-tool="anchor">Anclaje</button><button data-tool="path">Camino</button><button data-tool="wall">Muro</button>
 <button data-tool="stairs">Escalera</button><button data-tool="gate">Compuerta</button>
-<button data-tool="tree">Spawn árbol</button><button data-tool="wallspawn">Spawn muro</button>
-<button data-tool="spawn">Respawn</button><button data-tool="exit">Salida</button><button data-tool="delete">Borrar</button>
+<button data-tool="exit">Salida</button><button data-tool="delete">Borrar</button>
 </div>
 <div class="grid2"><label>Altura de muros<input id="wallHeight" type="number" min="2" max="60" value="12"></label><label>Subida de escaleras<input id="stairRise" type="number" min="1" max="50" value="8"></label></div>
 <p class="hint">Camino, muro, escalera y compuerta: haz clic en el punto inicial y luego en el final. Si colocas un anclaje cerca, el extremo se ajusta automáticamente a él. Las escaleras generan peldaños reales. El punto de spawn de árboles es solo un marcador: no genera árboles definitivos.</p>
@@ -296,7 +317,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <button id="meshResetDeform" type="button" disabled style="width:100%">Restaurar esculpido y deformaciones antiguas</button>
 </section>
 <button type="button" id="meshEditorActivate" data-tool="meshEdit" hidden aria-hidden="true" tabindex="-1"></button>
-<script src="./editor-workspace.js?v=0.9.25"></script>
+<script src="./editor-workspace.js?v=0.9.28"></script>
 <div id="axisGizmo" role="group" aria-label="Orientar la cámara con los ejes X, Y y Z">
  <svg id="axisGizmoSvg" viewBox="0 0 112 110" width="112" height="110" aria-hidden="true"></svg>
  <button type="button" class="axis-view-button" data-view-axis="x" aria-label="Vista lateral desde eje X" title="Vista lateral X">X</button>
@@ -343,5 +364,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.27').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.28').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
