@@ -9,5 +9,5 @@ const out=inPlaceClip(src);
 assert.equal(out.corrected,1);
 assert.deepEqual([...out.clip.tracks[0].values],[2,1,3,2,1.5,3,2,Math.fround(1.3),3]);
 assert.deepEqual([...out.clip.tracks[1].values],[0,1,0,1,2,2,2,3,3]);
-assert.deepEqual([...src.tracks[0].values],[2,1,3,5,1.5,9,-1,1.3,20]);
+assert.deepEqual([...src.tracks[0].values],[2,1,3,5,1.5,9,-1,Math.fround(1.3),20]);
 console.log('PASS: in-place root translation, leg tracks and source animation preserved');
