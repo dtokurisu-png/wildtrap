@@ -49,7 +49,7 @@ const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasi
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
 const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],objectGroups:[],holes:[],cuts3d:[],zones:[],nextId:1,settings:{heightMax:120}};
-let holesEditor=null,vertexEditor=null,terrainInspector=null,objectMeshOverlays=null,zoneTool=null,textureTool=null,terrainPainter=null,testingScene=false;
+let holesEditor=null,vertexEditor=null,terrainInspector=null,objectMeshOverlays=null,zoneTool=null,textureTool=null,terrainPainter=null,biomeGeneratorTool=null,testingScene=false;
 // Modo seguro usa otro espacio local: nunca sobreescribe el proyecto habitual.
 const flags=new URLSearchParams(location.search);
 const safeMode=flags.has('safe'),recoveryMode=flags.has('recover');
@@ -1428,7 +1428,7 @@ view.addEventListener('wheel',e=>{
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
 $('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
-$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 $('undo').onclick=()=>{
  // Deshace la última acción entre los vértices pendientes y el historial
  // persistente, incluso si el usuario cambió de herramienta.
@@ -1443,7 +1443,7 @@ $('undo').onclick=()=>{
  const v=JSON.parse(data);Object.assign(live,v);
  if(!Array.isArray(live.holes))live.holes=[];
  if(!Array.isArray(live.zones))live.zones=[];
- zoneTool?.refreshAll();textureTool?.refresh();terrainPainter?.schedule();
+ zoneTool?.refreshAll();textureTool?.refresh();biomeGeneratorTool?.refresh();terrainPainter?.schedule();
  if(!Array.isArray(v.cuts3d))live.cuts3d=[];
  live.objectGroups=cleanObjectGroups(v.objectGroups);
  selectedIds.clear();
@@ -1560,7 +1560,7 @@ $('removeRecoveryCuts').onclick=()=>{
 };
 $('remove').onclick=()=>{if(!selectedIds.size)return;snapshot();live.nodes=live.nodes.filter(n=>!selectedIds.has(n.id));pruneUnusedSceneGroups();selectedIds.clear();selectedId=null;draw();persist()};
 $('export').onclick=()=>{live.editorCamera=currentEditorCamera();download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;holesEditor.clearSelection();
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;holesEditor.clearSelection();
 updateMaxHeightControl();refreshTerrain();draw();
 if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
 persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
@@ -1596,7 +1596,7 @@ async function restoreSavedBase(confirmOverwrite=false){
   live.holes=[];
   live.cuts3d=[];
   live.zones=[];zoneTool?.refreshAll();
-  live.biomeMaterials={};textureTool?.refresh();
+  live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();
   live.objectGroups=[];
   live.settings={heightMax:120,...(data.settings&&typeof data.settings==='object'?data.settings:{})};
   live.version=3;
@@ -1615,7 +1615,7 @@ try{
  if(saved){
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
-   Object.assign(live,d);live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};textureTool?.refresh();terrainPainter?.schedule();
+   Object.assign(live,d);live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
    live.settings={heightMax:120,...(d.settings&&typeof d.settings==='object'?d.settings:{})};
    recoveredDraft=true;
    toast('Proyecto recuperado del guardado automático; puedes usar Cargar terreno base');
@@ -1641,7 +1641,7 @@ async function loadPublishedWorld(){
   Object.assign(live,world);
   live.holes=Array.isArray(world.holes)?world.holes:[];
   live.cuts3d=Array.isArray(world.cuts3d)?world.cuts3d:[];
-  live.objectGroups=cleanObjectGroups(world.objectGroups);live.zones=Array.isArray(world.zones)?world.zones:[];zoneTool?.refreshAll();live.biomeMaterials=world.biomeMaterials&&typeof world.biomeMaterials==='object'?world.biomeMaterials:{};textureTool?.refresh();terrainPainter?.schedule();
+  live.objectGroups=cleanObjectGroups(world.objectGroups);live.zones=Array.isArray(world.zones)?world.zones:[];zoneTool?.refreshAll();live.biomeMaterials=world.biomeMaterials&&typeof world.biomeMaterials==='object'?world.biomeMaterials:{};live.biomeGenerator=world.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
   live.settings={heightMax:120,...(world.settings&&typeof world.settings==='object'?world.settings:{})};
   selectedIds.clear();selectedId=null;
   // Do not reset the user's last camera merely because the published map loaded.
@@ -1685,6 +1685,17 @@ async function initializeTextureTool(){
  }
 }
 void initializeTextureTool();
+async function initializeBiomeGenerator(){
+ try{
+  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.27');
+  biomeGeneratorTool=createBiomeGeneratorPanel({live,snapshot,persist,toast,
+   onChange:()=>terrainPainter?.schedule(),onZoneChange:()=>zoneTool?.refreshAll()});
+ }catch(error){
+  console.error('Error cargando el generador de biomas:',error);
+  const panel=$('biomeGeneratorPanel');if(panel)panel.textContent='No se pudo iniciar el generador de biomas: '+error.message;
+ }
+}
+void initializeBiomeGenerator();
 async function initializeTerrainPainter(){
  try{
   const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.26');
