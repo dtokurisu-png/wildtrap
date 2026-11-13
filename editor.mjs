@@ -1662,7 +1662,7 @@ async function initializeZoneTool(){
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
-   onChange:()=>terrainPainter?.schedule()});
+   onChange:()=>{terrainPainter?.schedule();biomeGeneratorTool?.refresh();}});
   zoneTool.refreshAll();
  }catch(error){
   console.error('Error inicializando el Creador de zonas:',error);
