@@ -815,7 +815,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.22').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.28').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
    onStop:()=>{testingScene=false;draw();updateMeshInspection();}
@@ -1009,7 +1009,7 @@ window.__editorCamera={
 $('test').onclick=async()=>{
  if(testingScene||preview.busy)return;
  $('test').disabled=true;
- $('testModelStatus').textContent='Preparando modo Probar…';
+ $('testModelStatus').textContent='Preparando exploración desde el spawn del Jugador 1…';
  try{
   const test=await ensurePreview();
   testingScene=true;vertexEditor.setActive(false);terrainInspector.setActive(false);draw();
