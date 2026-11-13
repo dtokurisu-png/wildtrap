@@ -61,12 +61,12 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.32 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.33 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
 <button id="test" style="width:100%">▶ Probar</button>
-<p class="hint">Explorador 1 WT se carga automáticamente desde assets. Aparece en el Spawn del jugador 1. W/S avanzan o retroceden, A/D se desplazan izquierda/derecha en el mundo, independientemente de la cámara; arrastra para mirar y Shift para correr. Las animaciones propias se integrarán después.</p>
+<p class="hint">Explorador 1 WT se carga automáticamente desde assets. Aparece en el Spawn del jugador 1. W avanza hacia donde mira la cámara, S retrocede y A/D se desplazan lateralmente respecto a ella. Cámara en tercera persona detrás del Explorador; arrastra para orientar la vista y Shift para correr. Las animaciones propias se integrarán después.</p>
 <div class="grid2"><label class="fileBtn" style="margin:0">Cambiar GLB (opcional)<input id="localExplorer" type="file" accept=".glb,model/gltf-binary"></label><small id="testModelStatus" style="align-self:center">Explorador 1 WT · modelo predeterminado</small></div>
 </section>
 
@@ -336,11 +336,11 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div id="playHud">
   <div id="playTop"><strong>WILDTRAP · Prueba de terreno</strong>
     <div id="testCoords">Posición jugador 1</div>
-    <div>W: frente · S: atrás · A: izquierda · D: derecha · Shift: correr · arrastra: cámara libre · Esc: salir</div>
+    <div>W: avanzar hacia cámara · S: retroceder · A/D: desplazamiento lateral · Shift: correr · arrastra: girar cámara · Esc: salir</div>
   </div>
   <button id="stopTest">Volver al editor · Esc</button>
   <div id="playReticle" aria-hidden="true"></div>
-  <div id="playBottom">Explorador 1 WT · controles independientes de la cámara · mira con el cursor central</div>
+  <div id="playBottom">Explorador 1 WT · cámara en tercera persona · W sigue la dirección de la cámara</div>
 </div>
 <div id="boot"><div><h1>Iniciando editor WILDTRAP</h1><p id="bootMsg">Cargando motor gráfico…</p>
 <button onclick="location.reload()">Reintentar</button>
@@ -369,5 +369,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.32').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.33').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
