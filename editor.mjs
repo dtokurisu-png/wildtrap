@@ -1428,7 +1428,7 @@ view.addEventListener('wheel',e=>{
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
 $('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
-$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};textureTool?.refresh();terrainPainter?.schedule();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 $('undo').onclick=()=>{
  // Deshace la última acción entre los vértices pendientes y el historial
  // persistente, incluso si el usuario cambió de herramienta.
@@ -1691,8 +1691,9 @@ async function initializeTerrainPainter(){
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene});
   const toggle=$('textureShow');
-  toggle.onchange=()=>{terrainPainter?.setEnabled(toggle.checked);draw()};
-  terrainPainter.schedule();
+  toggle.checked=live.settings?.biomeTexturesVisible!==false;
+  toggle.onchange=()=>{snapshot();live.settings.biomeTexturesVisible=toggle.checked;terrainPainter?.setEnabled(toggle.checked);persist();draw()};
+  terrainPainter.setEnabled(toggle.checked);
  }catch(error){
   console.error('Error preparando render de texturas:',error);
   $('textureRenderStatus').textContent='Error al preparar texturas: '+error.message;
