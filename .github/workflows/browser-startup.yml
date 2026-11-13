@@ -14,6 +14,8 @@ on:
       - 'tests/player-spawns.mjs'
       - 'playtest-movement.mjs'
       - 'tests/playtest-movement.mjs'
+      - 'playtest-animation.mjs'
+      - 'tests/playtest-animation.mjs'
       - 'tests/explorer-glb.mjs'
       - 'assets/explorador 1 wt.glb'
       - 'index.html'
@@ -36,6 +38,8 @@ jobs:
         run: node tests/player-spawns.mjs
       - name: Validar movimiento del Explorador
         run: node tests/playtest-movement.mjs
+      - name: Validar animaciones in-place del Explorador
+        run: node tests/playtest-animation.mjs
       - name: Inspeccionar geometría real de Explorador 1 WT
         run: node tests/explorer-glb.mjs
       - run: command -v google-chrome || command -v chromium
