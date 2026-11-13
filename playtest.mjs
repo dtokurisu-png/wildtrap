@@ -225,12 +225,12 @@ const hiddenDebugMarkers=[];
   $('test').disabled=true;
   return fetchModel().then(()=>{
     if(active)return;
-    collider.refresh();
-    resetPosition();
-    if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
+    collider.refresh();
+    resetPosition();
+    if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
     hiddenDebugMarkers.length=0;
     scene.traverse(object=>{if(object.userData.editorOnly&&object.visible){hiddenDebugMarkers.push(object);object.visible=false}});
     scene.add(player);
