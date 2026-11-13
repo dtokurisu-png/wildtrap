@@ -67,18 +67,47 @@ const hiddenDebugMarkers=[];
     visual.name='Explorador 1 WT';
     visual.add(gltf.scene);
     visual.updateMatrixWorld(true);
+    // GLBs exported from Blender/Tripo may contain a zero-size or empty
+    // root bounds despite valid skinned geometry. Measure visible mesh bounds
+    // first and never reject a valid GLB solely because of its scene bounds.
     const bounds=new THREE.Box3().setFromObject(gltf.scene),size=new THREE.Vector3();
     bounds.getSize(size);
-    if(!Number.isFinite(size.y)||size.y<.01)throw Error('Escala GLB inválida');
-    // Normalize to an RPG human height, preserving proportions and GLB source.
-    const scale=clamp(1.8/size.y,.001,100);
+    let measured=Number.isFinite(size.y)&&size.y>1e-5?bounds:null;
+    if(!measured){
+      const meshBounds=new THREE.Box3();
+      gltf.scene.traverse(obj=>{
+        if(!obj.isMesh||!obj.geometry?.attributes?.position)return;
+        obj.geometry.computeBoundingBox();
+        if(!obj.geometry.boundingBox?.isEmpty()){
+          obj.updateWorldMatrix(true,false);
+          meshBounds.union(obj.geometry.boundingBox.clone().applyMatrix4(obj.matrixWorld));
+        }
+      });
+      const meshSize=new THREE.Vector3();
+      meshBounds.getSize(meshSize);
+      if(!meshBounds.isEmpty()&&Number.isFinite(meshSize.y)&&meshSize.y>1e-5){
+        measured=meshBounds;
+        size.copy(meshSize);
+      }
+    }
+    // Do not alter the GLB when the exporter provides degenerate bounds.
+    const scale=measured?clamp(1.8/size.y,.001,100):1;
+    if(!measured)console.warn('Explorador WT: límites de malla no disponibles; se conserva su escala nativa');
     gltf.scene.scale.multiplyScalar(scale);
     gltf.scene.updateMatrixWorld(true);
-    const box=new THREE.Box3().setFromObject(gltf.scene);
-    const center=box.getCenter(new THREE.Vector3());
-    gltf.scene.position.x-=center.x;
-    gltf.scene.position.z-=center.z;
-    gltf.scene.position.y-=box.min.y;
+    if(measured){
+      const box=measured.clone().applyMatrix4(new THREE.Matrix4().makeScale(scale,scale,scale));
+      // Local-world bounds are computed before scaling. Correct for scene
+      // translation and parent transforms through a fresh measurement.
+      const actual=new THREE.Box3().setFromObject(gltf.scene);
+      const aligned=actual.isEmpty()||!Number.isFinite(actual.min.y)?box:actual;
+      const center=aligned.getCenter(new THREE.Vector3());
+      if(Number.isFinite(center.x)&&Number.isFinite(center.z)&&Number.isFinite(aligned.min.y)){
+        gltf.scene.position.x-=center.x;
+        gltf.scene.position.z-=center.z;
+        gltf.scene.position.y-=aligned.min.y;
+      }
+    }
     // Orientation will be calibrated when the player's own rig arrives.
     visual.rotation.y=0;
     player.add(visual);
