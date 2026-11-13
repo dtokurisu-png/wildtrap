@@ -9,6 +9,9 @@ on:
       - 'biome-generator.mjs'
       - 'editor-biome-generator.mjs'
       - 'tests/biome-generator.mjs'
+      - 'editor-player-spawns.mjs'
+      - 'playtest.mjs'
+      - 'tests/player-spawns.mjs'
       - 'index.html'
       - 'prefab-library.mjs'
       - 'terrain-holes.mjs'
@@ -25,6 +28,8 @@ jobs:
           node-version: '22'
       - name: Validar motor procedural de biomas
         run: node tests/biome-generator.mjs
+      - name: Validar seis spawns de jugadores
+        run: node tests/player-spawns.mjs
       - run: command -v google-chrome || command -v chromium
       - name: Iniciar servidor local de la revisión
         run: |
