@@ -12,6 +12,8 @@ on:
       - 'editor-player-spawns.mjs'
       - 'playtest.mjs'
       - 'tests/player-spawns.mjs'
+      - 'playtest-movement.mjs'
+      - 'tests/playtest-movement.mjs'
       - 'index.html'
       - 'prefab-library.mjs'
       - 'terrain-holes.mjs'
@@ -30,6 +32,8 @@ jobs:
         run: node tests/biome-generator.mjs
       - name: Validar seis spawns de jugadores
         run: node tests/player-spawns.mjs
+      - name: Validar movimiento del Explorador
+        run: node tests/playtest-movement.mjs
       - run: command -v google-chrome || command -v chromium
       - name: Iniciar servidor local de la revisión
         run: |
