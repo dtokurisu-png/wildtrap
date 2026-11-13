@@ -815,7 +815,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.28').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.29').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
    onStop:()=>{testingScene=false;draw();updateMeshInspection();}
@@ -1030,10 +1030,10 @@ $('clearHoleSelection').onclick=()=>holesEditor.clearSelection();
 $('undoHolePoint').onclick=()=>holesEditor.removeLastPoint();
 $('closeHoleContour').onclick=()=>holesEditor.closePolygon();
 $('stopTest').onclick=()=>preview.stop();
-$('localFarolera').addEventListener('change',async e=>{
+$('localExplorer').addEventListener('change',async e=>{
  const file=e.target.files?.[0];if(!file)return;
  try{(await ensurePreview()).fromFile(file)}
- catch(error){toast('No se pudo preparar Farolera local: '+error.message)}
+ catch(error){toast('No se pudo cargar el GLB seleccionado: '+error.message)}
  e.target.value='';
 });
 function setNodeSelection(ids){
