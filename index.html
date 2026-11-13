@@ -61,7 +61,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.35 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.36 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -369,5 +369,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.35').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.36').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
