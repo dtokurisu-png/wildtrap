@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {PLAYER_SPAWN_MAX,normalizePlayerSlot,getPlayerSpawn} from '../editor-player-spawns.mjs';
+assert.equal(PLAYER_SPAWN_MAX,6);
+for(let i=1;i<=6;i++)assert.equal(normalizePlayerSlot(i),i);
+assert.equal(normalizePlayerSlot(0),1);
+assert.equal(normalizePlayerSlot(7),1);
+const nodes=Array.from({length:6},(_,i)=>({id:i+1,kind:'playerSpawn',playerSlot:i+1,x:i*30,z:i*15}));
+nodes.push({id:20,kind:'spawn',x:120,z:120});
+for(let i=1;i<=6;i++)assert.equal(getPlayerSpawn(nodes,i)?.playerSlot,i);
+assert.equal(getPlayerSpawn(nodes,1)?.x,0);
+assert.equal(getPlayerSpawn([],1),null);
+assert.equal(getPlayerSpawn([nodes[6]],1),null);
+const changed=nodes.map(n=>({...n}));
+changed[0].x=225;assert.equal(getPlayerSpawn(changed,1)?.x,225);
+assert.equal(getPlayerSpawn(nodes,1)?.x,0,'Editing one scene must not mutate another');
+console.log('PASS: six spawn slots, legacy spawn separation, valid movement lookup');
