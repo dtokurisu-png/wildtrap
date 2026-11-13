@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {inPlaceClip} from './playtest-animation.mjs?v=0.9.36';
+import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.39';
 import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.33';
 // The user's own WT GLB and animation files will be supplied separately.
 // No R.O.K. model or animation is loaded.
@@ -8,13 +9,15 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const forwardOf=yaw=>new THREE.Vector3(Math.sin(yaw),0,-Math.cos(yaw));
 const EXPLORER_URL='./assets/explorador%201%20wt.glb';
 
-export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,$,resizeEditor,onStop=()=>{}}){
+export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,collisionRoots=[],$,resizeEditor,onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const cameraFocus=new THREE.Vector3();
  const CAMERA_DISTANCE=5.1,CAMERA_HEIGHT=1.45;
  // Keep the classic third-person chase framing; never shorten the orbit
  // due to an intersecting terrain wall.
  const clock=new THREE.Clock();
+ const collider=createPlaytestCollider({THREE,terrain,roots:collisionRoots});
+ let verticalSpeed=0;
  const player=new THREE.Group();
  player.name='WILDTRAPPlayer1';
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
@@ -39,7 +42,9 @@ const hiddenDebugMarkers=[];
   return{x,z};
  }
  function resetPosition(){
-  const s=positionSpawn(),ground=heightAt(s.x,s.z);
+  const s=positionSpawn();
+  const ground=collider.floorAt(s.x,s.z,heightAt(s.x,s.z),{stepUp:2,searchDepth:35})?.y??heightAt(s.x,s.z);
+  verticalSpeed=0;
   player.position.set(s.x,ground,s.z);
   yaw=0;pitch=.22;
   player.rotation.y=0;
@@ -220,6 +225,7 @@ const hiddenDebugMarkers=[];
   $('test').disabled=true;
   return fetchModel().then(()=>{
     if(active)return;
+    collider.refresh();
     resetPosition();
     if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
     oldShow=cursor.visible;
@@ -251,6 +257,7 @@ const hiddenDebugMarkers=[];
  function stop(){
   if(!active)return;
   active=false;drag=false;keys.clear();
+  collider.restore();
   player.removeFromParent();
   cursor.visible=oldShow===null?true:oldShow;
   terrain.visible=oldShadow===null?true:oldShadow;
@@ -271,24 +278,35 @@ const hiddenDebugMarkers=[];
   // The camera never moves the player without keyboard input.
   const move=movementAxes(keys,yaw),moving=move.moving;
   const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?6.0:3.8;
+  let moved=false;
   if(moving){
     const nx=clamp(player.position.x+move.x*speed*dt,-live.size/2+3,live.size/2-3);
     const nz=clamp(player.position.z+move.z*speed*dt,-live.size/2+3,live.size/2-3);
-    const ny=heightAt(nx,nz),dy=ny-player.position.y;
-    if(!isHoleAt(nx,ny,nz)&&dy<1.6&&dy>-2.5){
-      player.position.set(nx,THREE.MathUtils.damp(player.position.y,ny,17,dt),nz);
-      // Turn the entire avatar with the direction of travel on the same
-      // frame as movement. The exported GLB's +Z correction remains on
-      // the visual child, while this parent rotation follows camera yaw.
-      // Do not smooth the heading: smoothing made the running animation
-      // point sideways/backwards whenever the camera turned while W was held.
-      // Mixamo's rig faces +Z; the visual child is rotated 180° so its
-      // locomotion forward is -Z. Three.js positive Y rotation turns -Z
-      // toward -X, so the parent yaw must be NEGATED to follow +X travel.
-      const heading=movementHeading(move.x,move.z);
-      player.rotation.y=-heading;
+    const dx=nx-player.position.x,dz=nz-player.position.z;
+    // Use real post-cut triangles. A polygon opening is genuinely passable.
+    // Probe the width and height of the Explorer, not a solid heightmap cell.
+    if(!collider.blocked(player.position.x,player.position.y,player.position.z,dx,dz)){
+      const futureGround=collider.floorAt(nx,nz,player.position.y);
+      // Don't climb an abrupt vertical ledge. Descending into a cave is allowed.
+      if(!futureGround||futureGround.y-player.position.y<=.70){
+        player.position.x=nx;player.position.z=nz;
+        moved=Math.hypot(dx,dz)>1e-6;
+        const heading=movementHeading(move.x,move.z);
+        player.rotation.y=-heading; // Mixamo's +Z rig correction
+      }
     }
-  }else player.position.y=THREE.MathUtils.damp(player.position.y,heightAt(player.position.x,player.position.z),17,dt);
+  }
+  // Follow the closest supporting cave/arena surface below the character.
+  // No floor means gravity, not an invisible barrier around a cut opening.
+  const floor=collider.floorAt(player.position.x,player.position.z,player.position.y);
+  if(floor&&floor.y>=player.position.y-.28&&verticalSpeed<=0){
+    player.position.y=floor.y;verticalSpeed=0;
+  }else{
+    verticalSpeed=Math.max(-24,verticalSpeed-19.6*dt);
+    const nextY=player.position.y+verticalSpeed*dt;
+    if(floor&&nextY<=floor.y){player.position.y=floor.y;verticalSpeed=0;}
+    else player.position.y=nextY;
+  }
   setMovingAnimation(keys.has('KeyW')||keys.has('ArrowUp'));
   if(mixer)mixer.update(dt);
   // Classic Farolera-style chase: camera BEHIND and ABOVE the player,
@@ -297,13 +315,16 @@ const hiddenDebugMarkers=[];
   const desired=player.position.clone().addScaledVector(camF,-CAMERA_DISTANCE).addScaledVector(camR,.6);
   desired.y+=3.0+pitch*1.7;
   // Keep height clearance without forcing the camera toward first person.
-  desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+1.5);
+  // Never clamp the camera against the uncut heightmap while inside a cave.
+  const cameraFloor=collider.floorAt(desired.x,desired.z,player.position.y,{stepUp:3.5,searchDepth:8});
+  if(cameraFloor&&Math.abs(cameraFloor.y-player.position.y)<2.5)
+    desired.y=Math.max(desired.y,cameraFloor.y+1.5);
   const look=player.position.clone().addScaledVector(camF,2.8);
   look.y+=CAMERA_HEIGHT-pitch*1.35;
   camera.position.lerp(desired,1-Math.exp(-dt*10));
   cameraFocus.lerp(look,1-Math.exp(-dt*14));
   camera.lookAt(cameraFocus);
-  $('testCoords').textContent='X '+player.position.x.toFixed(1)+' · Z '+player.position.z.toFixed(1)+' · altura '+heightAt(player.position.x,player.position.z).toFixed(1);
+  $('testCoords').textContent='X '+player.position.x.toFixed(1)+' · Z '+player.position.z.toFixed(1)+' · altura '+player.position.y.toFixed(1);
   return camera;
  }
  function fromFile(file){
