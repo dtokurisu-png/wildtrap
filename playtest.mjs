@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {inPlaceClip} from './playtest-animation.mjs?v=0.9.36';
 import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.33';
 // The user's own WT GLB and animation files will be supplied separately.
 // No R.O.K. model or animation is loaded.
@@ -146,6 +147,9 @@ const hiddenDebugMarkers=[];
       // Present a diagnostic instead of silently starting an invisible avatar.
       console.warn('Explorador WT: geometría detectada sin bounds mundiales', {meshes,vertices});
     }
+    // The exported WT rig faces +Z while the controller forward is -Z.
+    // Turn the visual only; never reverse camera/WASD or playback speed.
+    visual.rotation.y=Math.PI;
     player.add(visual);
     gltf.scene.traverse(object=>{
       if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
@@ -156,8 +160,11 @@ const hiddenDebugMarkers=[];
     const clips=gltf.animations||[];
     if(clips.length){
       mixer=new THREE.AnimationMixer(gltf.scene);
-      idle=mixer.clipAction(clips[IDLE_CLIP_INDEX]||clips[0]);
-      walk=mixer.clipAction(clips[RUN_CLIP_INDEX]||clips[IDLE_CLIP_INDEX]||clips[0]);
+      const stationary=inPlaceClip(clips[IDLE_CLIP_INDEX]||clips[0]);
+      const running=inPlaceClip(clips[RUN_CLIP_INDEX]||clips[IDLE_CLIP_INDEX]||clips[0]);
+      idle=mixer.clipAction(stationary.clip);
+      walk=mixer.clipAction(running.clip);
+      console.info('WT animaciones in-place', {idle:stationary.corrected,run:running.corrected});
       idle.reset().setLoop(THREE.LoopRepeat).play();
       walkWanted=false;
       say('Explorador WT listo · animación 3 quieto / 5 con W');
