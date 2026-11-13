@@ -282,8 +282,11 @@ const hiddenDebugMarkers=[];
       // the visual child, while this parent rotation follows camera yaw.
       // Do not smooth the heading: smoothing made the running animation
       // point sideways/backwards whenever the camera turned while W was held.
+      // Mixamo's rig faces +Z; the visual child is rotated 180° so its
+      // locomotion forward is -Z. Three.js positive Y rotation turns -Z
+      // toward -X, so the parent yaw must be NEGATED to follow +X travel.
       const heading=movementHeading(move.x,move.z);
-      player.rotation.y=heading;
+      player.rotation.y=-heading;
     }
   }else player.position.y=THREE.MathUtils.damp(player.position.y,heightAt(player.position.x,player.position.z),17,dt);
   setMovingAnimation(keys.has('KeyW')||keys.has('ArrowUp'));
