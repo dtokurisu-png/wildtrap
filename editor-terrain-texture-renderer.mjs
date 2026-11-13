@@ -39,7 +39,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  function clearCliffs(){
   while(cliffLayer.children.length){
    const mesh=cliffLayer.children[0];cliffLayer.remove(mesh);
-   mesh.geometry?.dispose();mesh.material?.dispose();
+   mesh.geometry?.dispose();mesh.material?.map?.dispose();mesh.material?.dispose();
   }
   hasCliffs=false;
  }
@@ -155,7 +155,8 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));
   if(ticket!==generation)return;
   ctx.clearRect(0,0,RES,RES);
-  // Preserve original untextured ground outside assigned regions (alpha canvas).
+  ctx.fillStyle='#56876b';ctx.fillRect(0,0,RES,RES);
+  // Unassigned regions retain a neutral natural ground color.
   let active=false;
   for(const z of zones){
    const config=live.biomeMaterials?.[z.biomeId];
