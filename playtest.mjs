@@ -10,13 +10,15 @@ const EXPLORER_URL='./assets/explorador%201%20wt.glb';
 export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,$,resizeEditor,onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const cameraFocus=new THREE.Vector3();
- const CAMERA_DISTANCE=6.3,CAMERA_HEIGHT=1.65;
- const cameraRay=new THREE.Raycaster();
+ const CAMERA_DISTANCE=5.1,CAMERA_HEIGHT=1.45;
+ // Keep the classic third-person chase framing; never shorten the orbit
+ // due to an intersecting terrain wall.
  const clock=new THREE.Clock();
  const player=new THREE.Group();
  player.name='WILDTRAPPlayer1';
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
+ let animationClips=[],activeClipIndex=-1;
  let oldShow=null,oldShadow=null;
 const hiddenDebugMarkers=[];
  const keys=new Set();
@@ -40,10 +42,11 @@ const hiddenDebugMarkers=[];
   player.position.set(s.x,ground,s.z);
   yaw=0;pitch=.22;
   player.rotation.y=0;
-  const focus=new THREE.Vector3(s.x,ground+CAMERA_HEIGHT,s.z);
-  cameraFocus.copy(focus);
-  camera.position.copy(focus).add(new THREE.Vector3(.45,Math.sin(pitch)*CAMERA_DISTANCE,Math.cos(pitch)*CAMERA_DISTANCE));
-  camera.lookAt(focus);
+  // Same shoulder chase placement as the earlier Farolera tester.
+  const forward=forwardOf(yaw);
+  cameraFocus.set(s.x,ground+CAMERA_HEIGHT,s.z).addScaledVector(forward,2.8);
+  camera.position.set(s.x+.6,ground+2.9+pitch*1.7,s.z+CAMERA_DISTANCE);
+  camera.lookAt(cameraFocus);
  }
  async function fetchModel(){
   if(imported)return imported;
@@ -147,28 +150,41 @@ const hiddenDebugMarkers=[];
       if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
     });
     imported=gltf;
-    if(gltf.animations?.length){
+    animationClips=gltf.animations||[];
+    const picker=$('playAnimation');
+    if(picker){
+      picker.replaceChildren();
+      const still=document.createElement('option');still.value='-1';still.textContent='Sin animación (pose del GLB)';picker.append(still);
+      animationClips.forEach((clip,i)=>{
+        const opt=document.createElement('option');opt.value=String(i);
+        opt.textContent=(i+1)+'. '+clip.name+' ('+clip.duration.toFixed(1)+' s)';
+        picker.append(opt);
+      });
+      picker.disabled=!animationClips.length;
+    }
+    if(animationClips.length){
       mixer=new THREE.AnimationMixer(gltf.scene);
-      const clip=gltf.animations.find(a=>/idle|standing/i.test(a.name))||gltf.animations[0];
-      idle=mixer.clipAction(clip);idle.play();
-      say('Personaje WT cargado · clip incrustado: '+clip.name);
-    }else say('Personaje WT cargado · esperando animaciones propias');
+      setAnimation(0);
+      say('Explorador cargado · '+animationClips.length+' animaciones disponibles');
+    }else say('Explorador cargado · sin animaciones en el GLB');
     return imported;
   })().catch(error=>{sourceError=error.message;loadingPromise=null;throw error});
   return loadingPromise;
  }
- function crossfade(moving){
-   if(!mixer||!idle||!walk)return;
-   if(walkWanted===moving)return;
-   walkWanted=moving;
-   if(moving){
-     walk.reset().play();walk.enabled=true;
-     idle.crossFadeTo(walk,.20,false);
-   }else{
-     idle.enabled=true;idle.play();
-     walk.crossFadeTo(idle,.20,false);
-   }
+ function setAnimation(index){
+  if(!imported)return;
+  activeClipIndex=Number(index);
+  if(mixer)mixer.stopAllAction();
+  idle=null;walk=null;
+  if(mixer&&Number.isInteger(activeClipIndex)&&activeClipIndex>=0&&activeClipIndex<animationClips.length){
+    const clip=animationClips[activeClipIndex];
+    idle=mixer.clipAction(clip);
+    idle.reset().setLoop(THREE.LoopRepeat).play();
+  }
+  const picker=$('playAnimation');if(picker)picker.value=String(activeClipIndex);
  }
+ const clipSelect=$('playAnimation');
+ if(clipSelect)clipSelect.onchange=e=>setAnimation(Number(e.target.value));
  function handleMouseDown(event){
   if(!active||event.button!==0&&event.button!==2)return;
   event.preventDefault();drag=true;lastX=event.clientX;lastY=event.clientY;
@@ -236,7 +252,7 @@ const hiddenDebugMarkers=[];
   for(const node of hiddenDebugMarkers)node.visible=true;
   hiddenDebugMarkers.length=0;
   orbit.enabled=true;walkWanted=false;
-  if(mixer){mixer.stopAllAction();idle?.reset().play();if(walk)walk.setEffectiveWeight(0)}
+  if(mixer)mixer.stopAllAction();
   $('test').textContent='▶ Probar';
   document.body.classList.remove('testing');
   resizeEditor();resize();
@@ -260,29 +276,18 @@ const hiddenDebugMarkers=[];
       player.rotation.y+=Math.atan2(Math.sin(heading-player.rotation.y),Math.cos(heading-player.rotation.y))*Math.min(1,dt*12);
     }
   }else player.position.y=THREE.MathUtils.damp(player.position.y,heightAt(player.position.x,player.position.z),17,dt);
-  crossfade(moving);
   if(mixer)mixer.update(dt);
-  // Third-person follow: keep the Explorer visible, above and behind him.
-  // Aim uses the camera center; yaw is independent from avatar heading.
-  const focus=player.position.clone().add(new THREE.Vector3(0,CAMERA_HEIGHT,0));
-  const horizontal=forwardOf(yaw).multiplyScalar(-Math.cos(pitch)*CAMERA_DISTANCE);
-  const desired=focus.clone().add(horizontal).add(new THREE.Vector3(0,Math.sin(pitch)*CAMERA_DISTANCE,0));
-  desired.addScaledVector(new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw)),.45);
-  // Prevent camera sinking into terrain while following steep slopes.
-  desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+1.25);
-  // Camera obstruction: move in front of intervening terrain meshes, not into them.
-  const rayDirection=desired.clone().sub(focus);
-  const rayDistance=rayDirection.length();
-  if(rayDistance>0.001){
-    cameraRay.set(focus,rayDirection.multiplyScalar(1/rayDistance));
-    cameraRay.far=rayDistance;
-    const collisions=cameraRay.intersectObject(terrain,false);
-    if(collisions.length&&collisions[0].distance<rayDistance-.1){
-      desired.copy(focus).addScaledVector(cameraRay.ray.direction,Math.max(2.25,collisions[0].distance-.35));
-    }
-  }
-  camera.position.lerp(desired,1-Math.exp(-dt*11));
-  cameraFocus.lerp(focus,1-Math.exp(-dt*14));
+  // Classic Farolera-style chase: camera BEHIND and ABOVE the player,
+  // looking slightly ahead. Mouse orbit changes only direction/aim.
+  const camF=forwardOf(yaw),camR=new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw));
+  const desired=player.position.clone().addScaledVector(camF,-CAMERA_DISTANCE).addScaledVector(camR,.6);
+  desired.y+=3.0+pitch*1.7;
+  // Keep height clearance without forcing the camera toward first person.
+  desired.y=Math.max(desired.y,heightAt(desired.x,desired.z)+1.5);
+  const look=player.position.clone().addScaledVector(camF,2.8);
+  look.y+=CAMERA_HEIGHT-pitch*1.35;
+  camera.position.lerp(desired,1-Math.exp(-dt*10));
+  cameraFocus.lerp(look,1-Math.exp(-dt*14));
   camera.lookAt(cameraFocus);
   $('testCoords').textContent='X '+player.position.x.toFixed(1)+' · Z '+player.position.z.toFixed(1)+' · altura '+heightAt(player.position.x,player.position.z).toFixed(1);
   return camera;
@@ -295,7 +300,7 @@ const hiddenDebugMarkers=[];
    if(previous)URL.revokeObjectURL(previous);
    imported=null;loadingPromise=null;
    if(player.children.length)player.clear();
-   mixer=null;idle=null;walk=null;
+   mixer=null;idle=null;walk=null;animationClips=[];activeClipIndex=-1;
    $('testModelStatus').textContent='Personaje propio: '+file.name+' · pulsa Probar';
  }
  return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError}};
