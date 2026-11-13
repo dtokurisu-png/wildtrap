@@ -14,6 +14,8 @@ on:
       - 'tests/player-spawns.mjs'
       - 'playtest-movement.mjs'
       - 'tests/playtest-movement.mjs'
+      - 'tests/explorer-glb.mjs'
+      - 'assets/explorador 1 wt.glb'
       - 'index.html'
       - 'prefab-library.mjs'
       - 'terrain-holes.mjs'
@@ -34,6 +36,8 @@ jobs:
         run: node tests/player-spawns.mjs
       - name: Validar movimiento del Explorador
         run: node tests/playtest-movement.mjs
+      - name: Inspeccionar geometría real de Explorador 1 WT
+        run: node tests/explorer-glb.mjs
       - run: command -v google-chrome || command -v chromium
       - name: Iniciar servidor local de la revisión
         run: |
