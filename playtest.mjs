@@ -18,7 +18,7 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  player.name='WILDTRAPPlayer1';
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
- let animationClips=[],activeClipIndex=-1;
+ const IDLE_CLIP_INDEX=2,RUN_CLIP_INDEX=4;
  let oldShow=null,oldShadow=null;
 const hiddenDebugMarkers=[];
  const keys=new Set();
@@ -151,41 +151,29 @@ const hiddenDebugMarkers=[];
       if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
     });
     imported=gltf;
-    animationClips=gltf.animations||[];
-    const picker=$('playAnimation');
-    if(picker){
-      picker.replaceChildren();
-      const still=document.createElement('option');still.value='-1';still.textContent='Sin animación (pose del GLB)';picker.append(still);
-      animationClips.forEach((clip,i)=>{
-        const opt=document.createElement('option');opt.value=String(i);
-        opt.textContent=(i+1)+'. '+clip.name+' ('+clip.duration.toFixed(1)+' s)';
-        picker.append(opt);
-      });
-      picker.disabled=!animationClips.length;
-    }
-    if(animationClips.length){
+    // WT animation slots are 1-based for the designer:
+    // clip 3 = stationary, clip 5 = moving forward with W.
+    const clips=gltf.animations||[];
+    if(clips.length){
       mixer=new THREE.AnimationMixer(gltf.scene);
-      setAnimation(0);
-      say('Explorador cargado · '+animationClips.length+' animaciones disponibles');
-    }else say('Explorador cargado · sin animaciones en el GLB');
+      idle=mixer.clipAction(clips[IDLE_CLIP_INDEX]||clips[0]);
+      walk=mixer.clipAction(clips[RUN_CLIP_INDEX]||clips[IDLE_CLIP_INDEX]||clips[0]);
+      idle.reset().setLoop(THREE.LoopRepeat).play();
+      walkWanted=false;
+      say('Explorador WT listo · animación 3 quieto / 5 con W');
+    }else say('Explorador WT listo · sin clips incrustados');
     return imported;
   })().catch(error=>{sourceError=error.message;loadingPromise=null;throw error});
   return loadingPromise;
  }
- function setAnimation(index){
-  if(!imported)return;
-  activeClipIndex=Number(index);
-  if(mixer)mixer.stopAllAction();
-  idle=null;walk=null;
-  if(mixer&&Number.isInteger(activeClipIndex)&&activeClipIndex>=0&&activeClipIndex<animationClips.length){
-    const clip=animationClips[activeClipIndex];
-    idle=mixer.clipAction(clip);
-    idle.reset().setLoop(THREE.LoopRepeat).play();
-  }
-  const picker=$('playAnimation');if(picker)picker.value=String(activeClipIndex);
+ function setMovingAnimation(wPressed){
+  if(!mixer||!idle||!walk||idle===walk)return;
+  if(walkWanted===wPressed)return;
+  walkWanted=wPressed;
+  const from=wPressed?idle:walk,to=wPressed?walk:idle;
+  to.reset().setLoop(THREE.LoopRepeat).play();
+  from.crossFadeTo(to,.16,false);
  }
- const clipSelect=$('playAnimation');
- if(clipSelect)clipSelect.onchange=e=>setAnimation(Number(e.target.value));
  function handleMouseDown(event){
   if(!active||event.button!==0&&event.button!==2)return;
   event.preventDefault();drag=true;lastX=event.clientX;lastY=event.clientY;
@@ -202,7 +190,10 @@ const hiddenDebugMarkers=[];
  }
  function handleMouseUp(){drag=false}
  function keyDown(event){
-  if(!active||event.target?.matches?.('input,textarea,select'))return;
+  if(!active)return;
+  // Once testing begins, keys belong to the game, not to the previously
+  // focused editor button or an invisible control.
+  if(event.target?.matches?.('input,textarea,select,[contenteditable="true"]'))event.target.blur?.();
   if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'].includes(event.code)){
    event.preventDefault();keys.add(event.code);
   }
@@ -223,7 +214,7 @@ const hiddenDebugMarkers=[];
   return fetchModel().then(()=>{
     if(active)return;
     resetPosition();
-    if(mixer)setAnimation(activeClipIndex>=0?activeClipIndex:0);
+    if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
@@ -233,6 +224,11 @@ const hiddenDebugMarkers=[];
     orbit.enabled=false;
     active=true;busy=false;
     document.body.classList.add('testing');
+    keys.clear();
+    // Probar was clicked with keyboard/mouse and may retain focus.
+    document.activeElement?.blur?.();
+    view.tabIndex=0;
+    view.focus({preventScroll:true});
     $('test').disabled=false;
     $('test').textContent='Probando…';
     resizeEditor();resize();
@@ -278,6 +274,7 @@ const hiddenDebugMarkers=[];
       player.rotation.y+=Math.atan2(Math.sin(heading-player.rotation.y),Math.cos(heading-player.rotation.y))*Math.min(1,dt*12);
     }
   }else player.position.y=THREE.MathUtils.damp(player.position.y,heightAt(player.position.x,player.position.z),17,dt);
+  setMovingAnimation(keys.has('KeyW')||keys.has('ArrowUp'));
   if(mixer)mixer.update(dt);
   // Classic Farolera-style chase: camera BEHIND and ABOVE the player,
   // looking slightly ahead. Mouse orbit changes only direction/aim.
@@ -302,7 +299,7 @@ const hiddenDebugMarkers=[];
    if(previous)URL.revokeObjectURL(previous);
    imported=null;loadingPromise=null;
    if(player.children.length)player.clear();
-   mixer=null;idle=null;walk=null;animationClips=[];activeClipIndex=-1;
+   mixer=null;idle=null;walk=null;walkWanted=false;
    $('testModelStatus').textContent='Personaje propio: '+file.name+' · pulsa Probar';
  }
  return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError}};
