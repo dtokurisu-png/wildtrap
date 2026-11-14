@@ -61,7 +61,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.39 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.40 · 630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -77,6 +77,23 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="grid2" style="margin-top:6px">
 <button id="export">Exportar JSON</button><label class="fileBtn" style="margin:0">Importar JSON<input id="importJSON" type="file" accept=".json,application/json"></label>
 </div>
+<section id="publishPanel" aria-label="Publicar mapa en WildTrap Play" style="margin:12px 0;padding:12px;background:#173a31;border:1px solid #59b99b;border-radius:10px">
+ <h2 style="margin:0 0 8px;color:#a3ffe1">Publicar mapa · WildTrap Play</h2>
+ <p class="hint">Tu mapa de trabajo permanece intacto. Solo se copia a Play cuando confirmas. Se guarda una versión histórica.</p>
+ <button type="button" id="publishPreview" style="width:100%">Revisar mapa actual y versión publicada</button>
+ <p class="hint" id="publishMeta" aria-live="polite">Todavía no se ha revisado el mapa.</p>
+ <label style="display:block;margin-top:8px">Notas de esta publicación
+   <input id="publishNotes" maxlength="240" placeholder="Ej. Cueva de aparición y retoques del terreno" style="width:100%" autocomplete="off">
+ </label>
+ <label style="display:block;margin-top:8px">Clave temporal GitHub (WildTrap Play)
+   <input type="password" id="publishToken" placeholder="Token temporal · Contents: Read and write" style="width:100%" autocomplete="off" spellcheck="false">
+ </label>
+ <p class="hint">Para publicar desde el navegador necesitas un <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer" style="color:#9ce9d3">token de acceso limitado</a> al repositorio <strong>dtokurisu-png/wildtrap-play</strong>, con permiso Contents: Read and write. No se guarda en el mapa ni en el navegador.</p>
+ <label style="display:flex;gap:7px;align-items:flex-start;margin:8px 0"><input id="publishConfirm" type="checkbox" style="margin-top:3px">Confirmo que deseo actualizar el mapa publicado para las próximas partidas.</label>
+ <button type="button" id="publishNow" style="width:100%;background:#00765d;border-color:#67e6bc;color:white;font-weight:700">Publicar copia en WildTrap Play</button>
+ <p id="publishStatus" class="hint" aria-live="polite">No se ha publicado ningún cambio en esta sesión.</p>
+ <a id="publishedMapLink" href="https://github.com/dtokurisu-png/wildtrap-play/tree/main/maps" target="_blank" rel="noopener noreferrer" hidden style="color:#9ce9d3">Ver versión publicada en GitHub</a>
+ </section>
 <section id="recoveryPanel" hidden style="border:1px solid #d9b875;border-radius:9px;padding:10px;margin-top:8px;background:#373123">
  <h2>Rescate del escenario original</h2>
  <p class="hint">Estás usando una COPIA del borrador normal, pero sin reconstruir recortes. Los modelos, sus posiciones y los datos de los agujeros siguen guardados.</p>
@@ -369,5 +386,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.39').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.40').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
