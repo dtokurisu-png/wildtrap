@@ -1581,6 +1581,10 @@ $('removeRecoveryCuts').onclick=()=>{
 };
 $('remove').onclick=()=>{if(!selectedIds.size)return;snapshot();live.nodes=live.nodes.filter(n=>!selectedIds.has(n.id));pruneUnusedSceneGroups();selectedIds.clear();selectedId=null;draw();persist()};
 $('export').onclick=()=>{live.editorCamera=currentEditorCamera();download('wildtrap-escenario.json',new Blob([JSON.stringify(live)],{type:'application/json'}))};
+// Publication never mutates the live editor scene; it submits a frozen copy to the independent Play repository.
+void import('./map-publisher.mjs?v=0.9.40').then(({createMapPublisher})=>{
+ createMapPublisher({getScene:()=>({...live,editorCamera:currentEditorCamera()})});
+}).catch(error=>{const status=$('publishStatus');if(status)status.textContent='No se pudo iniciar el publicador: '+error.message;});
 $('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
 updateMaxHeightControl();refreshTerrain();draw();
 if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
