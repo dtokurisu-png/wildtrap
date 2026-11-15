@@ -150,19 +150,19 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 <section id="texturePanel">
 <h2>▧ Texturizado · Materiales por bioma</h2>
-<button data-tool="textures" type="button" style="width:100%">▧ Activar Texturizado</button>
-<p class="hint">Biblioteca de materiales para generación procedural. Define 5 texturas por bioma: terreno base, tres variaciones y acantilado. Las texturas se aplican a las zonas del terreno con bioma asignado.</p>
+
+<p class="hint">Biblioteca de texturas del repositorio. Filtra por bioma y asigna etiquetas a cada textura; «Usar» la aplica a una ranura del escenario.</p>
 <label>Bioma<select id="textureBiome" style="width:100%;padding:7px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px"></select></label>
 <label style="display:flex;align-items:center;gap:8px"><input id="textureShow" type="checkbox" checked> Mostrar texturas en el escenario</label>
 <p id="textureRenderStatus" class="hint">Preparando materiales del terreno…</p>
-<div id="textureSlots"></div>
+<h2>Texturas del repositorio</h2><p id="textureCatalogCount" class="hint"></p><div id="textureCatalog"></div><h2>Ranuras activas del bioma</h2><div id="textureSlots"></div>
 <h2>Propiedades procedurales</h2>
 <label>Escala del ruido <output id="textureNoiseValue">20</output><input id="textureNoise" type="range" min="1" max="200" step="1" value="20"></label>
 <label>Semilla de variaciones<input id="textureSeed" type="number" min="1" max="9999999" step="1" value="1"></label>
 <label>Transición entre biomas (unidades) <output id="textureTransitionValue">4</output><input id="textureTransition" type="range" min="0" max="50" step=".5" value="4"></label>
-<p id="textureSize" class="hint">Sin imágenes importadas</p>
+<p id="textureSize" class="hint"></p>
 <button id="textureResetBiome" type="button" style="width:100%">Restablecer material de este bioma</button>
-<p class="hint">Las imágenes y parámetros de materiales se guardan con el escenario. Los biomas pueden asignarse manualmente o generarse desde las zonas definidas.</p>
+<p class="hint">Las etiquetas, rutas y parámetros de materiales se guardan con el escenario. Las imágenes originales permanecen en el repositorio. Los biomas pueden asignarse manualmente o generarse desde las zonas definidas.</p>
 <div id="biomeGeneratorPanel" style="border-top:1px solid #497967;margin-top:12px;padding-top:10px">
 <h2>Generador procedural de biomas</h2>
 <p class="hint">Reparte los cinco biomas entre las zonas existentes sin modificar alturas, acantilados, recortes ni objetos. Repetir una semilla y reglas idénticas devuelve la misma distribución.</p>
