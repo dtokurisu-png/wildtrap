@@ -1,3 +1,4 @@
+import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.73';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
 
@@ -7,6 +8,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  const canvas=document.createElement('canvas');canvas.width=canvas.height=RES;
  const ctx=canvas.getContext('2d',{willReadFrequently:false});
  const status=document.getElementById('textureRenderStatus');
+ const gpuLayers=createTerrainGPULayers({scene,terrain});
  const surfaceMap=new THREE.CanvasTexture(canvas);
  surfaceMap.colorSpace=THREE.SRGBColorSpace;
  surfaceMap.anisotropy=4;
@@ -181,35 +183,27 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   }
   await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));
   if(ticket!==generation)return;
-  ctx.clearRect(0,0,RES,RES);
-  ctx.fillStyle='#56876b';ctx.fillRect(0,0,RES,RES);
-  // Unassigned regions retain a neutral natural ground color.
-  let active=false;
-  for(const z of zones){
-   if(z.isCliff)continue; // Cliff polygons inherit their parent; they do not paint another ground biome.
-   const config=live.biomeMaterials?.[z.biomeId];
-   if(!config)continue;
-   const biomeIndex=BIOMES.findIndex(b=>b.id===z.biomeId);
-   // Render only where at least one ground/detail image exists.
-   if(!['ground','detail1','detail2','detail3'].some(id=>loaded.get(config.slots?.[id]?.image)))continue;
-   blendZone(z,config,biomeIndex);active=true;
-  }
-  hasSurface=active;
-  if(status)status.textContent=active?'Texturas aplicadas a '+zones.length+' zonas. Acantilados con proyección vertical.':'Sin texturas de terreno para las zonas asignadas.';
-  surfaceMap.needsUpdate=true;
+  // The old 768x768 baked terrain map turned 200 repeats into just 3.84
+  // pixels per tile. All terrain detail is now sampled from the source PNG
+  // directly by the GPU. The 768px masks only identify geographic zones.
+  gpuLayers.build({zones:live.zones||[],materials:live.biomeMaterials,loaded,enabled});
+  hasSurface=gpuLayers.count()>0;
+  if(status)status.textContent=hasSurface?
+   'Texturas originales en GPU · '+gpuLayers.count()+' biomas · sin reducir detalles a 768 px.':
+   'Sin texturas de terreno para las zonas asignadas.';
   buildCliffs();apply();
  }
  function apply(){
   // Transparency is not used for terrain; only replace material when surface imagery exists.
-  terrain.material=hasSurface?(live.settings?.terrainIntangible&&!isTesting()?paintedGhost:painted):
-   (live.settings?.terrainIntangible&&!isTesting()?intangibleMaterial:material);
+  terrain.material=(live.settings?.terrainIntangible&&!isTesting()?intangibleMaterial:material);
+  gpuLayers.sync(enabled&&!(live.settings?.terrainIntangible&&!isTesting()));
   cliffLayer.visible=enabled&&hasCliffs&&terrain.visible;
  }
  function schedule(){
   clearTimeout(timer);timer=setTimeout(()=>{void bake().catch(e=>toast('Error al generar texturas: '+e.message))},180);
  }
- function setEnabled(next){enabled=Boolean(next);if(enabled)schedule();else{hasSurface=false;clearCliffs();apply()}}
+ function setEnabled(next){enabled=Boolean(next);if(enabled)schedule();else{hasSurface=false;gpuLayers.clear();clearCliffs();apply()}}
  function refreshCliffs(){if(!enabled)return;buildCliffs();apply()}
- function dispose(){clearTimeout(timer);clearCliffs();surfaceMap.dispose();painted.dispose();paintedGhost.dispose();}
+ function dispose(){clearTimeout(timer);gpuLayers.clear();clearCliffs();surfaceMap.dispose();painted.dispose();paintedGhost.dispose();}
  return {schedule,apply,refreshCliffs,setEnabled,dispose};
 }
