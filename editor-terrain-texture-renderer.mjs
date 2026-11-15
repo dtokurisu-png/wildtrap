@@ -1,4 +1,4 @@
-import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.78';
+import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.79';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
 
