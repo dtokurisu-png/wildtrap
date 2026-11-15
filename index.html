@@ -70,7 +70,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="grid2"><label class="fileBtn" style="margin:0">Cambiar GLB (opcional)<input id="localExplorer" type="file" accept=".glb,model/gltf-binary"></label><small id="testModelStatus" style="align-self:center">Explorador 1 WT · modelo predeterminado</small></div>
 </section>
 
-<div class="grid2"><button id="top">Vista cenital</button><button id="angle">Vista 3D</button><button id="undo">Deshacer</button><button id="reset">Vaciar todo</button></div>
+<div class="grid2"><button id="top">Vista cenital</button><button id="angle">Vista 3D</button><button id="undo" type="button" title="Deshacer (Ctrl + Z)">Deshacer</button><button id="redo" type="button" title="Rehacer (Ctrl + Shift + Z / Ctrl + Y)" disabled>Rehacer</button><button id="reset">Vaciar todo</button></div>
 <div class="grid2" style="margin-top:6px">
 <button id="restoreBase">Restaurar relieve original</button><button id="loadPublished">Abrir mapa publicado</button>
 </div>
@@ -184,12 +184,10 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 <section id="zonesPanel">
 <h2>◇ Creador de zonas · Terreno</h2>
-<p class="hint">Clic izquierdo: marcar puntos. Mantener clic izquierdo y arrastrar: rotar cámara. Rueda presionada: desplazar cámara. Rueda: acercar o alejar. Cierra el contorno pulsando el primer punto o «Cerrar zona».</p>
+<p class="hint">Clic izquierdo: marcar puntos. Ctrl+Z: retirar el último punto; Ctrl+Shift+Z: recuperarlo. Arrastrar con clic izquierdo: rotar cámara. Rueda presionada: desplazar cámara; rueda: zoom. Cierra el contorno pulsando el primer punto o «Cerrar zona».</p>
 <button data-tool="zones" style="width:100%">◇ Activar Creador de zonas</button>
 <button id="zoneCenterView" type="button" style="width:100%;margin-top:6px">Centrar cámara en el mapa</button>
-<div class="grid2" style="margin-top:6px">
-<button id="zoneUndoPoint" disabled>↶ Último punto</button><button id="zoneClose" disabled>◇ Cerrar zona</button>
-</div>
+<button id="zoneClose" type="button" style="width:100%;margin-top:6px" disabled>◇ Cerrar zona</button>
 <button id="zoneCancel" style="width:100%;margin-top:6px">Cancelar contorno</button>
 <p class="hint" id="zonePendingCount">Haz clic en el terreno para comenzar</p>
 <h2>Zonas del escenario</h2>
