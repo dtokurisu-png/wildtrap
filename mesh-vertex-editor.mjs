@@ -85,7 +85,7 @@ export function createMeshVertexEditor({
     const key=pointKey(item.key,item.index);
     const picked=selected.has(key);
     const locked=lockedSets.get(item.key)?.has(item.index)===true;
-    colors.setXYZ(item.paintIndex,...(picked?[1,1,1]:locked?[1,.18,.33]:[0,1,.87]));
+    colors.setXYZ(item.paintIndex,...(picked?[1,.0,.95]:locked?[1,.18,.33]:[0,1,.87]));
    }
    colors.needsUpdate=true;
   }
@@ -133,7 +133,7 @@ export function createMeshVertexEditor({
    const cloudGeo=new THREE.BufferGeometry();
    cloudGeo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
    cloudGeo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-   const cloudMat=new THREE.PointsMaterial({size:11,sizeAttenuation:false,
+   const cloudMat=new THREE.PointsMaterial({size:13,sizeAttenuation:false,
     vertexColors:true,depthTest:false,depthWrite:false,transparent:false,opacity:1});
    const cloud=new THREE.Points(cloudGeo,cloudMat);
    cloud.userData.editorOnly=true;cloud.renderOrder=45;cloud.frustumCulled=false;
@@ -231,12 +231,19 @@ export function createMeshVertexEditor({
   }
   return best;
  }
- function worldUnitsPerPixel(worldPoint){
+ function worldAtPointer(clientX,clientY,depth){
   const box=view.getBoundingClientRect();
-  if(camera.isOrthographicCamera)return (camera.top-camera.bottom)/Math.max(.001,camera.zoom)/Math.max(1,box.height);
-  const distance=Math.max(.1,worldPoint.distanceTo(camera.position));
-  return 2*distance*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/
-   Math.max(.001,camera.zoom)/Math.max(1,box.height);
+  const x=(clientX-box.left)/box.width*2-1;
+  const y=1-(clientY-box.top)/box.height*2;
+  camera.updateMatrixWorld(true);
+  return new THREE.Vector3(x,y,depth).unproject(camera);
+ }
+ function worldDeltaToRoot(root,worldDelta){
+  root.updateMatrixWorld(true);
+  const inverse=root.matrixWorld.clone().invert();
+  const worldOrigin=root.localToWorld(new THREE.Vector3());
+  return worldOrigin.clone().add(worldDelta).applyMatrix4(inverse)
+   .sub(worldOrigin.clone().applyMatrix4(inverse));
  }
  function pointerdown(e){
   if(!active||e.button!==0||!getTarget())return false;
@@ -253,11 +260,12 @@ export function createMeshVertexEditor({
    selectChanged(next);
    const target=getTarget(),root=target.root;
    const origin=sample.vertex.clone().applyMatrix4(sample.mesh.matrixWorld);
+   const depth=origin.clone().project(camera).z;
+   const pointerOrigin=worldAtPointer(e.clientX,e.clientY,depth);
    gesture={pointerId:e.pointerId,x:e.clientX,y:e.clientY,kind:'vertex',
-    moved:false,snapshotTaken:false,node:target.node,root,origin,
+    moved:false,snapshotTaken:false,node:target.node,root,origin,depth,pointerOrigin,
     initialMoves:structuredClone(target.node.meshVertexMoves||{}),
-    locked:normalizedLocks(target.node.vertexLocks),selectedKeys:[...selected],
-    worldScale:worldUnitsPerPixel(origin)};
+    locked:normalizedLocks(target.node.vertexLocks),selectedKeys:[...selected]};
   }else{
    gesture={pointerId:e.pointerId,x:e.clientX,y:e.clientY,kind:'marquee',dragging:false};
   }
@@ -285,21 +293,18 @@ export function createMeshVertexEditor({
     }
    }
    g.moved=true;
-   // Screen-plane drag by default; Shift locks X/Y, Alt+Shift vertical locks Z.
-   const cameraRight=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0).normalize();
-   const cameraUp=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize();
-   let movement;
+   // Unproject the pointer at the original vertex's screen depth.
+   // This preserves the exact grab offset: a visible marker tracks the cursor
+   // even with a rotated camera, zoom or transformed GLB hierarchy.
+   const pointerWorld=worldAtPointer(e.clientX,e.clientY,g.depth);
+   const movement=pointerWorld.sub(g.pointerOrigin);
+   const rootDelta=worldDeltaToRoot(g.root,movement);
    if(e.shiftKey){
-    const axes=new THREE.Vector3();
-    if(e.altKey)axes.set(0,0,-dy);
-    else axes.set(dx,-dy,0);
-    // Axis-constrained movement is in the model's X/Y/Z axes.
-    movement=axes.multiplyScalar(g.worldScale).applyQuaternion(g.root.getWorldQuaternion(new THREE.Quaternion()));
-   }else{
-    movement=cameraRight.multiplyScalar(dx*g.worldScale).addScaledVector(cameraUp,-dy*g.worldScale);
+    if(e.altKey){
+     rootDelta.set(0,0,-dy*Math.max(.001,g.root.worldToLocal(g.origin.clone()).distanceTo(
+       g.root.worldToLocal(worldAtPointer(g.x,g.y+1,g.depth)))) );
+    }else rootDelta.set(rootDelta.x,rootDelta.y,0);
    }
-   const rootDelta=movement.applyQuaternion(g.root.getWorldQuaternion(new THREE.Quaternion()).invert())
-    .divide(g.root.getWorldScale(new THREE.Vector3()));
    const moves=structuredClone(g.initialMoves);
    for(const token of g.selectedKeys){
     const cut=token.lastIndexOf(':'),key=token.slice(0,cut),index=Number(token.slice(cut+1));
@@ -318,9 +323,13 @@ export function createMeshVertexEditor({
     const cut=item.id.lastIndexOf(':'),key=item.id.slice(0,cut),index=Number(item.id.slice(cut+1));
     if(g.locked[key]?.includes(index))continue;
     if(!g.sampleOrigins.has(item.id))g.sampleOrigins.set(item.id,item.vertex.clone());
-    const local=movement.clone()
-     .applyQuaternion(item.mesh.getWorldQuaternion(new THREE.Quaternion()).invert())
-     .divide(item.mesh.getWorldScale(new THREE.Vector3()));
+    // Convert both endpoints with full matrices to handle parent rotation
+    // and non-uniform normalization scales without flipped axes.
+    const base=g.sampleOrigins.get(item.id).clone().applyMatrix4(item.mesh.matrixWorld);
+    const local=base.add(rootDelta.clone().applyMatrix4(
+      new THREE.Matrix4().copy(g.root.matrixWorld).extractRotation(g.root.matrixWorld)
+    )).applyMatrix4(item.mesh.matrixWorld.clone().invert())
+     .sub(g.sampleOrigins.get(item.id));
     item.vertex.copy(g.sampleOrigins.get(item.id)).add(local);
     const originalGeometry=g.dragGeometry?.get(item.mesh)?.original;
     const previewGeometry=g.dragGeometry?.get(item.mesh)?.preview;
