@@ -322,7 +322,9 @@ if(n.kind==='gate')gateMesh(resolvePoint(n.a),resolvePoint(n.b));
  }
  renderedNodes.set(n.id,roots);
 }
-surface.visible=true;terrain.visible=live.settings?.hideTerrainEditor!==true;interiors.visible=false;
+surface.visible=true;terrain.visible=live.settings?.hideTerrainEditor!==true;
+// Cave floors/walls must be present while playtesting, but remain hidden in editor mode.
+interiors.visible=testingScene;
 terrain.material=live.settings?.terrainIntangible===true&&!testingScene?intangibleTerrainMaterial:material;
 terrainPainter?.apply();
 updateSelectionHighlights();updateHoverHighlight();updateStatus();
@@ -817,7 +819,7 @@ async function ensurePreview(){
  if(previewLoad)return previewLoad;
  previewLoad=import('./playtest.mjs?v=0.9.42').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
-   collisionRoots:[cavePiecesLayer,interiors],
+   collisionRoots:[surface,cavePiecesLayer,interiors],
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
    onStop:()=>{testingScene=false;draw();updateMeshInspection();}
   });
