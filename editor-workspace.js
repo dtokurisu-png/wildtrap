@@ -92,6 +92,9 @@
   const button=logic.querySelector('[data-tool="'+kind+'"]');
   if(button)oldSpawnControls.append(button);
  }
+ // Biome generation belongs to geographic zones, not the texture library.
+ const generatorPanel=document.getElementById('biomeGeneratorPanel');
+ if(generatorPanel)zones.append(generatorPanel);
  for(const [key,node] of [['project',project],['sculpt',sculpt],['knife',knife],['zones',zones],['textures',textures],['spawns',spawns]]){
   node.classList.add('workspace-section');node.dataset.workspaceContent=key;
   node.hidden=key!=='project';toolViews.append(node);
