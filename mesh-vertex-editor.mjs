@@ -217,16 +217,110 @@ export function createMeshVertexEditor({
   for(const sample of keys)for(const key of matchingKeys(sample))next.add(key);
   selectChanged(next);
  }
+ function closestSample(e){
+  scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
+  let best=null,distance=16;
+  for(const sample of samples){
+   const p=projected(sample);if(!p)continue;
+   const d=Math.hypot(e.clientX-p.x,e.clientY-p.y);
+   if(d<distance){best=sample;distance=d}
+  }
+  return best;
+ }
+ function worldUnitsPerPixel(worldPoint){
+  const box=view.getBoundingClientRect();
+  if(camera.isOrthographicCamera)return (camera.top-camera.bottom)/Math.max(.001,camera.zoom)/Math.max(1,box.height);
+  const distance=Math.max(.1,worldPoint.distanceTo(camera.position));
+  return 2*distance*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/
+   Math.max(.001,camera.zoom)/Math.max(1,box.height);
+ }
  function pointerdown(e){
   if(!active||e.button!==0||!getTarget())return false;
   e.preventDefault();e.stopImmediatePropagation();
-  gesture={pointerId:e.pointerId,x:e.clientX,y:e.clientY,dragging:false};
+  const sample=closestSample(e);
+  if(sample){
+   const keys=matchingKeys(sample);
+   const next=e.ctrlKey||e.metaKey?new Set(selected):new Set(keys);
+   if(e.ctrlKey||e.metaKey){
+    if(keys.every(k=>next.has(k)))keys.forEach(k=>next.delete(k));
+    else keys.forEach(k=>next.add(k));
+   }
+   selectChanged(next);
+   const target=getTarget(),root=target.root;
+   const origin=sample.vertex.clone().applyMatrix4(sample.mesh.matrixWorld);
+   gesture={pointerId:e.pointerId,x:e.clientX,y:e.clientY,kind:'vertex',
+    moved:false,snapshotTaken:false,node:target.node,root,origin,
+    initialMoves:structuredClone(target.node.meshVertexMoves||{}),
+    locked:normalizedLocks(target.node.vertexLocks),selectedKeys:[...selected],
+    worldScale:worldUnitsPerPixel(origin)};
+  }else{
+   gesture={pointerId:e.pointerId,x:e.clientX,y:e.clientY,kind:'marquee',dragging:false};
+  }
   try{view.setPointerCapture(e.pointerId)}catch(_){}
   return true;
  }
  function pointermove(e){
   if(!gesture||e.pointerId!==gesture.pointerId)return false;
   e.preventDefault();e.stopImmediatePropagation();
+  if(gesture.kind==='vertex'){
+   const g=gesture,dx=e.clientX-g.x,dy=e.clientY-g.y;
+   if(Math.hypot(dx,dy)<2&&!g.moved)return true;
+   if(!g.selectedKeys.length)return true;
+   if(!g.snapshotTaken){snapshot();g.snapshotTaken=true}
+   g.moved=true;
+   // Screen-plane drag by default; Shift locks X/Y, Alt+Shift vertical locks Z.
+   const cameraRight=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0).normalize();
+   const cameraUp=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1).normalize();
+   let movement;
+   if(e.shiftKey){
+    const axes=new THREE.Vector3();
+    if(e.altKey)axes.set(0,0,-dy);
+    else axes.set(dx,-dy,0);
+    // Axis-constrained movement is in the model's X/Y/Z axes.
+    movement=axes.multiplyScalar(g.worldScale).applyQuaternion(g.root.getWorldQuaternion(new THREE.Quaternion()));
+   }else{
+    movement=cameraRight.multiplyScalar(dx*g.worldScale).addScaledVector(cameraUp,-dy*g.worldScale);
+   }
+   const rootDelta=movement.applyQuaternion(g.root.getWorldQuaternion(new THREE.Quaternion()).invert())
+    .divide(g.root.getWorldScale(new THREE.Vector3()));
+   const moves=structuredClone(g.initialMoves);
+   for(const token of g.selectedKeys){
+    const cut=token.lastIndexOf(':'),key=token.slice(0,cut),index=Number(token.slice(cut+1));
+    if(!Number.isInteger(index)||g.locked[key]?.includes(index))continue;
+    if(!moves[key])moves[key]={};
+    const old=Array.isArray(moves[key][index])?moves[key][index]:[0,0,0];
+    moves[key][index]=[old[0]+rootDelta.x,old[1]+rootDelta.y,old[2]+rootDelta.z];
+   }
+   g.node.meshVertexMoves=moves;
+   // Update the already rendered mesh and selection dots without recreating
+   // the full editor scene on every mouse movement.
+   for(const token of g.selectedKeys){
+    const cut=token.lastIndexOf(':'),key=token.slice(0,cut),index=Number(token.slice(cut+1));
+    if(g.locked[key]?.includes(index))continue;
+    for(const item of samples){
+     if(item.id!==token)continue;
+     const local=movement.clone().applyQuaternion(item.mesh.getWorldQuaternion(new THREE.Quaternion()).invert())
+      .divide(item.mesh.getWorldScale(new THREE.Vector3()));
+     const previous=item.vertex.clone();
+     const original=g.sampleOrigins?.get(token)||previous;
+     if(!g.sampleOrigins)g.sampleOrigins=new Map();
+     if(!g.sampleOrigins.has(token))g.sampleOrigins.set(token,previous);
+     item.vertex.copy(original).add(local);
+     const source=item.mesh.userData.wildtrapSourceGeometry||item.mesh.geometry;
+     const position=item.mesh.geometry.getAttribute('position');
+     if(position&&index<position.count&&source===item.mesh.geometry)
+      position.setXYZ(index,item.vertex.x,item.vertex.y,item.vertex.z);
+     if(position)position.needsUpdate=true;
+    }
+   }
+   for(const {geometry,sampleRefs} of disposables.filter(v=>v.sampleRefs)){
+    const attr=geometry.getAttribute('position');
+    for(const item of sampleRefs)if(g.selectedKeys.includes(item.id))
+     attr.setXYZ(item.paintIndex,item.vertex.x,item.vertex.y,item.vertex.z);
+    attr.needsUpdate=true;
+   }
+   return true;
+  }
   if(Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y)>5)gesture.dragging=true;
   if(gesture.dragging){
    marquee.style.display='block';
@@ -239,11 +333,16 @@ export function createMeshVertexEditor({
  }
  function pointerup(e){
   if(!gesture||e.pointerId!==gesture.pointerId)return false;
-  const start=gesture;
-  release();
-  scene.updateMatrixWorld(true);
-  if(start.dragging)chooseByRect(start,e);
-  else chooseByPoint(e);
+  const g=gesture;
+  if(g.kind==='marquee'){
+   release();
+   scene.updateMatrixWorld(true);
+   if(g.dragging)chooseByRect(g,e);
+   else chooseByPoint(e);
+  }else{
+   release();
+   if(g.moved){draw();persist();}
+  }
   return true;
  }
  // Capture the exact vertex positions when locking. Anchors are stored per
