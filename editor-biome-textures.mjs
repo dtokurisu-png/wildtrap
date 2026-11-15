@@ -88,6 +88,40 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
  const slots=$('textureSlots');
 
  const catalogPanel=$('textureCatalog');
+ let previewController=null;
+ async function openEditor(t,biome,slot){
+  if(!biome){toast('Primero selecciona un bioma para editar la textura');return}
+  const record=ensure()[biome]?.slots?.[slot];
+  if(!record){toast('No se encontró la ranura de la textura');return}
+  try{
+   if(!previewController){
+    const {createTextureScalePreview}=await import('./editor-texture-scale-preview.mjs?v=0.9.71');
+    previewController=createTextureScalePreview({toast,onApply:next=>{
+     snapshot();
+     const current=ensure()[next.biome]?.slots?.[next.slot];
+     if(!current)return;
+     current.name=next.name;current.image=next.url;current.scale=next.scale;
+     // Store the chosen repeat count for this exact repository texture.
+     if(!live.textureCatalogScale||typeof live.textureCatalogScale!=='object')live.textureCatalogScale={};
+     live.textureCatalogScale[next.id]=next.scale;
+     // The same texture can already be in another active slot:
+     // update its footprint without changing the image assignment.
+     for(const config of Object.values(ensure())){
+      for(const entry of Object.values(config.slots||{}))
+       if(entry!==current&&entry.image===next.url)entry.scale=next.scale;
+     }
+     persist();render();onChange();
+     toast('Escala aplicada: '+next.scale+' repeticiones en el mapa');
+    }});
+   }
+   const url=textureUrl(t);
+   const prev=Number(live.textureCatalogScale?.[t.id]);
+   const known=Number.isFinite(prev)&&prev>=.25&&prev<=100?prev:
+    record.image===url?record.scale:8;
+   previewController.open({id:t.id,name:t.file,url,biome,slot,scale:known});
+  }catch(error){toast('No se pudo abrir editor de textura: '+error.message)}
+ }
+
  function tags(){
   if(!live.textureCatalogTags||typeof live.textureCatalogTags!=='object'||Array.isArray(live.textureCatalogTags))
    live.textureCatalogTags={};
@@ -127,14 +161,10 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
     const validSlots=t.kind==='ground'?['ground']:t.kind==='cliff'?['cliff']:['detail1','detail2','detail3'];
     for(const key of validSlots){const option=element('option','',SLOTS.find(s=>s.id===key).name);option.value=key;slot.append(option)}
     row.append(slot);
-    const use=element('button','','Usar');use.type='button';
-    use.onclick=()=>{
-     if(!biome.value){toast('Selecciona un bioma');return}
-     snapshot();const target=ensure()[biome.value].slots[slot.value];
-     target.name=t.file;target.image=textureUrl(t);
-     persist();render();onChange();toast('Textura asignada al escenario');
-    };
-    row.append(use);card.append(row);group.append(card);
+    const edit=element('button','','Editar');edit.type='button';
+    edit.title='Ver la textura junto al Explorador 1 WT y ajustar tamaño con Shift + arrastrar';
+    edit.onclick=()=>{void openEditor(t,biome.value,slot.value)};
+    row.append(edit);card.append(row);group.append(card);
    }
    if(!files.length)group.append(element('small','', 'Sin texturas para este filtro'));
    catalogPanel.append(group);
@@ -193,7 +223,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    clear.onclick=()=>mutate(m=>{m.slots[def.id].image='';m.slots[def.id].name=''});
    card.append(clear);
    const scaleLabel=element('label','', 'Repetición / escala: '+item.scale);
-   const scale=element('input');scale.type='range';scale.min='.25';scale.max='60';scale.step='.25';scale.value=String(item.scale);
+   const scale=element('input');scale.type='range';scale.min='.25';scale.max='100';scale.step='.25';scale.value=String(item.scale);
    scale.oninput=()=>{scaleLabel.firstChild.textContent='Repetición / escala: '+scale.value};
    scale.onchange=()=>mutate(m=>m.slots[def.id].scale=Number(scale.value));
    scaleLabel.append(scale);card.append(scaleLabel);
