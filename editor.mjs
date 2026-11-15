@@ -469,9 +469,13 @@ function updateStatus(){
  $('snapCaveToTerrain').disabled=!cave||picked?.rotationLocks?.y===true;
  if(editable){
   const layers=normalizedMeshLayers(picked.editorMeshLayers);
-  for(const layer of ['Faces','Edges','Vertices','Xray'])
+  for(const layer of ['Faces','Edges','Vertices','Xray']){
    $('model'+layer).checked=layers[layer.toLowerCase()];
+   $('sculptShow'+layer).checked=layers[layer.toLowerCase()];
+  }
  }
+ $('sculptSelectVertices').disabled=!editable;
+ $('sculptSelectVertices').textContent=mode==='meshEdit'?'✓ Terminar selección de vértices':'✣ Seleccionar y mover vértices';
  if(editable){
   const locks=picked.rotationLocks||{};
   // The saved XYZ lock buttons apply to movement AND rotation.
@@ -514,6 +518,23 @@ function updateMeshInspection(){
  }
  objectMeshOverlays?.refresh({skipId:editing?selectedId:null,testingScene});
  $('terrainMeshControls').hidden=!terrainPropertiesSelected;
+}
+$('sculptSelectVertices').addEventListener('click',()=>{
+ const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
+ if(!node){toast('Selecciona primero una cueva o un modelo');return}
+ $('modelVertexEditToggle').click();
+});
+for(const layer of ['Faces','Edges','Vertices','Xray']){
+ $('sculptShow'+layer).addEventListener('change',()=>{
+  const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
+  if(!node)return;
+  const input=$('model'+layer);
+  input.checked=$('sculptShow'+layer).checked;
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+  if(!node.editorMeshVisible){
+   snapshot();node.editorMeshVisible=true;draw();persist();
+  }
+ });
 }
 $('modelVertexEditToggle').addEventListener('click',()=>{
  const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
@@ -666,7 +687,7 @@ function pickModelSculptSurface(e,node){
 function sculptModelAt(node,hit,{start=false}={}){
  if(!node||!hit||!sculptTools[mode])return false;
  const stamps=cleanSculptStamps(node.meshSculptOps);
- if(stamps.length>=240){toast('Máximo de 240 pinceladas para este modelo; guarda una copia antes de continuar.');return false}
+ 
  const radius=Number(radiusInput.value)/Math.max(.01,Number(node.scale)||1);
  const strength=Number(strengthInput.value)/Math.max(.01,Number(node.scale)||1);
  if(!Number.isFinite(radius)||!Number.isFinite(strength))return false;
