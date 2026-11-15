@@ -12,7 +12,8 @@ const EXPLORER_URL='./assets/explorador%201%20wt.glb';
 export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,collisionRoots=[],$,resizeEditor,onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const cameraFocus=new THREE.Vector3();
- const CAMERA_DISTANCE=5.1,CAMERA_HEIGHT=1.45;
+ const CAMERA_DISTANCE=2.55,CAMERA_HEIGHT=1.15;
+ const CAMERA_ELEVATION=1.9,CAMERA_LOOK_AHEAD=1.35;
  // Keep the classic third-person chase framing; never shorten the orbit
  // due to an intersecting terrain wall.
  const clock=new THREE.Clock();
@@ -50,8 +51,8 @@ const hiddenDebugMarkers=[];
   player.rotation.y=0;
   // Same shoulder chase placement as the earlier Farolera tester.
   const forward=forwardOf(yaw);
-  cameraFocus.set(s.x,ground+CAMERA_HEIGHT,s.z).addScaledVector(forward,2.8);
-  camera.position.set(s.x+.6,ground+2.9+pitch*1.7,s.z+CAMERA_DISTANCE);
+  cameraFocus.set(s.x,ground+CAMERA_HEIGHT-pitch*.55,s.z).addScaledVector(forward,CAMERA_LOOK_AHEAD);
+  camera.position.set(s.x+.28,ground+CAMERA_ELEVATION+pitch*.65,s.z+CAMERA_DISTANCE);
   camera.lookAt(cameraFocus);
  }
  async function fetchModel(){
@@ -315,15 +316,15 @@ const hiddenDebugMarkers=[];
   // Classic Farolera-style chase: camera BEHIND and ABOVE the player,
   // looking slightly ahead. Mouse orbit changes only direction/aim.
   const camF=forwardOf(yaw),camR=new THREE.Vector3(Math.cos(yaw),0,Math.sin(yaw));
-  const desired=player.position.clone().addScaledVector(camF,-CAMERA_DISTANCE).addScaledVector(camR,.6);
-  desired.y+=3.0+pitch*1.7;
+  const desired=player.position.clone().addScaledVector(camF,-CAMERA_DISTANCE).addScaledVector(camR,.28);
+  desired.y+=CAMERA_ELEVATION+pitch*.65;
   // Keep height clearance without forcing the camera toward first person.
   // Never clamp the camera against the uncut heightmap while inside a cave.
   const cameraFloor=collider.floorAt(desired.x,desired.z,player.position.y,{stepUp:3.5,searchDepth:8});
   if(cameraFloor&&Math.abs(cameraFloor.y-player.position.y)<2.5)
     desired.y=Math.max(desired.y,cameraFloor.y+1.5);
-  const look=player.position.clone().addScaledVector(camF,2.8);
-  look.y+=CAMERA_HEIGHT-pitch*1.35;
+  const look=player.position.clone().addScaledVector(camF,CAMERA_LOOK_AHEAD);
+  look.y+=CAMERA_HEIGHT-pitch*.55;
   camera.position.lerp(desired,1-Math.exp(-dt*10));
   cameraFocus.lerp(look,1-Math.exp(-dt*14));
   camera.lookAt(cameraFocus);
