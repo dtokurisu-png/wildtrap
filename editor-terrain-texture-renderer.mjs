@@ -1,4 +1,4 @@
-import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.81';
+import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.82';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
 
@@ -179,10 +179,11 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   const zones=(live.zones||[]).filter(z=>BIOMES.some(b=>b.id===parentBiome(z))&&Array.isArray(z.points)&&z.points.length>=3);
   const urls=new Set();
   for(const z of zones){
-   // Safe mode loads only the continuous base plus cliff. Complementary
-   // PNGs and their shader are deliberately disabled, not removed from data.
+   // Load all configured images; the stable base material remains separate
+   // from the three optional procedural complement overlays.
    const slots=live.biomeMaterials?.[parentBiome(z)]?.slots;
-   for(const key of ['ground','cliff'])if(slots?.[key]?.image)urls.add(slots[key].image);
+   for(const key of ['ground','detail1','detail2','detail3','cliff'])
+    if(slots?.[key]?.image)urls.add(slots[key].image);
   }
   await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));
   if(ticket!==generation)return;
@@ -192,7 +193,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   gpuLayers.build({zones:live.zones||[],materials:live.biomeMaterials,loaded,enabled});
   hasSurface=gpuLayers.count()>0;
   if(status)status.textContent=hasSurface?
-   'Modo seguro: '+gpuLayers.count()+' suelos base en GPU · complementarias desactivadas temporalmente.':
+   'Suelos base intactos · capas complementarias independientes · '+gpuLayers.count()+' capas GPU.':
    'Sin texturas de terreno para las zonas asignadas.';
   buildCliffs();apply();
  }
