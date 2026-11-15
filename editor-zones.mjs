@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {createCliffRegions} from './editor-cliffs.mjs?v=0.9.24';
+import {createCliffRegions} from './editor-cliffs.mjs?v=0.9.67';
 
 // Zonas lógicas: no perforan ni modifican la geometría de terreno.
 export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,isActive,isBlocked,onChange=()=>{},nextHistorySerial=()=>Date.now(),onPendingHistoryChange=()=>{},onPendingEdit=()=>{}}){
