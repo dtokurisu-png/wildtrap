@@ -266,7 +266,19 @@ export function createMeshVertexEditor({
    const g=gesture,dx=e.clientX-g.x,dy=e.clientY-g.y;
    if(Math.hypot(dx,dy)<2&&!g.moved)return true;
    if(!g.selectedKeys.length)return true;
-   if(!g.snapshotTaken){snapshot();g.snapshotTaken=true}
+   if(!g.snapshotTaken){
+    snapshot();g.snapshotTaken=true;
+    g.dragGeometry=new Map();
+    for(const item of samples){
+     if(!g.selectedKeys.includes(item.id)||g.dragGeometry.has(item.mesh))continue;
+     const original=item.mesh.geometry;
+     // The GLB's source geometry can be shared by other instances.
+     // Display the drag on an isolated temporary geometry only.
+     const preview=original.clone();
+     item.mesh.geometry=preview;
+     g.dragGeometry.set(item.mesh,{original,preview});
+    }
+   }
    g.moved=true;
    // Screen-plane drag by default; Shift locks X/Y, Alt+Shift vertical locks Z.
    const cameraRight=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0).normalize();
@@ -292,30 +304,35 @@ export function createMeshVertexEditor({
     moves[key][index]=[old[0]+rootDelta.x,old[1]+rootDelta.y,old[2]+rootDelta.z];
    }
    g.node.meshVertexMoves=moves;
-   // Update the already rendered mesh and selection dots without recreating
-   // the full editor scene on every mouse movement.
-   for(const token of g.selectedKeys){
-    const cut=token.lastIndexOf(':'),key=token.slice(0,cut),index=Number(token.slice(cut+1));
+   // Preview coordinates are based on the drag's original positions,
+   // never accumulated per pointermove. Keep all uncropped source GLBs intact.
+   if(!g.sampleOrigins)g.sampleOrigins=new Map();
+   const chosen=new Set(g.selectedKeys);
+   for(const item of samples){
+    if(!chosen.has(item.id))continue;
+    const cut=item.id.lastIndexOf(':'),key=item.id.slice(0,cut),index=Number(item.id.slice(cut+1));
     if(g.locked[key]?.includes(index))continue;
-    for(const item of samples){
-     if(item.id!==token)continue;
-     const local=movement.clone().applyQuaternion(item.mesh.getWorldQuaternion(new THREE.Quaternion()).invert())
-      .divide(item.mesh.getWorldScale(new THREE.Vector3()));
-     const previous=item.vertex.clone();
-     const original=g.sampleOrigins?.get(token)||previous;
-     if(!g.sampleOrigins)g.sampleOrigins=new Map();
-     if(!g.sampleOrigins.has(token))g.sampleOrigins.set(token,previous);
-     item.vertex.copy(original).add(local);
-     const source=item.mesh.userData.wildtrapSourceGeometry||item.mesh.geometry;
-     const position=item.mesh.geometry.getAttribute('position');
-     if(position&&index<position.count&&source===item.mesh.geometry)
+    if(!g.sampleOrigins.has(item.id))g.sampleOrigins.set(item.id,item.vertex.clone());
+    const local=movement.clone()
+     .applyQuaternion(item.mesh.getWorldQuaternion(new THREE.Quaternion()).invert())
+     .divide(item.mesh.getWorldScale(new THREE.Vector3()));
+    item.vertex.copy(g.sampleOrigins.get(item.id)).add(local);
+    const originalGeometry=g.dragGeometry?.get(item.mesh)?.original;
+    const previewGeometry=g.dragGeometry?.get(item.mesh)?.preview;
+    // A cut mesh changes topology/index mapping. Its preview is limited to
+    // the selection markers; the canonical cut rebuild occurs on mouseup.
+    if(previewGeometry&&originalGeometry===item.mesh.userData.wildtrapSourceGeometry||
+       previewGeometry&&!item.mesh.userData.wildtrapSourceGeometry){
+     const position=previewGeometry.getAttribute('position');
+     if(position&&index<position.count){
       position.setXYZ(index,item.vertex.x,item.vertex.y,item.vertex.z);
-     if(position)position.needsUpdate=true;
+      position.needsUpdate=true;
+     }
     }
    }
    for(const {geometry,sampleRefs} of disposables.filter(v=>v.sampleRefs)){
     const attr=geometry.getAttribute('position');
-    for(const item of sampleRefs)if(g.selectedKeys.includes(item.id))
+    for(const item of sampleRefs)if(chosen.has(item.id))
      attr.setXYZ(item.paintIndex,item.vertex.x,item.vertex.y,item.vertex.z);
     attr.needsUpdate=true;
    }
@@ -341,7 +358,13 @@ export function createMeshVertexEditor({
    else chooseByPoint(e);
   }else{
    release();
-   if(g.moved){draw();persist();}
+   if(g.moved){
+    // Restore the original mesh buffers before reconstructing from saved JSON.
+    for(const [mesh,{original,preview}] of g.dragGeometry||[]){
+     mesh.geometry=original;preview.dispose();
+    }
+    draw();persist();
+   }
   }
   return true;
  }
