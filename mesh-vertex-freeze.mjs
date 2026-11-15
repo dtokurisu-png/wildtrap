@@ -78,65 +78,52 @@ export function sculptRootPoints(points,stamps,locked=[],meshKey='0',topology=nu
   for(let i=0;i<result.length;i++){
    if(locks.has(i)||!topology[i]?.length)continue;
    const p=result[i],d=Math.hypot(p[0]-center[0],p[1]-center[1],p[2]-center[2]);
-   if(d<r)included.push([i,(1-d/r)**1.5]);
+   if(d<r)included.push([i,(1-d/r)**.75]);
   }
   if(!included.length)continue;
-  const rounds=stamp.mode==='smooth'?2:3;
-  for(let iteration=0;iteration<rounds;iteration++){
+  if(stamp.mode==='relax'){
+   // Distribute CONVERGES toward each local connected component's center
+   // in X,Y,Z simultaneously. Never repel or extrapolate away from the
+   // centroid. Separate cave walls remain separate components.
+   const candidate=new Set(included.map(v=>v[0]));
+   const fades=new Map(included);
+   const visited=new Set();
+   for(const [seed] of included){
+    if(visited.has(seed))continue;
+    const group=[],pending=[seed];visited.add(seed);
+    for(let k=0;k<pending.length;k++){
+     const i=pending[k];group.push(i);
+     for(const j of topology[i]){
+      if(candidate.has(j)&&!visited.has(j)){visited.add(j);pending.push(j)}
+     }
+    }
+    if(group.length<2)continue;
+    const centroid=[0,0,0];
+    for(const i of group)for(let k=0;k<3;k++)centroid[k]+=result[i][k]/group.length;
+    // Calculate from a frozen snapshot to prevent ordering-dependent drift.
+    const before=new Map(group.map(i=>[i,result[i].slice()]));
+    for(const i of group){
+     const fade=fades.get(i);
+     const rate=Math.min(.75,strength*.035*fade);
+     const point=before.get(i);
+     for(let k=0;k<3;k++)result[i][k]=point[k]+(centroid[k]-point[k])*rate;
+    }
+   }
+   continue;
+  }
+  // Smooth only along the local brush normal, retaining vertex spacing.
+  for(let iteration=0;iteration<2;iteration++){
    const before=result.map(v=>v.slice()),updates=[];
    for(const [i,fade] of included){
     const p=before[i],neighbors=topology[i].filter(j=>j!==i&&before[j]);
     if(neighbors.length<2)continue;
-    const move=[0,0,0];
-    if(stamp.mode==='smooth'){
-     // Uniform Laplacian smoothing: average only edge-connected neighbors.
-     // Avoid the near-zero old stroke factor that made Smooth imperceptible.
-     for(const j of neighbors)for(let k=0;k<3;k++)move[k]+=before[j][k]-p[k];
-     for(let k=0;k<3;k++)move[k]/=neighbors.length;
-     // Smooth height/shape along the brush surface normal only.
-     // Tangential Laplacian averaging would collapse densely packed edges;
-     // Distribute handles edge spacing independently.
-     const depth=move[0]*n[0]+move[1]*n[1]+move[2]*n[2];
-     for(let k=0;k<3;k++)move[k]=n[k]*depth;
-    }else{
-     // Estimate the characteristic edge length from the local two-ring,
-     // rather than from compressed incident edges alone.
-     const lengths=[];
-     const ring=new Set([i,...neighbors]);
-     for(const j of neighbors)for(const h of topology[j]||[])ring.add(h);
-     for(const j of ring){
-      if(!before[j])continue;
-      const list=topology[j]||[];
-      for(const h of list){
-       if(h<=j||!ring.has(h)||!before[h])continue;
-       const length=Math.hypot(...before[j].map((v,k)=>v-before[h][k]));
-       if(length>1e-6)lengths.push(length);
-      }
-     }
-     if(!lengths.length)continue;
-     lengths.sort((a,b)=>a-b);
-     const target=lengths[Math.floor(lengths.length/2)];
-     for(const j of neighbors){
-      const q=before[j],dx=p[0]-q[0],dy=p[1]-q[1],dz=p[2]-q[2];
-      const length=Math.hypot(dx,dy,dz);
-      if(length<1e-8)continue;
-      // Stronger response to compressed edges; mild pull on stretched edges.
-      const imbalance=Math.max(-.55,Math.min(.9,(target-length)/target));
-      for(let k=0;k<3;k++)move[k]+=(p[k]-q[k])/length*imbalance*target;
-     }
-     for(let k=0;k<3;k++)move[k]/=neighbors.length;
-     // Moderate centroid correction avoids irregular tangential distribution.
-     const average=[0,0,0];
-     for(const j of neighbors)for(let k=0;k<3;k++)average[k]+=before[j][k];
-     for(let k=0;k<3;k++)move[k]+=.15*(average[k]/neighbors.length-p[k]);
-    }
-    const maxStep=r*(stamp.mode==='smooth'?.13:.10);
-    const magnitude=Math.hypot(...move);
-    const rate=Math.min(stamp.mode==='smooth'?.60:.48,strength*.07*fade);
-    const step=rate*Math.min(1,maxStep/Math.max(magnitude,1e-8));
-    updates.push([i,move.map(v=>v*step)]);
+    const delta=[0,0,0];
+    for(const j of neighbors)for(let k=0;k<3;k++)delta[k]+=(before[j][k]-p[k])/neighbors.length;
+    const depth=delta[0]*n[0]+delta[1]*n[1]+delta[2]*n[2];
+    const amount=Math.min(.6,strength*.07*fade)*depth;
+    updates.push([i,amount]);
    }
-   for(const [i,delta] of updates)for(let k=0;k<3;k++)result[i][k]+=delta[k];
+   for(const [i,amount] of updates)for(let k=0;k<3;k++)result[i][k]+=n[k]*amount;
   }
  }
  return result;
