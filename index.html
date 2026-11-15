@@ -206,10 +206,10 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <input id="zoneCliffSlope" type="range" min="5" max="85" step="5" value="40" oninput="document.getElementById('zoneCliffSlopeValue').textContent=this.value+'°'"></label>
 <button id="zoneCliffAdd" type="button" style="width:100%">+ Acantilado</button>
 <div class="grid2" style="margin-top:6px">
-<button id="zoneEditVertices" type="button" title="Mover los puntos de la zona seleccionada">Editar zona</button>
-<button id="zoneAddVertex" type="button" disabled title="Inserta un nuevo punto en la arista más cercana de la zona seleccionada">Añadir vértice</button>
-<button id="zoneCliffClose" type="button" disabled>◇ Cerrar acantilado</button>
+<button id="zoneEditVertices" type="button" title="Mueve los puntos blancos; haz clic en la arista para insertar uno">Editar zona</button>
+<button id="zoneAddVertex" type="button" disabled title="Al pulsarlo puedes añadir un punto en cualquier lugar del terreno; se inserta en la arista más cercana">Añadir vértice</button>
 </div>
+<button id="zoneCliffClose" type="button" style="width:100%;margin-top:5px" disabled>◇ Cerrar acantilado</button>
 <button id="zoneCliffCancel" type="button" style="width:100%;margin-top:5px">Cancelar contorno</button>
 <p class="hint" id="zoneCliffHint">Selecciona una zona para registrar sus acantilados.</p>
 <div id="zoneCliffList"></div>
