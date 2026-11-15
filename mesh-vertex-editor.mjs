@@ -480,6 +480,9 @@ export function createMeshVertexEditor({
   const action=controls[event.code];if(!action)return;
   event.preventDefault();moveSelection(...action);
  });
+ window.addEventListener('pointercancel',e=>{
+  if(gesture?.pointerId===e.pointerId)pointerup(e);
+ });
  $('meshLockVertices').addEventListener('click',()=>mutateLocks(true));
  $('meshUnlockVertices').addEventListener('click',()=>mutateLocks(false));
  $('meshSelectAll').addEventListener('click',()=>selectChanged([...vertexBuckets.values()].flat()));
