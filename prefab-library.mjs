@@ -98,6 +98,18 @@ export function createPrefabLibrary(onChange=()=>{}){
       const face=ids?[ids.getX(t*3),ids.getX(t*3+1),ids.getX(t*3+2)]:[t*3,t*3+1,t*3+2];
       for(let k=0;k<3;k++){const a=face[k],b=face[(k+1)%3];if(a!==b){adjacency[a].add(b);adjacency[b].add(a)}}
      }
+     // Join duplicated seam vertices only at exactly the same position.
+     // Do not connect merely nearby points: cave wall thickness stays isolated.
+     const groups=new Map();
+     for(let i=0;i<points.length;i++){
+      const token=points[i].map(n=>Math.round(n*1e5)).join(':');
+      if(!groups.has(token))groups.set(token,[]);
+      groups.get(token).push(i);
+     }
+     for(const ids of groups.values())if(ids.length>1&&ids.length<=16){
+      const connected=new Set(ids.flatMap(i=>[...adjacency[i]]));
+      for(const i of ids)for(const j of connected)if(j!==i)adjacency[i].add(j);
+     }
      const shaped=sculptRootPoints(points,sculptStamps,[],key,adjacency.map(v=>[...v]));
     const converted=original.clone(),out=converted.getAttribute('position');
     for(let i=0;i<shaped.length;i++){
