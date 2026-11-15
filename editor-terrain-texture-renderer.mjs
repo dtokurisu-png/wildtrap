@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {BIOMES} from './editor-biome-textures.mjs?v=0.9.25';
+import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
 export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false,isHoleAt=()=>false}){
@@ -102,6 +102,20 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   c.globalCompositeOperation='source-over';
   ctx.drawImage(layer,0,0);
  }
+ function pointInZone(points,p){
+  if(!Array.isArray(points)||points.length<3)return false;
+  let inside=false;
+  for(let i=0,j=points.length-1;i<points.length;j=i++){
+   const a=points[i],b=points[j];
+   if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)inside=!inside;
+  }
+  return inside;
+ }
+ function parentBiome(zone){
+  if(!zone.isCliff)return zone.biomeId;
+  const parent=(live.zones||[]).find(z=>z.id===zone.cliffParentId&&!z.isCliff);
+  return parent?.biomeId||null;
+ }
  function buildCliffs(){
   clearCliffs();
   const attr=terrainGeo.attributes.position,idx=terrainGeo.index;
@@ -111,11 +125,20 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    return [[attr.getX(a),attr.getY(a),attr.getZ(a)],[attr.getX(b),attr.getY(b),attr.getZ(b)],[attr.getX(c),attr.getY(c),attr.getZ(c)]];
   };
   for(const zone of live.zones||[]){
-   const slot=live.biomeMaterials?.[zone.biomeId]?.slots?.cliff;
+   const slot=live.biomeMaterials?.[parentBiome(zone)]?.slots?.cliff;
    const img=loaded.get(slot?.image);
    if(!img)continue;
-   const faces=[...new Set((zone.cliffs||[]).flatMap(c=>Array.isArray(c.faces)?c.faces:[])
-    .filter(f=>Number.isInteger(f)&&f>=0&&f<faceCount))];
+   // A cliff is now an explicitly outlined zone. Apply the inherited cliff
+   // material to faces located inside its XZ contour, with no slope threshold.
+   // Older stored face-based cliffs remain supported for existing projects.
+   const faces=zone.isCliff?
+    Array.from({length:faceCount},(_,f)=>f).filter(f=>{
+     const tri=getFace(f);
+     const centroid={x:(tri[0][0]+tri[1][0]+tri[2][0])/3,z:(tri[0][2]+tri[1][2]+tri[2][2])/3};
+     return pointInZone(zone.points,centroid);
+    }):
+    [...new Set((zone.cliffs||[]).flatMap(c=>Array.isArray(c.faces)?c.faces:[])
+     .filter(f=>Number.isInteger(f)&&f>=0&&f<faceCount))];
    if(!faces.length)continue;
    const verts=[],uvs=[];
    const scale=Math.max(.25,Number(slot.scale)||8);
@@ -151,10 +174,10 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  async function bake(){
   const ticket=++generation;
   if(!enabled)return;
-  const zones=(live.zones||[]).filter(z=>BIOMES.some(b=>b.id===z.biomeId)&&Array.isArray(z.points)&&z.points.length>=3);
+  const zones=(live.zones||[]).filter(z=>BIOMES.some(b=>b.id===parentBiome(z))&&Array.isArray(z.points)&&z.points.length>=3);
   const urls=new Set();
   for(const z of zones){
-   for(const slot of Object.values(live.biomeMaterials?.[z.biomeId]?.slots||{}))if(slot?.image)urls.add(slot.image);
+   for(const slot of Object.values(live.biomeMaterials?.[parentBiome(z)]?.slots||{}))if(slot?.image)urls.add(slot.image);
   }
   await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));
   if(ticket!==generation)return;
@@ -163,6 +186,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   // Unassigned regions retain a neutral natural ground color.
   let active=false;
   for(const z of zones){
+   if(z.isCliff)continue; // Cliff polygons inherit their parent; they do not paint another ground biome.
    const config=live.biomeMaterials?.[z.biomeId];
    if(!config)continue;
    const biomeIndex=BIOMES.findIndex(b=>b.id===z.biomeId);
