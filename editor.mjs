@@ -61,7 +61,7 @@ const draftKey=recoveryMode?'wildtrap-editor-draft-recovered-v1':
 const cameraKey=draftKey+'-camera-v1';
 const undo=[],undoSerials=[];let actionSerial=0;
 const nextUndoSerial=()=>++actionSerial;
-let saveTimer=null;function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}},700)}
+let saveTimer=null;function persist(immediate=false){clearTimeout(saveTimer);const save=()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}};if(immediate)save();else saveTimer=setTimeout(save,700)}
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
 // El gestor usa el historial del editor: no modifica la escena por su cuenta.
