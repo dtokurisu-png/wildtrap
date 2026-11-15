@@ -601,8 +601,23 @@ function setFlattenDirection(direction){
 }
 $('flattenMax').addEventListener('click',()=>setFlattenDirection('max'));
 $('flattenMin').addEventListener('click',()=>setFlattenDirection('min'));
+let zoneCameraPrevious=null;
 function setMode(v){
- if(mode==='zones'&&v!=='zones')zoneTool?.onModeChange();
+ if(mode==='zones'&&v!=='zones'){
+  zoneTool?.onModeChange();
+  if(zoneCameraPrevious){
+   orbit.mouseButtons={...zoneCameraPrevious.mouseButtons};
+   orbit.enableRotate=zoneCameraPrevious.enableRotate;
+   zoneCameraPrevious=null;
+  }
+ }
+ if(v==='zones'&&mode!=='zones'){
+  zoneCameraPrevious={mouseButtons:{...orbit.mouseButtons},enableRotate:orbit.enableRotate};
+  // Zone drawing is click-to-place; left dragging rotates the camera.
+  // Middle panning and right rotation remain available.
+  orbit.mouseButtons={...orbit.mouseButtons,LEFT:THREE.MOUSE.ROTATE};
+  orbit.enabled=true;orbit.enableRotate=true;orbit.enablePan=true;orbit.enableZoom=true;
+ }
  if(modelSculptSession){
   if(modelSculptSession.changed)persist();
   modelSculptSession=null;
@@ -1583,6 +1598,14 @@ view.addEventListener('wheel',e=>{
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
 $('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
+$('zoneCenterView').onclick=()=>{
+ // Recenter the orbit pivot without teleporting the camera to a fixed corner.
+ // Preserve camera offset, distance, up vector and zoom.
+ const newTarget=new THREE.Vector3(0,0,0);
+ const offset=camera.position.clone().sub(orbit.target);
+ orbit.target.copy(newTarget);camera.position.copy(newTarget).add(offset);
+ camera.lookAt(orbit.target);orbit.update();scheduleCameraSave();
+};
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 $('undo').onclick=()=>{
  // Deshace la última acción entre los vértices pendientes y el historial
@@ -1834,7 +1857,7 @@ window.__editorReady?.();
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
 async function initializeZoneTool(){
  try{
-  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.24');
+  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.63');
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
