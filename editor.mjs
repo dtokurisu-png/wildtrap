@@ -9,7 +9,7 @@ import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17'
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.17';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.44';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.45';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.44';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.44';
@@ -591,14 +591,23 @@ window.addEventListener('blur',()=>finishBrushGesture());
 function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
 const cx=Math.round((x/SIZE+.5)*(N-1)),cz=Math.round((z/SIZE+.5)*(N-1));const r=Math.ceil(radius/cell);
-let source=mode==='smooth'?live.heights.slice():null;
+let source=(mode==='smooth'||mode==='trim')?live.heights.slice():null;
 for(let j=Math.max(0,cz-r);j<=Math.min(N-1,cz+r);j++)for(let i=Math.max(0,cx-r);i<=Math.min(N-1,cx+r);i++){
 const px=(i/(N-1)-.5)*SIZE,pz=(j/(N-1)-.5)*SIZE,d=Math.hypot(px-x,pz-z);
 if(d>radius)continue;const falloff=(1-d/radius)**2,k=index(i,j),old=live.heights[k],delta=strength*.12*falloff;
 if(mode==='raise')live.heights[k]=clamp(old+delta,0,Number($('maxHeight').value));
 if(mode==='lower')live.heights[k]=clamp(old-delta,0,Number($('maxHeight').value));
 if(mode==='flatten')live.heights[k]=clamp(old+(target-old)*clamp(delta*.17,0,1),0,Number($('maxHeight').value));
-if(mode==='smooth'){let v=0,num=0;for(let yy=Math.max(0,j-1);yy<=Math.min(N-1,j+1);yy++)for(let xx=Math.max(0,i-1);xx<=Math.min(N-1,i+1);xx++){v+=source[index(xx,yy)];num++}live.heights[k]=old+(v/num-old)*clamp(delta*.4,0,1)}
+if(mode==='smooth'||mode==='trim'){
+ let v=0,weight=0;
+ for(let yy=Math.max(0,j-1);yy<=Math.min(N-1,j+1);yy++)
+ for(let xx=Math.max(0,i-1);xx<=Math.min(N-1,i+1);xx++){
+  const w=(xx===i?2:1)*(yy===j?2:1);
+  v+=source[index(xx,yy)]*w;weight+=w;
+ }
+ const mean=v/weight,change=mode==='trim'?Math.min(0,mean-old):mean-old;
+ live.heights[k]=clamp(old+change*clamp(delta*.45,0,.65),0,Number($('maxHeight').value));
+}
 }
 refreshTerrain();draw();persist();
 }
