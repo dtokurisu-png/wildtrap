@@ -1922,7 +1922,7 @@ async function initializeTextureTool(){
 void initializeTextureTool();
 async function initializeBiomeGenerator(){
  try{
-  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.69');
+  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.70');
   biomeGeneratorTool=createBiomeGeneratorPanel({live,snapshot,persist,toast,
    onChange:()=>terrainPainter?.schedule(),onZoneChange:()=>zoneTool?.refreshAll()});
  }catch(error){
