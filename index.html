@@ -105,6 +105,17 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <section>
 <h2>1. Esculpir · Terreno o modelo seleccionado</h2>
 <p class="hint" id="sculptTargetHint">Sin un GLB seleccionado, esculpes el terreno. Con un GLB seleccionado, Subir/Bajar/Nivelar/Suavizar trabajan sobre su geometría real sin modificar los vértices bloqueados. Finaliza la edición de vértices antes de esculpir.</p>
+<div id="sculptMeshTools" style="padding:8px;margin:8px 0;border:1px solid #477e67;border-radius:8px">
+ <strong>Malla del modelo · Esculpir</strong>
+ <p class="hint">Selecciona un modelo. Las capas se muestran también mientras utilizas los pinceles.</p>
+ <div class="terrain-mesh-toggles">
+ <label><input id="sculptShowFaces" type="checkbox" checked> Caras</label>
+ <label><input id="sculptShowEdges" type="checkbox" checked> Aristas</label>
+ <label><input id="sculptShowVertices" type="checkbox" checked> Vértices</label>
+ <label><input id="sculptShowXray" type="checkbox"> Rayos X</label></div>
+ <button id="sculptSelectVertices" type="button" style="width:100%;margin-top:5px">✣ Seleccionar y mover vértices</button>
+ <p class="hint">En selección: clic para elegir un vértice, arrastra para seleccionar varios y usa los controles X/Y/Z en Propiedades del modelo.</p>
+ </div>
 <div class="grid">
 <button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Aplanar</button><button data-tool="smooth">Suavizar</button><button data-tool="trim">Recortar</button><button data-tool="move">Mover</button>
 </div>
