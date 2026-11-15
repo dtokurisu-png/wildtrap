@@ -25,7 +25,7 @@ export function normalAnchorRootPoint(anchor,currentScale){
 }
 export function cleanSculptStamps(stamps){
  if(!Array.isArray(stamps))return [];
- return stamps.slice(0,240).filter(s=>s&&['raise','lower','flatten','smooth','trim'].includes(s.mode)&&
+ return stamps.filter(s=>s&&['raise','lower','flatten','smooth','trim'].includes(s.mode)&&
   validVec(s.center)&&validVec(s.normal)&&Number.isFinite(s.radius)&&s.radius>.02&&s.radius<=500&&
   Number.isFinite(s.strength)&&s.strength>.00001&&s.strength<=100
  ).map(s=>({mode:s.mode,center:s.center.slice(),normal:s.normal.slice(),
