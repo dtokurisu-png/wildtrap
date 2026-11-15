@@ -155,7 +155,8 @@ export function createTerrainGPULayers({scene,terrain}){
    });
    const mesh=new THREE.Mesh(terrain.geometry,material);
    mesh.name='BiomeGPU '+biome;mesh.renderOrder=3;
-   mesh.userData.editorOnly=true;mesh.frustumCulled=false;
+   // Biome materials are gameplay visuals, never editor-only helpers.
+   mesh.frustumCulled=false;
    scene.add(mesh);
    records.push({mesh,mask,material,textures,fallback});
   }
