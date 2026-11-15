@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 // El editor de zonas se carga después del motor principal; un módulo opcional no bloquea la apertura.
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
+import {putDraft,getDraft} from './editor-draft-storage.mjs?v=0.9.59';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
 // Playtest is loaded on demand. Broken external GLB/FBX cannot prevent the editor boot.
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.13';
@@ -61,7 +62,43 @@ const draftKey=recoveryMode?'wildtrap-editor-draft-recovered-v1':
 const cameraKey=draftKey+'-camera-v1';
 const undo=[],undoSerials=[];let actionSerial=0;
 const nextUndoSerial=()=>++actionSerial;
-let saveTimer=null;function persist(immediate=false){clearTimeout(saveTimer);const save=()=>{try{localStorage.setItem(draftKey,JSON.stringify(live))}catch(e){$('toast').textContent='Aviso: guardado automático bloqueado; exporta JSON'}};if(immediate)save();else saveTimer=setTimeout(save,700)}
+// Save large maps primarily in IndexedDB; retain localStorage as a compatible
+// secondary copy. Browser quota failures never turn off autosave.
+const localStampKey=draftKey+'-last-save-time-v1';
+let saveTimer=null,saveQueue=Promise.resolve();
+function saveProject(manual=false){
+ clearTimeout(saveTimer);saveTimer=null;
+ let json;
+ try{json=JSON.stringify(live)}catch(error){
+  if(manual)toast('No se pudo preparar el guardado: '+error.message);
+  return Promise.resolve(false);
+ }
+ // Serialize IndexedDB transactions so old async writes cannot replace newer ones.
+ saveQueue=saveQueue.catch(()=>{}).then(async()=>{
+  let localOK=false,dbOK=false;
+  const savedAt=Date.now();
+  try{
+   localStorage.setItem(draftKey,json);
+   localOK=true;
+   try{localStorage.setItem(localStampKey,String(savedAt))}catch(_){}
+  }catch(_){/* QuotaExceededError is expected for large cave projects. */}
+  try{await putDraft(draftKey,json);dbOK=true}catch(_){}
+  if(localOK||dbOK){
+   if(manual)toast('Proyecto guardado correctamente'+(!localOK?' (almacenamiento ampliado)':''));
+   return true;
+  }
+  const message='No se pudo guardar en este navegador; comprueba el espacio disponible';
+  $('toast').textContent=message;
+  return false;
+ });
+ return saveQueue;
+}
+function persist(immediate=false){
+ clearTimeout(saveTimer);
+ if(immediate)return saveProject();
+ saveTimer=setTimeout(()=>{void saveProject()},700);
+}
+
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
 // El gestor usa el historial del editor: no modifica la escena por su cuenta.
@@ -1688,6 +1725,12 @@ if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
 persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function toast(msg){$('toast').textContent=msg;setTimeout(()=>{if($('toast').textContent===msg)$('toast').textContent=''},4500)}
+$('save').addEventListener('click',()=>{void saveProject(true)});
+window.addEventListener('keydown',e=>{
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='g'){
+  e.preventDefault();if(!preview.active&&!preview.busy)void saveProject(true);
+ }
+},true);
 window.addEventListener('keydown',e=>{if(preview.active||preview.busy)return;if(e.target.matches('input,textarea'))return;
 if(e.key==='Escape'){
  if(mode==='holePaint'){holesEditor.clearSelection();e.preventDefault();return;}
@@ -1732,8 +1775,18 @@ async function restoreSavedBase(confirmOverwrite=false){
 $('restoreBase').onclick=()=>restoreSavedBase(true);
 let recoveredDraft=false;
 try{
- const saved=localStorage.getItem(draftKey)||
-  (recoveryMode?localStorage.getItem('wildtrap-editor-draft-v1'):null);
+ const localSaved=localStorage.getItem(draftKey);
+ const localStamp=Number(localStorage.getItem(localStampKey))||0;
+ let stored=null;
+ try{stored=await getDraft(draftKey)}catch(_){}
+ // Prefer the newest complete draft. If the browser previously ran out of
+ // localStorage space, IndexedDB is authoritative and restores all vertex edits.
+ let saved=stored?.json&&(!localSaved||stored.updatedAt>=localStamp)?
+  stored.json:localSaved;
+ if(!saved&&recoveryMode){
+  saved=localStorage.getItem('wildtrap-editor-draft-v1');
+  if(!saved)try{saved=(await getDraft('wildtrap-editor-draft-v1'))?.json||null}catch(_){}
+ }
  if(saved){
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
