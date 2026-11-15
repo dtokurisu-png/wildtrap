@@ -32,9 +32,9 @@ export function normalizeBiomeMaterials(raw){
    const target=dest.slots[slot.id];
    target.name=typeof v.name==='string'?v.name.slice(0,130):'';
    // Only user-uploaded images, never externally supplied script/URLs.
-   const src=typeof v.image==='string'?v.image:'';
-   target.image=REPO_TEXTURES.some(t=>textureUrl(t)===src)?src:
-    /^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(src)&&src.length<=MAX_IMAGE*1.4?src:'';
+   const imageSource=typeof v.image==='string'?v.image:'';
+   target.image=REPO_TEXTURES.some(t=>textureUrl(t)===imageSource)?imageSource:
+    /^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(imageSource)&&imageSource.length<=MAX_IMAGE*1.4?imageSource:'';
    target.scale=cl(Number(v.scale)||8,.25,100);
    target.opacity=cl(Number.isFinite(Number(v.opacity))?Number(v.opacity):target.opacity,0,1);
   }
