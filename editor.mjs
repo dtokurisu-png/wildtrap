@@ -60,7 +60,7 @@ const draftKey=recoveryMode?'wildtrap-editor-draft-recovered-v1':
 // A separate small key survives reloads even if the full world draft write
 // is still debounced. Each mode has its own camera state.
 const cameraKey=draftKey+'-camera-v1';
-const undo=[],undoSerials=[];let actionSerial=0;
+const undo=[],undoSerials=[],redo=[];let actionSerial=0;
 const nextUndoSerial=()=>++actionSerial;
 // Save large maps primarily in IndexedDB; retain localStorage as a compatible
 // secondary copy. Browser quota failures never turn off autosave.
@@ -236,7 +236,12 @@ const fx=clamp((x/SIZE+.5)*(N-1),0,N-1),fz=clamp((z/SIZE+.5)*(N-1),0,N-1),ix=Mat
 const a=live.heights[index(ix,iz)],b=live.heights[index(xx,iz)],c=live.heights[index(ix,zz)],d=live.heights[index(xx,zz)];
 return(a*(1-tx)+b*tx)*(1-tz)+(c*(1-tx)+d*tx)*tz;
 }
-function snapshot(){undo.push(JSON.stringify(live));undoSerials.push(nextUndoSerial());if(undo.length>20){undo.shift();undoSerials.shift()}persist()}
+function updateHistoryButtons(){
+ const back=$('undo'),forward=$('redo');
+ if(back)back.disabled=undo.length===0&&!zoneTool?.hasPending()&&!(holesEditor?.pendingUndoSerial()>0);
+ if(forward)forward.disabled=redo.length===0&&!zoneTool?.hasRedoPending();
+}
+function snapshot(){undo.push(JSON.stringify(live));undoSerials.push(nextUndoSerial());redo.length=0;if(undo.length>20){undo.shift();undoSerials.shift()}persist();updateHistoryButtons()}
 function refreshTerrain(){
 const p=terrainGeo.attributes.position;
 const rgb=new Float32Array(COUNT*3),color=new THREE.Color();
@@ -1607,28 +1612,53 @@ $('zoneCenterView').onclick=()=>{
  camera.lookAt(orbit.target);orbit.update();scheduleCameraSave();
 };
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
-$('undo').onclick=()=>{
- // Deshace la última acción entre los vértices pendientes y el historial
- // persistente, incluso si el usuario cambió de herramienta.
- if(holesEditor?.pendingUndoSerial()>(undoSerials.at(-1)||0)){
-  holesEditor.undoPending();return;
- }
- const data=undo.pop();if(!data)return;
- undoSerials.pop();
- // During mesh editing, preserve the selected object and its vertex workspace
- // while reverting only the latest geometry/lock change.
+function restoreHistoryState(data){
+ // Restore the complete scene, including zones, textures and cuts.
+ // Do not replace the live reference used by the other editor modules.
  const meshSelection=mode==='meshEdit'?[...selectedIds]:[];
- const v=JSON.parse(data);Object.assign(live,v);
+ const v=JSON.parse(data);
+ Object.assign(live,v);
  if(!Array.isArray(live.holes))live.holes=[];
  if(!Array.isArray(live.zones))live.zones=[];
- playerSpawnPanel?.refresh();zoneTool?.refreshAll();textureTool?.refresh();biomeGeneratorTool?.refresh();terrainPainter?.schedule();
  if(!Array.isArray(v.cuts3d))live.cuts3d=[];
  live.objectGroups=cleanObjectGroups(v.objectGroups);
+ playerSpawnPanel?.refresh();zoneTool?.refreshAll();textureTool?.refresh();
+ biomeGeneratorTool?.refresh();terrainPainter?.schedule();
  selectedIds.clear();
  for(const id of meshSelection)if(live.nodes.some(n=>n.id===id))selectedIds.add(id);
  selectedId=[...selectedIds].at(-1)??null;
- if(holesEditor.pendingUndoSerial()<0)holesEditor.clearSelection();
- refreshTerrain();draw();persist();
+ if(holesEditor?.pendingUndoSerial()<0)holesEditor.clearSelection();
+ refreshTerrain();draw();persist(true);updateHistoryButtons();
+}
+$('undo').onclick=()=>{
+ // Pending zone points are real undo actions and must take priority over
+ // previous committed areas. They never remove completed zones.
+ if(mode==='zones'&&zoneTool?.hasPending()){
+  if(zoneTool.undoPoint()){updateHistoryButtons();return}
+ }
+ if(holesEditor?.pendingUndoSerial()>(undoSerials.at(-1)||0)){
+  holesEditor.undoPending();updateHistoryButtons();return;
+ }
+ const data=undo.pop();if(!data)return;
+ undoSerials.pop();
+ redo.push({data:JSON.stringify(live),order:nextUndoSerial()});
+ if(redo.length>20)redo.shift();
+ restoreHistoryState(data);
+};
+$('redo').onclick=()=>{
+ // Replay undo actions in reverse order, including temporary zone points.
+ if(mode==='zones'&&zoneTool?.hasRedoPending()&&
+    zoneTool.pendingRedoOrder()>(redo.at(-1)?.order||0)){
+  zoneTool.redoPoint();updateHistoryButtons();return;
+ }
+ const item=redo.pop();
+ if(!item){
+  if(mode==='zones'&&zoneTool?.redoPoint())updateHistoryButtons();
+  return;
+ }
+ undo.push(JSON.stringify(live));undoSerials.push(nextUndoSerial());
+ if(undo.length>20){undo.shift();undoSerials.shift()}
+ restoreHistoryState(item.data);
 };
 $('prefabType').addEventListener('change',()=>{if(mode==='prefab')updateStatus()});
 for(const btn of document.querySelectorAll('[data-rotation-lock]')){
@@ -1765,7 +1795,13 @@ if(mode==='holePaint'&&(e.key==='Backspace'||e.key==='Delete')){
  e.preventDefault();holesEditor.removeLastPoint();return;
 }
 if(e.key==='Delete'&&mode!=='meshEdit')$('remove').click();
-if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$('undo').click()}
+if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){
+ e.preventDefault();
+ if(e.shiftKey)$('redo').click();else $('undo').click();
+}
+if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){
+ e.preventDefault();$('redo').click();
+}
 });
 window.addEventListener('resize',()=>{resize();preview.resize()});
 function updateMaxHeightControl(){
@@ -1857,12 +1893,14 @@ window.__editorReady?.();
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
 async function initializeZoneTool(){
  try{
-  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.63');
+  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.66');
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
-   onChange:()=>{terrainPainter?.schedule();biomeGeneratorTool?.refresh();}});
-  zoneTool.refreshAll();
+   onChange:()=>{terrainPainter?.schedule();biomeGeneratorTool?.refresh();},
+   nextHistorySerial:nextUndoSerial,onPendingHistoryChange:updateHistoryButtons,
+   onPendingEdit:()=>{redo.length=0;updateHistoryButtons()}});
+  zoneTool.refreshAll();updateHistoryButtons();
  }catch(error){
   console.error('Error inicializando el Creador de zonas:',error);
   const button=document.querySelector('[data-tool="zones"]');
