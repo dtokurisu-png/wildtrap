@@ -69,7 +69,7 @@ float smoothNoise(vec2 p){
 // Different seed/slot IDs produce independent locations and rotations.
 // Each fragment samples a detail image ONLY if inside its occasional patch.
 vec4 sparsePatch(sampler2D img,vec2 worldPos,float repeats,float id){
- float total=clamp(round(repeats*.25),1.0,250.0);
+ float total=clamp(floor(repeats*.25+.5),1.0,250.0);
  float across=ceil(sqrt(total));
  float chance=total/(across*across);
  vec2 region=floor((worldPos+315.0)/630.0*across);
@@ -88,7 +88,7 @@ vec4 sparsePatch(sampler2D img,vec2 worldPos,float repeats,float id){
  vec2 rotated=mat2(cos(angle),-sin(angle),sin(angle),cos(angle))*rel;
  float maxEdge=max(abs(rotated.x),abs(rotated.y));
  // True transparent exterior; smooth alpha toward the interior.
- float edge=smoothstep(.5,.27,maxEdge);
+ float edge=1.0-smoothstep(.27,.5,maxEdge);
  if(edge<=.002)return vec4(0.0);
  vec4 pixel=texture2D(img,rotated+.5);
  // PNG intrinsic alpha is preserved as well as the procedural soft edge.
