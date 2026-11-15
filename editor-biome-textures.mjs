@@ -53,7 +53,7 @@ export function normalizeBiomeMaterials(raw){
    const imageSource=typeof v.image==='string'?v.image:'';
    target.image=REPO_TEXTURES.some(t=>textureUrl(t)===imageSource)?imageSource:
     /^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(imageSource)&&imageSource.length<=MAX_IMAGE*1.4?imageSource:'';
-   target.scale=cl(Number(v.scale)||8,.25,100);
+   target.scale=cl(Number(v.scale)||8,.25,1000);
    target.opacity=cl(Number.isFinite(Number(v.opacity))?Number(v.opacity):target.opacity,0,1);
   }
   dest.noise.scale=cl(Number(src.noise?.scale)||20,1,200);
@@ -116,7 +116,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    }
    const url=textureUrl(t);
    const prev=Number(live.textureCatalogScale?.[t.id]);
-   const known=Number.isFinite(prev)&&prev>=.25&&prev<=100?prev:
+   const known=Number.isFinite(prev)&&prev>=.25&&prev<=1000?prev:
     record.image===url?record.scale:8;
    previewController.open({id:t.id,name:t.file,url,biome,slot,scale:known});
   }catch(error){toast('No se pudo abrir editor de textura: '+error.message)}
@@ -223,7 +223,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    clear.onclick=()=>mutate(m=>{m.slots[def.id].image='';m.slots[def.id].name=''});
    card.append(clear);
    const scaleLabel=element('label','', 'Repetición / escala: '+item.scale);
-   const scale=element('input');scale.type='range';scale.min='.25';scale.max='100';scale.step='.25';scale.value=String(item.scale);
+   const scale=element('input');scale.type='range';scale.min='.25';scale.max='1000';scale.step='.25';scale.value=String(item.scale);
    scale.oninput=()=>{scaleLabel.firstChild.textContent='Repetición / escala: '+scale.value};
    scale.onchange=()=>mutate(m=>m.slots[def.id].scale=Number(scale.value));
    scaleLabel.append(scale);card.append(scaleLabel);
