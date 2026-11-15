@@ -6,13 +6,13 @@ import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.
 // Playtest is loaded on demand. Broken external GLB/FBX cannot prevent the editor boot.
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.13';
 import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17';
-import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.17';
+import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.50';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.45';
-import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.44';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.50';
+import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.50';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
-import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.44';
+import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.50';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
@@ -519,6 +519,13 @@ function updateMeshInspection(){
  objectMeshOverlays?.refresh({skipId:editing?selectedId:null,testingScene});
  $('terrainMeshControls').hidden=!terrainPropertiesSelected;
 }
+document.querySelectorAll('[data-sculpt-vertex-axis]').forEach(button=>{
+ button.addEventListener('click',()=>{
+  const step=$('sculptVertexStep');
+  $('meshMoveStep').value=step.value;
+  $('meshMove'+button.dataset.sculptVertexAxis)?.click();
+ });
+});
 $('sculptSelectVertices').addEventListener('click',()=>{
  const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
  if(!node){toast('Selecciona primero una cueva o un modelo');return}
