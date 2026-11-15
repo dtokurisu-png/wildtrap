@@ -131,7 +131,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   const p=pointerPoint(e);if(!p)return;
   if(pending.length>=3&&screenDistance(pending[0],e)<16){close();return}
   if(pending.length>=2&&Math.hypot(p.x-pending.at(-1).x,p.z-pending.at(-1).z)<.3)return;
-  pendingRedo.length=0;onPendingEdit();pending.push(p);hover=null;refreshAll();
+  pendingRedo.length=0;onPendingEdit();pending.push(p);hover=null;refreshAll();onPendingHistoryChange();
  }
  function down(e){
   if(!isActive()||isBlocked()||e.button!==0||e.ctrlKey||e.altKey)return;
