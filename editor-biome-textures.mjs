@@ -21,6 +21,24 @@ const defaults=()=>Object.fromEntries(BIOMES.map(b=>[b.id,{
  slots:Object.fromEntries(SLOTS.map(s=>[s.id,{name:'',image:'',scale:8,opacity:s.id==='ground'||s.id==='cliff'?1:.5}])),
  noise:{scale:20,seed:1},edgeBlend:4
 }]));
+// Keep explicit user overrides, but seed empty slots with the 25 committed PNGs.
+// The exported JSON stores URLs, never base64 copies of repo textures.
+export function ensureBiomeTextureDefaults(raw){
+ const out=normalizeBiomeMaterials(raw);
+ for(const biome of BIOMES){
+  const catalog=REPO_TEXTURES.filter(t=>t.biome===biome.id);
+  const keys=[['ground',catalog.find(t=>t.kind==='ground')],['cliff',catalog.find(t=>t.kind==='cliff')]];
+  catalog.filter(t=>t.kind==='blend').forEach((t,i)=>keys.push(['detail'+(i+1),t]));
+  for(const [slot,file] of keys){
+   if(!file||!out[biome.id]?.slots?.[slot])continue;
+   const target=out[biome.id].slots[slot];
+   if(target.image)continue;
+   target.name=file.file;target.image=textureUrl(file);
+   if(slot.startsWith('detail'))target.opacity=.5;
+  }
+ }
+ return out;
+}
 export function normalizeBiomeMaterials(raw){
  const out=defaults();
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return out;
@@ -50,7 +68,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
  let biomeId=BIOMES[0].id,normalizedRef=null;
  function ensure(){
   if(live.biomeMaterials!==normalizedRef){
-   live.biomeMaterials=normalizeBiomeMaterials(live.biomeMaterials);
+   live.biomeMaterials=ensureBiomeTextureDefaults(live.biomeMaterials);
    normalizedRef=live.biomeMaterials;
   }
   return normalizedRef;
