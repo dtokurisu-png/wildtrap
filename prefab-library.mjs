@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {buildAdaptiveModel} from './adaptive-model-cuts.mjs?v=0.9.8';
 import {applyVertexOperations,cleanVertexOperations} from './mesh-deform.mjs?v=0.9.12';
-import {normalizedVertexAnchors,normalAnchorRootPoint,cleanSculptStamps,sculptRootPoints} from './mesh-vertex-freeze.mjs?v=0.9.58';
+import {normalizedVertexAnchors,normalAnchorRootPoint,cleanSculptStamps,sculptRootPoints} from './mesh-vertex-freeze.mjs?v=0.9.60';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
