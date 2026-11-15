@@ -15,7 +15,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  const painted=material.clone();painted.vertexColors=false;painted.color.set(0xffffff);painted.map=surfaceMap;painted.needsUpdate=true;
  const paintedGhost=painted.clone();paintedGhost.transparent=true;paintedGhost.opacity=.24;paintedGhost.depthWrite=false;
  const cliffLayer=new THREE.Group();cliffLayer.name='ProceduralCliffMaterials';scene.add(cliffLayer);
- cliffLayer.userData.editorOnly=true;
+ // Cliff materials are gameplay visuals and must remain visible in Play mode.
  let enabled=true,timer=0,generation=0,hasSurface=false,hasCliffs=false;
  const imageCache=new Map(),loaded=new Map();
  const worldToPixel=(x,z)=>[(x/SIZE+.5)*RES,(z/SIZE+.5)*RES];
