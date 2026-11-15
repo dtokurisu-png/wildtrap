@@ -1,21 +1,21 @@
 import assert from 'node:assert/strict';
 import {sculptRootPoints} from '../mesh-vertex-freeze.mjs';
 
+const stamp={mode:'relax',center:[0,0,0],normal:[0,1,0],radius:20,strength:16,locked:{}};
+const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
+for(const [label,pair] of [
+ ['Y',[[0,4,0],[0,-4,0]]],
+ ['X',[[-5,0,0],[5,0,0]]],
+ ['Z',[[0,0,-6],[0,0,6]]]
+]){
+ const updated=sculptRootPoints(pair,[stamp],[],'0',[[1],[0]]);
+ assert.ok(distance(...updated)<distance(...pair),label+': connected vertices must APPROACH each other');
+ assert.ok(updated[0].every(Number.isFinite)&&updated[1].every(Number.isFinite));
+}
 const source=[[0,0,0],[.2,.7,0],[1.9,-.6,.3],[3,0,0],[4,0,0],[30,20,5],[31,20,5]];
 const graph=[[1],[0,2],[1,3],[2,4],[3],[6],[5]];
-const stamp={mode:'relax',center:[2,0,0],normal:[0,1,0],radius:10,strength:20,locked:{}};
-const distances=p=>[0,1,2,3].map(i=>Math.hypot(...p[i].map((x,k)=>x-p[i+1][k])));
-const spread=a=>Math.max(...a)-Math.min(...a);
-let updated=source.map(p=>p.slice());
-for(let i=0;i<10;i++)updated=sculptRootPoints(updated,[stamp],[],'0',graph);
-assert.ok(spread(distances(updated))<spread(distances(source))*.3,'Edges should become more uniform');
-assert.deepEqual(updated.slice(5),source.slice(5),'Unconnected geometry outside the brush must not move');
-assert.ok(Math.hypot(...updated[0].map((v,k)=>v-updated[4][k]))>2.5,
- 'The whole chain must not collapse to a single centroid');
-const withLock={...stamp,locked:{'0':[2]}};
-const protectedMesh=sculptRootPoints(source,[withLock],[],'0',graph);
-assert.deepEqual(protectedMesh[2],source[2],'Locked vertices may not move');
-const displaced={...stamp,center:[2,1,1]};
-const next=sculptRootPoints(source,[displaced],[],'0',graph);
-assert.ok(next.every(p=>p.every(Number.isFinite)),'Brush changes must remain finite');
-console.log('MESH RELAXATION PASS: neighbor edges, locks, locality, no centroid collapse');
+const moved=sculptRootPoints(source,[{...stamp,center:[2,0,0],radius:10}],[],'0',graph);
+assert.deepEqual(moved.slice(5),source.slice(5),'Unconnected geometry outside the brush must not move');
+const locked=sculptRootPoints(source,[{...stamp,center:[2,0,0],radius:10,locked:{'0':[2]}}],[],'0',graph);
+assert.deepEqual(locked[2],source[2],'Locked vertices must not move');
+console.log('MESH RELAXATION PASS: neighbor attraction in X/Y/Z, locks and locality');

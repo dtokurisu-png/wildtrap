@@ -82,68 +82,28 @@ export function sculptRootPoints(points,stamps,locked=[],meshKey='0',topology=nu
   }
   if(!included.length)continue;
   if(stamp.mode==='relax'){
-   // Edge-local mesh relaxation: the brush selects vertices, but NEVER
-   // determines a destination. Only topology neighbours exert forces.
-   // Equalize short/long edges without collapsing the component centroid.
-   const fades=new Map(included);
-   const active=new Set(fades.keys());
+   // Pure attraction along connected mesh edges. Each vertex is pulled
+   // toward its DIRECT neighbours, never repelled for being "too close".
+   // Frozen snapshot avoids update-order drift and guarantees that a pair
+   // of editable vertices moves toward its shared midpoint on X/Y/Z.
    const before=result.map(p=>p.slice());
-   const edges=[];
-   for(const [i] of included){
-    for(const j of topology[i]){
-     if(!Number.isInteger(j)||j<0||j>=before.length||j===i)continue;
-     if(active.has(j)&&j<i)continue;
-     const p=before[i],q=before[j];
-     const length=Math.hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2]);
-     // Duplicate seam vertices at the same location should remain welded.
-     if(length>1e-6)edges.push({i,j,length});
-    }
-   }
-   if(!edges.length)continue;
-   // A robust local reference length from REAL connected edges, independent
-   // of camera angle, global axes, or position of the mouse within the brush.
-   const sorted=edges.map(e=>e.length).sort((a,b)=>a-b);
-   const reference=sorted[Math.floor(sorted.length/2)];
-   const forces=new Map(included.map(([i])=>[i,[0,0,0]]));
-   const weights=new Map(included.map(([i])=>[i,0]));
-   for(const {i,j,length} of edges){
-    const p=before[i],q=before[j];
-    // Keep displacement conservative to avoid turning triangles inside out.
-    const imbalance=Math.max(-.65,Math.min(.65,(length-reference)/Math.max(reference,1e-6)));
-    const tension=imbalance*reference/length;
-    for(const [vertex,sign] of [[i,1],[j,-1]]){
-     if(!active.has(vertex))continue;
-     const f=forces.get(vertex);
-     for(let k=0;k<3;k++)f[k]+=(q[k]-p[k])*tension*sign;
-     weights.set(vertex,weights.get(vertex)+1);
-    }
-   }
-   // Small Laplacian correction irons uneven angles around each vertex.
-   // No common component centroid is used; only directly connected neighbours.
-   const correction=new Map();
+   const rate=Math.min(.3,strength*.018);
+   const updates=[];
    for(const [i,fade] of included){
     const neighbours=topology[i].filter(j=>Number.isInteger(j)&&j>=0&&j<before.length&&j!==i);
     if(!neighbours.length)continue;
-    const p=before[i],avg=[0,0,0],edgeLengths=[];
+    const point=before[i],mean=[0,0,0];
     for(const j of neighbours){
-     const q=before[j];
-     for(let k=0;k<3;k++)avg[k]+=q[k]/neighbours.length;
-     const d=Math.hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2]);
-     if(d>1e-6)edgeLengths.push(d);
+     const other=before[j];
+     for(let k=0;k<3;k++)mean[k]+=other[k]/neighbours.length;
     }
-    if(!edgeLengths.length)continue;
-    const f=forces.get(i),weight=Math.max(1,weights.get(i));
-    const amplitude=Math.min(.34,strength*.022)*fade;
-    const meanEdge=edgeLengths.reduce((a,b)=>a+b,0)/edgeLengths.length;
-    const maxStep=Math.min(reference,meanEdge)*.22;
-    const move=[0,1,2].map(k=>
-     ((f[k]/weight)*.75+(avg[k]-p[k])*.25)*amplitude);
-    const len=Math.hypot(...move);
-    correction.set(i,move.map(v=>v*Math.min(1,maxStep/Math.max(len,1e-8))));
+    // Because rate is below 1/2, two linked vertices cannot overshoot
+    // one another during a single application.
+    const alpha=rate*fade;
+    updates.push([i,[0,1,2].map(k=>(mean[k]-point[k])*alpha)]);
    }
-   // Anchored vertices and the region boundary remain in place; interior
-   // vertices move simultaneously based on frozen positions (no chain drift).
-   for(const [i,move] of correction)for(let k=0;k<3;k++)result[i][k]+=move[k];
+   for(const [i,delta] of updates)
+    for(let k=0;k<3;k++)result[i][k]+=delta[k];
    continue;
   }
   // Smooth only along the local brush normal, retaining vertex spacing.
