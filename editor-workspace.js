@@ -112,8 +112,7 @@
  const terrainMeshControls=$('terrainMeshControls');
  if(!constraints||!meshControls||!terrainMeshControls)
   throw Error('Faltan controles de malla, terreno o transformación');
- // Vertex controls stay in Esculpir; object transforms and terrain properties stay here.
- objectEditor.append(constraints,terrainMeshControls);
+ objectEditor.append(constraints,terrainMeshControls,meshControls);
  const showProperties=el('button','scene-manager-action','Propiedades y malla del modelo seleccionado');
  showProperties.type='button';showProperties.id='structuresOpenObjectProperties';
  showProperties.addEventListener('click',()=>activateTab('object'));
