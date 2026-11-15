@@ -9,6 +9,8 @@ assert.match(gpu,/mesh=new THREE\.Mesh\(terrain\.geometry,material\)/,'GPU overl
 assert.match(gpu,/r\.mesh\.geometry=terrain\.geometry/,'Edited terrain cuts must synchronize to GPU overlays');
 assert.match(renderer,/gpuLayers\.build\(/,'Renderer should use GPU layers instead of baked 768px texture');
 assert.doesNotMatch(renderer,/surfaceMap\.needsUpdate=true/,'Old low-resolution texture must not be uploaded');
+assert.doesNotMatch(gpu,/mesh\.userData\.editorOnly\s*=\s*true/,'GPU biome materials must remain visible during Play');
+assert.doesNotMatch(renderer,/cliffLayer\.userData\.editorOnly\s*=\s*true/,'Cliff materials must remain visible during Play');
 const worldRepeat=630/200;
 assert.equal(worldRepeat,3.15);
 const oldPixelsPerTile=768/200;
