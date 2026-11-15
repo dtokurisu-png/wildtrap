@@ -36,7 +36,6 @@ export function createTextureScalePreview({onApply,toast}){
  function dispose(){
   cancelAnimationFrame(raf);raf=0;drag=null;
   orbit?.dispose();orbit=null;
-  if(scene){scene.traverse(o=>{if(o.isMesh&&o!==model&&o!==plane){/* GLB disposes below */}})}
   model?.traverse(o=>{if(o.isMesh){o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material])){if(!m)continue;for(const k of ['map','normalMap','roughnessMap','metalnessMap','emissiveMap','aoMap'])m[k]?.dispose?.();m.dispose();}}});
   plane?.geometry?.dispose();plane?.material?.dispose();texture?.dispose();
   renderer?.dispose();
@@ -59,7 +58,7 @@ export function createTextureScalePreview({onApply,toast}){
   camera=new THREE.OrthographicCamera(-5,5,5,-5,.02,3000);
   camera.position.set(7,10,13);camera.lookAt(0,0,0);
   orbit=new OrbitControls(camera,canvas);orbit.enableDamping=true;
-  orbit.target.set(0,0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.PAN};
+  orbit.target.set(0,0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
   update();
   const draw=()=>{
    if(token!==openToken||!dialog.open)return;
