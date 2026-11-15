@@ -240,7 +240,8 @@ export function createMeshVertexEditor({
   const sample=closestSample(e);
   if(sample){
    const keys=matchingKeys(sample);
-   const next=e.ctrlKey||e.metaKey?new Set(selected):new Set(keys);
+   const next=e.ctrlKey||e.metaKey||keys.some(k=>selected.has(k))?
+    new Set(selected):new Set(keys);
    if(e.ctrlKey||e.metaKey){
     if(keys.every(k=>next.has(k)))keys.forEach(k=>next.delete(k));
     else keys.forEach(k=>next.add(k));
@@ -321,8 +322,8 @@ export function createMeshVertexEditor({
     const previewGeometry=g.dragGeometry?.get(item.mesh)?.preview;
     // A cut mesh changes topology/index mapping. Its preview is limited to
     // the selection markers; the canonical cut rebuild occurs on mouseup.
-    if(previewGeometry&&originalGeometry===item.mesh.userData.wildtrapSourceGeometry||
-       previewGeometry&&!item.mesh.userData.wildtrapSourceGeometry){
+    if(previewGeometry&&(!item.mesh.userData.wildtrapSourceGeometry||
+        originalGeometry===item.mesh.userData.wildtrapSourceGeometry)){
      const position=previewGeometry.getAttribute('position');
      if(position&&index<position.count){
       position.setXYZ(index,item.vertex.x,item.vertex.y,item.vertex.z);
