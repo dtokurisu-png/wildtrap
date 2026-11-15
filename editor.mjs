@@ -929,8 +929,13 @@ const prefabGallery=createPrefabGallery({
  }
 });
 window.addEventListener('wildtrap:workspace-tool',event=>{
- if(event.detail?.key==='structures')prefabGallery.open();
+ const key=event.detail?.key;
+ if(key==='structures')prefabGallery.open();
  else prefabGallery.close();
+ // Switching to Zones automatically activates its drawing canvas.
+ // No redundant "activate zones" control is required.
+ if(key==='zones')setMode('zones');
+ else if(mode==='zones')setMode('move');
 });
 if(window.__workspaceLayout?.getState().workspace==='structures')prefabGallery.open();
 $('openPrefabGallery').onclick=()=>prefabGallery.open();
@@ -1603,14 +1608,6 @@ view.addEventListener('wheel',e=>{
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
 $('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
-$('zoneCenterView').onclick=()=>{
- // Recenter the orbit pivot without teleporting the camera to a fixed corner.
- // Preserve camera offset, distance, up vector and zoom.
- const newTarget=new THREE.Vector3(0,0,0);
- const offset=camera.position.clone().sub(orbit.target);
- orbit.target.copy(newTarget);camera.position.copy(newTarget).add(offset);
- camera.lookAt(orbit.target);orbit.update();scheduleCameraSave();
-};
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 function restoreHistoryState(data){
  // Restore the complete scene, including zones, textures and cuts.
@@ -1893,7 +1890,7 @@ window.__editorReady?.();
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
 async function initializeZoneTool(){
  try{
-  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.68');
+  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.69');
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
@@ -1901,6 +1898,7 @@ async function initializeZoneTool(){
    nextHistorySerial:nextUndoSerial,onPendingHistoryChange:updateHistoryButtons,
    onPendingEdit:()=>{redo.length=0;updateHistoryButtons()}});
   zoneTool.refreshAll();updateHistoryButtons();
+  if(window.__workspaceLayout?.getState().workspace==='zones')setMode('zones');
  }catch(error){
   console.error('Error inicializando el Creador de zonas:',error);
   const button=document.querySelector('[data-tool="zones"]');
@@ -1911,7 +1909,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.65');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.69');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
  }catch(error){
@@ -1924,7 +1922,7 @@ async function initializeTextureTool(){
 void initializeTextureTool();
 async function initializeBiomeGenerator(){
  try{
-  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.27');
+  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.69');
   biomeGeneratorTool=createBiomeGeneratorPanel({live,snapshot,persist,toast,
    onChange:()=>terrainPainter?.schedule(),onZoneChange:()=>zoneTool?.refreshAll()});
  }catch(error){
@@ -1948,7 +1946,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.26');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.69');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false});
   const toggle=$('textureShow');
