@@ -17,7 +17,7 @@ export const REPO_TEXTURES=[
   "id": "tx03",
   "file": "Baldosa rocosa con musgo en capas.png",
   "biome": "mountain",
-  "kind": "ground",
+  "kind": "blend",
   "size": 2133214
  },
  {
@@ -115,14 +115,14 @@ export const REPO_TEXTURES=[
   "id": "tx17",
   "file": "Textura de Tierra Desértica Agrietada.png",
   "biome": "desert",
-  "kind": "ground",
+  "kind": "blend",
   "size": 2282093
  },
  {
   "id": "tx18",
   "file": "Textura de arena dorada ondulada.png",
   "biome": "desert",
-  "kind": "ground",
+  "kind": "blend",
   "size": 2294623
  },
  {
