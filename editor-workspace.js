@@ -38,7 +38,7 @@
  const brand=el('div','workspace-brand');brand.append(title,subtitle);
  const topActions=el('nav','workspace-top-actions');
  topActions.setAttribute('aria-label','Acciones del proyecto');
- for(const id of ['undo','reset','restoreBase','loadPublished','save','export']){
+ for(const id of ['undo','redo','reset','restoreBase','loadPublished','save','export']){
   const node=$(id);
   if(!node)throw new Error('Falta el control de proyecto '+id);
   if(id==='restoreBase'||id==='export')topActions.append(el('span','workspace-top-separator'));
