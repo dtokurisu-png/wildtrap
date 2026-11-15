@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {buildAdaptiveModel} from './adaptive-model-cuts.mjs?v=0.9.8';
 import {applyVertexOperations,cleanVertexOperations} from './mesh-deform.mjs?v=0.9.12';
-import {normalizedVertexAnchors,normalAnchorRootPoint,cleanSculptStamps,sculptRootPoints} from './mesh-vertex-freeze.mjs?v=0.9.19';
+import {normalizedVertexAnchors,normalAnchorRootPoint,cleanSculptStamps,sculptRootPoints} from './mesh-vertex-freeze.mjs?v=0.9.44';
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
@@ -92,7 +92,13 @@ export function createPrefabLibrary(onChange=()=>{}){
     const temp=new THREE.Vector3();
     const points=Array.from({length:attr.count},(_,i)=>
      temp.set(attr.getX(i),attr.getY(i),attr.getZ(i)).applyMatrix4(meshToRoot).toArray());
-    const shaped=sculptRootPoints(points,sculptStamps,[],key);
+    const adjacency=Array.from({length:attr.count},()=>new Set());
+     const ids=original.getIndex(),triangles=ids?Math.floor(ids.count/3):Math.floor(attr.count/3);
+     for(let t=0;t<triangles;t++){
+      const face=ids?[ids.getX(t*3),ids.getX(t*3+1),ids.getX(t*3+2)]:[t*3,t*3+1,t*3+2];
+      for(let k=0;k<3;k++){const a=face[k],b=face[(k+1)%3];if(a!==b){adjacency[a].add(b);adjacency[b].add(a)}}
+     }
+     const shaped=sculptRootPoints(points,sculptStamps,[],key,adjacency.map(v=>[...v]));
     const converted=original.clone(),out=converted.getAttribute('position');
     for(let i=0;i<shaped.length;i++){
      temp.set(...shaped[i]).applyMatrix4(rootToMesh);
@@ -104,7 +110,35 @@ export function createPrefabLibrary(onChange=()=>{}){
     child.userData.wildtrapGeneratedSculptGeometry=converted;
    });
   }
-  // Final vertex constraints counteract transforms on the model root.
+  // Persistent manual translations, root-local and specific to this instance.
+   if(node.meshVertexMoves&&typeof node.meshVertexMoves==='object'){
+    root.updateMatrixWorld(true);
+    const inverseRoot=root.matrixWorld.clone().invert();
+    root.traverse(child=>{
+     if(!child.isMesh||child.isSkinnedMesh)return;
+     const moves=node.meshVertexMoves[String(child.userData.wildtrapMeshKey)];
+     if(!moves||typeof moves!=='object')return;
+     const original=child.geometry,attr=original.getAttribute('position');
+     if(!attr)return;
+     const meshToRoot=inverseRoot.clone().multiply(child.matrixWorld);
+     const rootToMesh=meshToRoot.clone().invert();
+     const copy=original.clone(),out=copy.getAttribute('position'),v=new THREE.Vector3();
+     let modified=false;
+     for(const [id,d] of Object.entries(moves)){
+      const i=Number(id);
+      if(!Number.isInteger(i)||i<0||i>=out.count||!Array.isArray(d)||d.length!==3||
+       !d.every(n=>Number.isFinite(n)&&Math.abs(n)<100000))continue;
+      v.set(out.getX(i),out.getY(i),out.getZ(i)).applyMatrix4(meshToRoot);
+      v.add(new THREE.Vector3(...d)).applyMatrix4(rootToMesh);
+      out.setXYZ(i,v.x,v.y,v.z);modified=true;
+     }
+     if(modified){
+      out.needsUpdate=true;copy.computeVertexNormals();copy.computeBoundingBox();copy.computeBoundingSphere();
+      child.geometry=copy;child.userData.wildtrapGeneratedManualGeometry=copy;
+     }else copy.dispose();
+    });
+   }
+   // Final vertex constraints counteract transforms on the model root.
   // Normal locks resist scaling but follow whole-object translation/rotation.
   // Total locks are WORLD-space anchors and also resist translation/rotation.
   // Apply before cuts so the cutter sees the actual constrained geometry.
@@ -209,6 +243,7 @@ export function createPrefabLibrary(onChange=()=>{}){
    if(deformed){deformed.dispose();delete child.userData.wildtrapGeneratedDeformGeometry;}
    for(const [key,field] of [
     ['wildtrapGeneratedSculptGeometry','Sculpt'],
+     ['wildtrapGeneratedManualGeometry','Manual'],
     ['wildtrapGeneratedAnchorGeometry','Anchor']
    ]){
     const generated=child.userData?.[key];
