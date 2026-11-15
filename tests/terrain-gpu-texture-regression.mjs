@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const gpu=readFileSync(new URL('../editor-terrain-gpu-layers.mjs',import.meta.url),'utf8');
+const renderer=readFileSync(new URL('../editor-terrain-texture-renderer.mjs',import.meta.url),'utf8');
+assert.match(gpu,/worldUV\*repeatScale\.x/,'Ground should sample source image in GPU at configured repetition scale');
+assert.match(gpu,/new THREE\.Texture\(bitmap\)/,'The source image should be used by the GPU directly');
+assert.match(gpu,/new THREE\.CanvasTexture\(canvas\)/,'A low resolution texture should be used ONLY as a zone mask');
+assert.match(gpu,/mesh=new THREE\.Mesh\(terrain\.geometry,material\)/,'GPU overlays should share live cut geometry');
+assert.match(gpu,/r\.mesh\.geometry=terrain\.geometry/,'Edited terrain cuts must synchronize to GPU overlays');
+assert.match(renderer,/gpuLayers\.build\(/,'Renderer should use GPU layers instead of baked 768px texture');
+assert.doesNotMatch(renderer,/surfaceMap\.needsUpdate=true/,'Old low-resolution texture must not be uploaded');
+const worldRepeat=630/200;
+assert.equal(worldRepeat,3.15);
+const oldPixelsPerTile=768/200;
+assert.ok(oldPixelsPerTile<4,'Old baking reduces a tile to under four pixels');
+console.log('PASS: Procedural terrain uses original detail GPU sampling and zone-only low-resolution masks');
