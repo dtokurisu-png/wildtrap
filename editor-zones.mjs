@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import {createCliffRegions} from './editor-cliffs.mjs?v=0.9.24';
 
 // Zonas lógicas: no perforan ni modifican la geometría de terreno.
-export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,isActive,isBlocked,onChange=()=>{}}){
+export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,isActive,isBlocked,onChange=()=>{},nextHistorySerial=()=>Date.now(),onPendingHistoryChange=()=>{},onPendingEdit=()=>{}}){
  const $=id=>document.getElementById(id);
  const commit=()=>{persist();onChange();};
  const layer=new THREE.Group();layer.name='EditorZoneBoundaries';scene.add(layer);
  const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
  let pending=[],hover=null,selected=null,dragging=null,editVertices=false,clickCandidate=null;
+ const pendingRedo=[];
  const cliffTool=createCliffRegions({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist:commit,toast,
    getZone:()=>items().find(z=>z.id===selected),isActive,isBlocked});
  const max=315;
@@ -87,7 +88,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   if(zone){$('zoneName').value=zone.name||'';$('zonePointCount').textContent=zone.points.length+' vértices';$('zoneBiome').value=zone.biomeId||'';$('zoneBiomeLocked').checked=zone.biomeLocked===true;}
   $('zonePendingCount').textContent=pending.length?pending.length+' puntos pendientes · pulsa el primero para cerrar':'Haz clic en el terreno para comenzar';
   $('zoneClose').disabled=pending.length<3;
-  $('zoneUndoPoint').disabled=!pending.length;
+
   $('zoneEditVertices').disabled=!zone;
   $('zoneEditVertices').classList.toggle('active',editVertices);
   $('zoneEditVertices').textContent=editVertices?'✓ Editando vértices':'Editar vértices';
@@ -120,17 +121,17 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   snapshot();
   const ids=new Set(items().map(z=>z.id));let i=1;while(ids.has('zone-'+i))i++;
   const zone={id:'zone-'+i,name:'Zona '+String(i).padStart(2,'0'),points:pending.map(norm),hidden:false,cliffs:[]};
-  items().push(zone);selected=zone.id;pending=[];hover=null;editVertices=false;cliffTool.onZoneChange();
+  items().push(zone);selected=zone.id;pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;editVertices=false;cliffTool.onZoneChange();
   commit();refreshAll();toast(zone.name+' creada y guardada');
  }
- function cancel(){pending=[];hover=null;dragging=null;clickCandidate=null;cliffTool.cancel();refreshAll();}
+ function cancel(){pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;dragging=null;clickCandidate=null;cliffTool.cancel();refreshAll();}
  function placePoint(e){
   if(cliffTool.down(e))return;
   if(editVertices&&selected)return;
   const p=pointerPoint(e);if(!p)return;
   if(pending.length>=3&&screenDistance(pending[0],e)<16){close();return}
   if(pending.length>=2&&Math.hypot(p.x-pending.at(-1).x,p.z-pending.at(-1).z)<.3)return;
-  pending.push(p);hover=null;refreshAll();
+  pendingRedo.length=0;onPendingEdit();pending.push(p);hover=null;refreshAll();
  }
  function down(e){
   if(!isActive()||isBlocked()||e.button!==0||e.ctrlKey||e.altKey)return;
@@ -193,13 +194,27 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
  window.addEventListener('pointerup',up,true);
  window.addEventListener('pointercancel',cancelPointer,true);
  $('zoneClose').onclick=close;
- $('zoneUndoPoint').onclick=()=>{pending.pop();hover=null;refreshAll()};
+ function undoPending(){
+  if(cliffTool.isDrawing()){cliffTool.undo();onPendingHistoryChange();return true}
+  if(!pending.length)return false;
+  const point=pending.pop();
+  pendingRedo.push({point,order:nextHistorySerial()});
+  hover=null;refreshAll();onPendingHistoryChange();return true;
+ }
+ function redoPending(){
+  if(!pendingRedo.length)return false;
+  const item=pendingRedo.pop();
+  pending.push(item.point);hover=null;refreshAll();onPendingHistoryChange();return true;
+ }
  $('zoneCancel').onclick=cancel;
  $('zoneName').onchange=e=>{const z=items().find(z=>z.id===selected);if(!z)return;snapshot();z.name=e.target.value.trim()||z.name;commit();refreshAll()};
  $('zoneDelete').onclick=()=>{if(!selected)return;const z=items().find(z=>z.id===selected);if(!z||!confirm('¿Eliminar '+z.name+'?'))return;snapshot();live.zones=items().filter(x=>x.id!==selected);selected=null;editVertices=false;cliffTool.onZoneChange();commit();refreshAll()};
- $('zoneEditVertices').onclick=()=>{editVertices=!editVertices;pending=[];hover=null;cliffTool.cancel();refreshAll();};
+ $('zoneEditVertices').onclick=()=>{editVertices=!editVertices;pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;cliffTool.cancel();refreshAll();};
  $('zoneBiome').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;snapshot();zone.biomeId=e.target.value||null;if(!zone.biomeId)zone.biomeLocked=false;commit();refreshAll();};
  $('zoneBiomeLocked').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;if(e.target.checked&&!zone.biomeId){e.target.checked=false;toast('Asigna un bioma antes de bloquear la zona');return;}snapshot();zone.biomeLocked=e.target.checked;commit();refreshAll();};
  refreshAll();
- return {refresh,refreshAll,cancel,undoPoint:()=>{if(cliffTool.isDrawing())cliffTool.undo();else{pending.pop();hover=null;refreshAll()}},hasPending:()=>pending.length>0||cliffTool.isDrawing(),onModeChange:()=>{pending=[];hover=null;dragging=null;clickCandidate=null;editVertices=false;cliffTool.cancel();refreshAll();}};
+ return {refresh,refreshAll,cancel,undoPoint:undoPending,redoPoint:redoPending,
+  hasPending:()=>pending.length>0||cliffTool.isDrawing(),hasRedoPending:()=>pendingRedo.length>0,
+  pendingRedoOrder:()=>pendingRedo.at(-1)?.order||0,
+  onModeChange:()=>{pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;dragging=null;clickCandidate=null;editVertices=false;cliffTool.cancel();refreshAll();}};
 }
