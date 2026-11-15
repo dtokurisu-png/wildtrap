@@ -53,8 +53,8 @@ export function createMeshVertexEditor({
   // controls must stay hidden so the cutter exclusively receives pointer input.
   controls.hidden=node?.kind!=='prefab';
   const canEdit=active&&getMode()==='meshEdit';
-  for(const id of ['meshLockVertices','meshUnlockVertices','meshResetDeform']){
-   const button=$(id);if(button)button.disabled=!supports||!canEdit||(id==='meshLockVertices'||id==='meshUnlockVertices'?selected.size===0:false);
+  for(const id of ['meshLockVertices','meshUnlockVertices','meshResetDeform','meshMoveXNeg','meshMoveXPos','meshMoveYNeg','meshMoveYPos','meshMoveZNeg','meshMoveZPos']){
+   const button=$(id);if(button)button.disabled=!supports||!canEdit||(id==='meshLockVertices'||id==='meshUnlockVertices'||id.startsWith('meshMove')?selected.size===0:false);
   }
   const locks=normalizedLocks(node?.vertexLocks);
   const totalLocked=Object.values(locks).reduce((sum,ids)=>sum+ids.length,0);
@@ -326,9 +326,39 @@ export function createMeshVertexEditor({
  }
  function resetDeformation(){
   const node=getSelectedNode();
-  if(!active||node?.kind!=='prefab'||(!node.meshScaleOps?.length&&!node.meshSculptOps?.length))return;
-  snapshot();node.meshScaleOps=[];node.meshSculptOps=[];draw();persist();
+  if(!active||node?.kind!=='prefab'||(!node.meshScaleOps?.length&&!node.meshSculptOps?.length&&!Object.keys(node.meshVertexMoves||{}).length))return;
+  snapshot();node.meshScaleOps=[];node.meshSculptOps=[];node.meshVertexMoves={};draw();persist();
  }
+ function moveSelection(axis,sign){
+  const target=getTarget();if(!active||!target||!selected.size)return false;
+  const step=Math.max(.001,Math.min(10,Number($('meshMoveStep')?.value)||.1));
+  const {node}=target,locks=normalizedLocks(node.vertexLocks);
+  const moves=structuredClone(node.meshVertexMoves||{});
+  const component={x:0,y:1,z:2}[axis];if(component===undefined)return false;
+  let changed=false;
+  for(const token of selected){
+   const sep=token.lastIndexOf(':'),key=token.slice(0,sep),i=Number(token.slice(sep+1));
+   if(!Number.isInteger(i)||locks[key]?.includes(i))continue;
+   if(!moves[key])moves[key]={};
+   const delta=Array.isArray(moves[key][i])?moves[key][i].slice():[0,0,0];
+   delta[component]=Math.round((delta[component]+sign*step)*100000)/100000;
+   moves[key][i]=delta;changed=true;
+  }
+  if(!changed)return false;
+  snapshot();node.meshVertexMoves=moves;draw();persist();return true;
+ }
+ for(const axis of ['X','Y','Z']){
+  for(const [direction,suffix] of [[-1,'Neg'],[1,'Pos']])
+   $('meshMove'+axis+suffix)?.addEventListener('click',()=>moveSelection(axis.toLowerCase(),direction));
+ }
+ window.addEventListener('keydown',event=>{
+  if(!active||getMode()!=='meshEdit'||!event.shiftKey||event.ctrlKey||event.altKey||
+   /^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName||''))return;
+  const controls={ArrowLeft:['x',-1],ArrowRight:['x',1],ArrowUp:['y',1],ArrowDown:['y',-1],
+   PageUp:['z',1],PageDown:['z',-1]};
+  const action=controls[event.code];if(!action)return;
+  event.preventDefault();moveSelection(...action);
+ });
  $('meshLockVertices').addEventListener('click',()=>mutateLocks(true));
  $('meshUnlockVertices').addEventListener('click',()=>mutateLocks(false));
  $('meshSelectAll').addEventListener('click',()=>selectChanged([...vertexBuckets.values()].flat()));
@@ -346,6 +376,7 @@ export function createMeshVertexEditor({
   getState:()=>({active,currentId,points:samples.length,selected:selected.size,
    locked:Object.values(normalizedLocks(getSelectedNode()?.vertexLocks)).reduce((a,b)=>a+b.length,0),
    operations:cleanVertexOperations(getSelectedNode()?.meshScaleOps).length+
+    Object.values(getSelectedNode()?.meshVertexMoves||{}).reduce((n,v)=>n+Object.keys(v).length,0)+
     (Array.isArray(getSelectedNode()?.meshSculptOps)?getSelectedNode().meshSculptOps.length:0),
    totalLock:getSelectedNode()?.vertexTotalLock===true,
    renderedEdges:disposables.filter(x=>x.kind==='edges').length,
