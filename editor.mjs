@@ -9,17 +9,17 @@ import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17'
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.50';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.50';
-import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.52';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.55';
+import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.55';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
-import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.50';
+import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.55';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
-const sculptTools={raise:1,lower:1,flatten:1,smooth:1,trim:1};
+const sculptTools={raise:1,lower:1,flatten:1,smooth:1,trim:1,relax:1};
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
@@ -521,13 +521,6 @@ function updateMeshInspection(){
  objectMeshOverlays?.refresh({skipId:editing?selectedId:null,testingScene});
  $('terrainMeshControls').hidden=!terrainPropertiesSelected;
 }
-document.querySelectorAll('[data-sculpt-vertex-axis]').forEach(button=>{
- button.addEventListener('click',()=>{
-  const step=$('sculptVertexStep');
-  $('meshMoveStep').value=step.value;
-  $('meshMove'+button.dataset.sculptVertexAxis)?.click();
- });
-});
 $('sculptSelectVertices').addEventListener('click',()=>{
  // Directly activate the tool. Do not proxy a click to a control in another dock.
  // Selecting a model in the viewport is also supported after enabling it.
@@ -595,7 +588,7 @@ function setMode(v){
  updateStatus();
 }
 // Zone editor initializes after boot; see initializeZoneTool below.
-const tools={raise:1,lower:1,flatten:1,smooth:1,trim:1};
+const tools={raise:1,lower:1,flatten:1,smooth:1,trim:1,relax:1};
 // Alt + clic derecho: horizontal cambia radio, vertical cambia intensidad.
 // Captura el puntero antes de OrbitControls, selección y esculpido.
 let brushGesture=null;
@@ -709,8 +702,10 @@ function sculptModelAt(node,hit,{start=false}={}){
  if(!Number.isFinite(radius)||!Number.isFinite(strength))return false;
  const last=stamps.at(-1);
  if(!start&&last&&last.mode===mode&&
-  Math.hypot(...hit.point.map((v,i)=>v-last.center[i]))<Math.max(.07,radius*.16))
+  Math.hypot(...hit.point.map((v,i)=>v-last.center[i]))<Math.max(.025,radius*.045)&&
+  performance.now()-(modelSculptSession?.lastStampAt||0)<130)
   return false;
+ if(modelSculptSession)modelSculptSession.lastStampAt=performance.now();
  if(start)snapshot();
  // A stroke snapshot, not the currently locked set at reload time.
  node.meshSculptOps=[...stamps,{
@@ -1449,6 +1444,7 @@ view.addEventListener('pointerdown',e=>{
  }
  pointerDown=true;changed=false;
  if(tools[mode]){
+  if(mode==='relax'){toast('Distribuir funciona sobre una cueva o modelo seleccionado');return}
   snapshot();brush(p.x,p.z);changed=true;
  }else if(mode==='move'){
   setNodeSelection([]);setHoverNode(null,e);
@@ -1496,7 +1492,7 @@ view.addEventListener('pointermove',e=>{
  cursor.position.set(p.x,p.y+.3,p.z);
  cursor.rotation.set(-Math.PI/2,0,0);
  cursor.scale.setScalar(tools[mode]?Number($('brushRadius').value):4);
- if(pointerDown&&tools[mode])brush(p.x,p.z);
+ if(pointerDown&&tools[mode]&&mode!=='relax')brush(p.x,p.z);
 });
 view.addEventListener('pointerleave',e=>{
  if(!dragSession){setHoverNode(null,e);updatePlacementAt(null);holesEditor?.hoverAt(null)}
