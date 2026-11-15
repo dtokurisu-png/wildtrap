@@ -127,6 +127,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
  function render(){
   if(!root.isConnected)return;
   const data=model();
+  $('textureActiveSlotsTitle').textContent='Ranuras activas · '+BIOMES.find(b=>b.id===biomeId).name;
   renderCatalog();
   slots.replaceChildren();
   const total=BIOMES.reduce((sum,b)=>sum+SLOTS.reduce((n,s)=>n+(ensure()[b.id]?.slots?.[s.id]?.image?.length||0),0),0);
