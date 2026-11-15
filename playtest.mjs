@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {inPlaceClip} from './playtest-animation.mjs?v=0.9.36';
-import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.39';
+import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.40';
 import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.33';
 // The user's own WT GLB and animation files will be supplied separately.
 // No R.O.K. model or animation is loaded.
