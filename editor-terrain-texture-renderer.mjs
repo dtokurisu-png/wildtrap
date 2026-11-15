@@ -168,7 +168,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     map:tex,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,
     depthWrite:false,transparent:true,opacity:1
    }));
-   mesh.renderOrder=4;mesh.userData.editorOnly=true;
+   mesh.renderOrder=4; // Terrain cliff texture remains visible in Play.
    cliffLayer.add(mesh);hasCliffs=true;
    mesh.userData.disposeTexture=tex;
   }
