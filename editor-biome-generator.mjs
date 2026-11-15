@@ -10,7 +10,9 @@ export function createBiomeGeneratorPanel({live,snapshot,persist,toast,onChange=
  if(!root)throw Error('Falta el panel del generador de biomas');
  let storedRef=null;
  function config(){
-  if(storedRef!==live.biomeGenerator){
+  // Initial projects have biomeGenerator=null. Never mistake the null
+  // sentinel for an already normalized configuration.
+  if(!storedRef||storedRef!==live.biomeGenerator){
    live.biomeGenerator=normalizeBiomeGenerator(live.biomeGenerator);
    storedRef=live.biomeGenerator;
   }
