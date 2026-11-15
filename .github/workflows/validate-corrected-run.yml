@@ -1,0 +1,23 @@
+name: Validate corrected Explorer running animation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/animations/explorer-run-corrected.b64'
+      - 'explorer-run-corrected.mjs'
+      - 'playtest.mjs'
+      - 'tests/explorer-corrected-run.test.mjs'
+      - '.github/workflows/validate-corrected-run.yml'
+  workflow_dispatch:
+jobs:
+  corrected-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check explorer-run-corrected.mjs
+      - run: node --check playtest.mjs
+      - run: node --test tests/explorer-corrected-run.test.mjs
