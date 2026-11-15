@@ -113,15 +113,15 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <label><input id="sculptShowEdges" type="checkbox" checked> Aristas</label>
  <label><input id="sculptShowVertices" type="checkbox" checked> Vértices</label>
  <label><input id="sculptShowXray" type="checkbox"> Rayos X</label></div>
- <button id="sculptSelectVertices" type="button" style="width:100%;margin-top:5px">✣ Seleccionar y mover vértices</button>
- <p class="hint">En selección: clic para elegir un vértice, arrastra para seleccionar varios. Ctrl + clic añade puntos.</p>
+ 
+ <p class="hint">Clic en un vértice y arrastra para moverlo. Shift + arrastre: horizontal X, vertical Y. Alt + Shift + arrastre vertical: Z. Ctrl + clic añade puntos; desde un espacio vacío arrastra un rectángulo para seleccionar varios.</p>
  <label>Movimiento preciso · distancia <input id="sculptVertexStep" type="number" min="0.001" max="10" step="0.05" value="0.1"></label>
  <div class="grid2"><button type="button" data-sculpt-vertex-axis="XNeg">X −</button><button type="button" data-sculpt-vertex-axis="XPos">X +</button></div>
  <div class="grid2"><button type="button" data-sculpt-vertex-axis="YNeg">Y −</button><button type="button" data-sculpt-vertex-axis="YPos">Y +</button></div>
  <div class="grid2"><button type="button" data-sculpt-vertex-axis="ZNeg">Z −</button><button type="button" data-sculpt-vertex-axis="ZPos">Z +</button></div>
  </div>
 <div class="grid">
-<button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Aplanar</button><button data-tool="smooth">Suavizar</button><button data-tool="trim">Recortar</button><button data-tool="move">Mover</button>
+<button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Aplanar</button><button data-tool="smooth">Suavizar</button><button data-tool="trim">Recortar</button><button type="button" id="sculptSelectVertices" data-tool="meshEdit">Seleccionar vértices</button><button data-tool="move">Mover</button>
 </div>
 <label>Radio del pincel <output id="brushRadiusValue">12</output><input id="brushRadius" type="range" min="1" max="65" step=".5" value="12"></label>
 <label>Intensidad <output id="brushStrengthValue">12</output><input id="strength" type="range" min="1" max="30" value="12"></label>
