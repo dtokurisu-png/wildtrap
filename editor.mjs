@@ -1932,7 +1932,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.71');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.72');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
  }catch(error){
