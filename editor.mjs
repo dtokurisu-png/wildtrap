@@ -475,7 +475,8 @@ function updateStatus(){
   }
  }
  $('sculptSelectVertices').disabled=!editable;
- $('sculptSelectVertices').textContent=mode==='meshEdit'?'✓ Terminar selección de vértices':'✣ Seleccionar y mover vértices';
+ $('sculptSelectVertices').textContent=mode==='meshEdit'?'✓ Terminar selección de vértices':'✣ Seleccionar vértices';
+ $('sculptSelectVertices').classList.toggle('active',mode==='meshEdit');
  if(editable){
   const locks=picked.rotationLocks||{};
   // The saved XYZ lock buttons apply to movement AND rotation.
