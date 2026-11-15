@@ -75,12 +75,12 @@ export function createObjectMeshOverlays({getNodes,getRoots}){
      const pointsGeometry=new THREE.BufferGeometry();
      pointsGeometry.setAttribute('position',new THREE.Float32BufferAttribute(dots,3));
      const pointsMaterial=new THREE.PointsMaterial({
-      color:0xffd17a,size:4,sizeAttenuation:false,
-      depthTest:!layers.xray,depthWrite:false
+      color:0x00ffdf,size:10,sizeAttenuation:false,
+      transparent:false,depthTest:false,depthWrite:false
      });
      const points=new THREE.Points(pointsGeometry,pointsMaterial);
      points.userData.editorOnly=true;points.userData.meshLayer='vertices';
-     points.renderOrder=11;points.frustumCulled=false;
+     points.renderOrder=40;points.frustumCulled=false;
      points.visible=layers.vertices;points.raycast=()=>{};
      mesh.add(points);
      owned.push({type:'geometry',object:points,geometry:pointsGeometry,material:pointsMaterial});
