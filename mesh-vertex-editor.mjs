@@ -36,6 +36,10 @@ export function createMeshVertexEditor({
  function release(){
   if(gesture){
    try{if(view.hasPointerCapture?.(gesture.pointerId))view.releasePointerCapture(gesture.pointerId)}catch(_){}
+   // The drag preview is never allowed to become the persistent/shared GLB.
+   for(const [mesh,{original,preview}] of gesture.dragGeometry||[]){
+    mesh.geometry=original;preview.dispose();
+   }
   }
   gesture=null;marquee.style.display='none';
  }
@@ -359,13 +363,7 @@ export function createMeshVertexEditor({
    else chooseByPoint(e);
   }else{
    release();
-   if(g.moved){
-    // Restore the original mesh buffers before reconstructing from saved JSON.
-    for(const [mesh,{original,preview}] of g.dragGeometry||[]){
-     mesh.geometry=original;preview.dispose();
-    }
-    draw();persist();
-   }
+   if(g.moved){draw();persist();}
   }
   return true;
  }
