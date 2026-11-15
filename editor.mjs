@@ -9,17 +9,17 @@ import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17'
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.17';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.19';
-import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.19';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.44';
+import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.44';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
-import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.19';
+import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.44';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
-const sculptTools={raise:1,lower:1,flatten:1,smooth:1};
+const sculptTools={raise:1,lower:1,flatten:1,smooth:1,trim:1};
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
@@ -541,7 +541,7 @@ function setMode(v){
  updateStatus();
 }
 // Zone editor initializes after boot; see initializeZoneTool below.
-const tools={raise:1,lower:1,flatten:1,smooth:1};
+const tools={raise:1,lower:1,flatten:1,smooth:1,trim:1};
 // Alt + clic derecho: horizontal cambia radio, vertical cambia intensidad.
 // Captura el puntero antes de OrbitControls, selección y esculpido.
 let brushGesture=null;
