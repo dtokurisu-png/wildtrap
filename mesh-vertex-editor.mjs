@@ -81,7 +81,7 @@ export function createMeshVertexEditor({
     const key=pointKey(item.key,item.index);
     const picked=selected.has(key);
     const locked=lockedSets.get(item.key)?.has(item.index)===true;
-    colors.setXYZ(item.paintIndex,...(picked?[1,.82,.24]:locked?[1,.3,.38]:[.1,1,.86]));
+    colors.setXYZ(item.paintIndex,...(picked?[1,1,1]:locked?[1,.18,.33]:[0,1,.87]));
    }
    colors.needsUpdate=true;
   }
@@ -123,16 +123,16 @@ export function createMeshVertexEditor({
     const sample={key,index:i,mesh,vertex:v,id,token,paintIndex:sampleRefs.length};
     sampleRefs.push(sample);samples.push(sample);
     verts.push(x,y,z);
-    colors.push(.1,1,.86);
+    colors.push(0,1,.87);
    }
    painted+=sampleRefs.length;
    const cloudGeo=new THREE.BufferGeometry();
    cloudGeo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
    cloudGeo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
-   const cloudMat=new THREE.PointsMaterial({size:5,sizeAttenuation:false,
-    vertexColors:true,depthTest:false,depthWrite:false,transparent:true,opacity:1});
+   const cloudMat=new THREE.PointsMaterial({size:11,sizeAttenuation:false,
+    vertexColors:true,depthTest:false,depthWrite:false,transparent:false,opacity:1});
    const cloud=new THREE.Points(cloudGeo,cloudMat);
-   cloud.userData.editorOnly=true;cloud.renderOrder=13;cloud.frustumCulled=false;
+   cloud.userData.editorOnly=true;cloud.renderOrder=45;cloud.frustumCulled=false;
    mesh.add(cloud);disposables.push({object:cloud,geometry:cloudGeo,material:cloudMat,sampleRefs,kind:'vertices'});
    // Edges reflect the ACTUAL cut topology. Dense GLBs can show full wireframe.
    const wireGeo=new THREE.WireframeGeometry(mesh.geometry);
@@ -163,7 +163,7 @@ export function createMeshVertexEditor({
    if(item.kind==='vertices')item.object.visible=$('modelVertices').checked;
    if(item.kind==='edges')item.object.visible=$('modelEdges').checked;
    if(item.kind==='vertices'||item.kind==='edges'){
-    item.material.depthTest=!xray;item.material.needsUpdate=true;
+    item.material.depthTest=item.kind==='vertices'?false:!xray;item.material.needsUpdate=true;
    }
   }
   for(const {clone} of faded)for(const mat of (Array.isArray(clone)?clone:[clone])){
