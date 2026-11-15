@@ -76,6 +76,16 @@ export function createMeshVertexEditor({
    !getRoot(node.id)?'El archivo GLB todavía está cargando':
    'Clic en un vértice o arrastra un rectángulo. Ctrl añade o quita vértices.');
  }
+ function updateSelectionOutlines(){
+  for(const record of disposables){
+   if(record.kind!=='selectionOutline')continue;
+   const verts=[];
+   for(const item of samples)if(item.mesh===record.mesh&&selected.has(item.id))
+    verts.push(item.vertex.x,item.vertex.y,item.vertex.z);
+   record.geometry.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+   record.geometry.computeBoundingSphere();
+  }
+ }
  function refreshColors(){
   const node=getSelectedNode(),locks=normalizedLocks(node?.vertexLocks);
   const lockedSets=new Map(Object.entries(locks).map(([k,v])=>[k,new Set(v)]));
@@ -89,6 +99,7 @@ export function createMeshVertexEditor({
    }
    colors.needsUpdate=true;
   }
+  updateSelectionOutlines();
   updateInfo();
  }
  // Rebuild is called after the editor recreates GLB instances, and when the
@@ -138,6 +149,14 @@ export function createMeshVertexEditor({
    const cloud=new THREE.Points(cloudGeo,cloudMat);
    cloud.userData.editorOnly=true;cloud.renderOrder=45;cloud.frustumCulled=false;
    mesh.add(cloud);disposables.push({object:cloud,geometry:cloudGeo,material:cloudMat,sampleRefs,kind:'vertices'});
+   const haloGeo=new THREE.BufferGeometry();
+   haloGeo.setAttribute('position',new THREE.Float32BufferAttribute([],3));
+   const haloMat=new THREE.PointsMaterial({color:0xffffff,size:21,sizeAttenuation:false,
+    transparent:false,depthTest:false,depthWrite:false});
+   const halo=new THREE.Points(haloGeo,haloMat);
+   halo.userData.editorOnly=true;halo.renderOrder=44;halo.frustumCulled=false;
+   halo.raycast=()=>{};mesh.add(halo);
+   disposables.push({object:halo,geometry:haloGeo,material:haloMat,kind:'selectionOutline',mesh});
    // Edges reflect the ACTUAL cut topology. Dense GLBs can show full wireframe.
    const wireGeo=new THREE.WireframeGeometry(mesh.geometry);
    const wireMat=new THREE.LineBasicMaterial({color:0x39ffd0,transparent:true,opacity:.52,
@@ -350,6 +369,7 @@ export function createMeshVertexEditor({
      attr.setXYZ(item.paintIndex,item.vertex.x,item.vertex.y,item.vertex.z);
     attr.needsUpdate=true;
    }
+   updateSelectionOutlines();
    return true;
   }
   if(Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y)>5)gesture.dragging=true;
@@ -372,7 +392,7 @@ export function createMeshVertexEditor({
    else chooseByPoint(e);
   }else{
    release();
-   if(g.moved){draw();persist();}
+   if(g.moved){persist(true);draw();}
   }
   return true;
  }
