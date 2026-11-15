@@ -117,7 +117,20 @@ export function createTerrainGPULayers({scene,terrain}){
    const mask=makeMask(biomeZones);
    const textures=entries.map(({image})=>{
     if(!image)return fallback;
-    const t=new THREE.Texture(image);
+    // Preserve the real bitmap detail. Only exceptionally large files
+    // (e.g. an 8K llanura) are capped at 4096px for GPU compatibility and
+    // to avoid a single tile consuming hundreds of MB of VRAM.
+    let bitmap=image;
+    if(Math.max(image.width,image.height)>4096){
+     const ratio=4096/Math.max(image.width,image.height);
+     const small=document.createElement('canvas');
+     small.width=Math.max(1,Math.round(image.width*ratio));
+     small.height=Math.max(1,Math.round(image.height*ratio));
+     const cx=small.getContext('2d');cx.imageSmoothingQuality='high';
+     cx.drawImage(image,0,0,small.width,small.height);
+     bitmap=small;
+    }
+    const t=new THREE.Texture(bitmap);
     t.wrapS=t.wrapT=THREE.RepeatWrapping;
     t.colorSpace=THREE.SRGBColorSpace;
     t.minFilter=THREE.LinearMipmapLinearFilter;
