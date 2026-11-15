@@ -68,15 +68,15 @@ float smoothNoise(vec2 p){
 // Nominal density: 25% of the repeat count over the complete 630-unit map.
 // Different seed/slot IDs produce independent locations and rotations.
 // Each fragment samples a detail image ONLY if inside its occasional patch.
-vec4 sparsePatch(sampler2D img,vec2 worldPos,float repeats,float id){
+vec3 sparsePatch(vec2 worldPos,float repeats,float id){
  float total=clamp(floor(repeats*.25+.5),1.0,250.0);
  float across=ceil(sqrt(total));
  float chance=total/(across*across);
  vec2 region=floor((worldPos+315.0)/630.0*across);
  if(region.x<0.0||region.y<0.0||region.x>=across||region.y>=across)
-  return vec4(0.0);
+  return vec3(0.0);
  vec2 token=region+vec2(id*17.3+seed*.117,id*31.9+seed*.071);
- if(hash(token+43.0)>chance)return vec4(0.0);
+ if(hash(token+43.0)>chance)return vec3(0.0);
  float cellSize=630.0/across;
  float size=630.0/max(.25,repeats);
  // Center is jittered within the cell. Each texture uses its own
@@ -89,11 +89,11 @@ vec4 sparsePatch(sampler2D img,vec2 worldPos,float repeats,float id){
  float maxEdge=max(abs(rotated.x),abs(rotated.y));
  // True transparent exterior; smooth alpha toward the interior.
  float edge=1.0-smoothstep(.27,.5,maxEdge);
- if(edge<=.002)return vec4(0.0);
- vec4 pixel=texture2D(img,rotated+.5);
- // PNG intrinsic alpha is preserved as well as the procedural soft edge.
- float alpha=(.5+.3*hash(token+94.0))*edge*pixel.a;
- return vec4(pixel.rgb,alpha);
+ if(edge<=.002)return vec3(0.0);
+ // Return UV and opacity; fragment samples the texture using a direct
+ // uniform sampler. WebGL1 must not pass sampler2D as a function parameter.
+ float alpha=(.5+.3*hash(token+94.0))*edge;
+ return vec3(rotated+.5,alpha);
 }
 void main(){
  vec2 coord=vWorldPoint.xz;
@@ -107,16 +107,25 @@ void main(){
  float cloud=smoothNoise(coord/max(8.0,variation*2.0)+vec2(seed*.173));
  rgb*=mix(.92,1.045,cloud);
  if(activeDetails.x>.5){
-  vec4 patch=sparsePatch(detailMap1,coord,repeatScale.y,1.0);
-  rgb=mix(rgb,patch.rgb,patch.a*clamp(detailOpacity.x*2.0,0.0,1.0));
+  vec3 patch=sparsePatch(coord,repeatScale.y,1.0);
+  if(patch.z>.002){
+   vec4 pixel=texture2D(detailMap1,patch.xy);
+   rgb=mix(rgb,pixel.rgb,pixel.a*patch.z*clamp(detailOpacity.x*2.0,0.0,1.0));
+  }
  }
  if(activeDetails.y>.5){
-  vec4 patch=sparsePatch(detailMap2,coord,repeatScale.z,2.0);
-  rgb=mix(rgb,patch.rgb,patch.a*clamp(detailOpacity.y*2.0,0.0,1.0));
+  vec3 patch=sparsePatch(coord,repeatScale.z,2.0);
+  if(patch.z>.002){
+   vec4 pixel=texture2D(detailMap2,patch.xy);
+   rgb=mix(rgb,pixel.rgb,pixel.a*patch.z*clamp(detailOpacity.y*2.0,0.0,1.0));
+  }
  }
  if(activeDetails.z>.5){
-  vec4 patch=sparsePatch(detailMap3,coord,repeatScale.w,3.0);
-  rgb=mix(rgb,patch.rgb,patch.a*clamp(detailOpacity.z*2.0,0.0,1.0));
+  vec3 patch=sparsePatch(coord,repeatScale.w,3.0);
+  if(patch.z>.002){
+   vec4 pixel=texture2D(detailMap3,patch.xy);
+   rgb=mix(rgb,pixel.rgb,pixel.a*patch.z*clamp(detailOpacity.z*2.0,0.0,1.0));
+  }
  }
  vec3 n=normalize(vNormalWorld);
  float directional=.78+.22*max(0.0,dot(n,normalize(vec3(-.4,1.0,.45))));
