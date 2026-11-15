@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {loadCorrectedExplorerRun} from './explorer-run-corrected.mjs?v=0.9.80';
 import {inPlaceClip} from './playtest-animation.mjs?v=0.9.36';
 import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.40';
 import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.33';
@@ -168,13 +169,21 @@ const hiddenDebugMarkers=[];
     if(clips.length){
       mixer=new THREE.AnimationMixer(gltf.scene);
       const stationary=inPlaceClip(clips[IDLE_CLIP_INDEX]||clips[0]);
-      const running=inPlaceClip(clips[RUN_CLIP_INDEX]||clips[IDLE_CLIP_INDEX]||clips[0]);
+      let correctedRun=null;
+      try{
+       correctedRun=await loadCorrectedExplorerRun(THREE,gltf);
+      }catch(error){
+       // Preserve the player's existing running animation if the separate
+       // authored asset is unavailable; never replace the explorer GLB.
+       console.warn('WT: no se pudo cargar la carrera corregida:',error);
+      }
+      const running=inPlaceClip(correctedRun||clips[RUN_CLIP_INDEX]||clips[IDLE_CLIP_INDEX]||clips[0]);
       idle=mixer.clipAction(stationary.clip);
       walk=mixer.clipAction(running.clip);
       console.info('WT animaciones in-place', {idle:stationary.corrected,run:running.corrected});
       idle.reset().setLoop(THREE.LoopRepeat).play();
       walkWanted=false;
-      say('Explorador WT listo · animación 3 quieto / 5 con W');
+      say(correctedRun?'Explorador WT listo · carrera corregida cargada':'Explorador WT listo · carrera original de respaldo');
     }else say('Explorador WT listo · sin clips incrustados');
     return imported;
   })().catch(error=>{sourceError=error.message;loadingPromise=null;throw error});
