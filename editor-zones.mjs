@@ -7,7 +7,14 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
  const commit=()=>{persist();onChange();};
  const layer=new THREE.Group();layer.name='EditorZoneBoundaries';scene.add(layer);
  const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
- let pending=[],hover=null,selected=null,dragging=null,editVertices=false,clickCandidate=null;
+ // Raycast against the actual terrain triangles at the height of the white
+ // marker center, so its projected screen position stays under the mouse.
+ // Do not add this picking-only mesh to the scene.
+ const markerLift=1.65;
+ const pickingSurface=new THREE.Mesh(terrainGeo,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
+ pickingSurface.position.y=markerLift;
+ pickingSurface.updateMatrixWorld(true);
+ let pending=[],hover=null,selected=null,dragging=null,editVertices=false,addingVertex=false,clickCandidate=null;
  const pendingRedo=[];
  const cliffTool=createCliffRegions({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist:commit,toast,
    getZone:()=>items().find(z=>z.id===selected),isActive,isBlocked});
@@ -78,7 +85,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   for(const zone of items()){
    const row=document.createElement('div');row.className='zone-entry';row.style.cssText='display:flex;gap:5px;align-items:center;margin:5px 0';
    const select=document.createElement('button');select.textContent=zone.name||'Zona';select.style.flex='1';select.classList.toggle('active',zone.id===selected);
-   select.onclick=()=>{selected=zone.id;pending=[];pendingRedo.length=0;hover=null;editVertices=false;cliffTool.onZoneChange();renderPanel();refresh();onPendingHistoryChange();};
+   select.onclick=()=>{selected=zone.id;pending=[];pendingRedo.length=0;hover=null;editVertices=false;addingVertex=false;cliffTool.onZoneChange();renderPanel();refresh();onPendingHistoryChange();};
    const eye=document.createElement('button');eye.textContent=zone.hidden?'◌':'◉';eye.title=zone.hidden?'Mostrar':'Ocultar';
    eye.onclick=()=>{snapshot();zone.hidden=!zone.hidden;commit();renderPanel();refresh()};
    row.append(select,eye);list.append(row);
@@ -92,28 +99,69 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   $('zoneEditVertices').disabled=!zone;
   $('zoneEditVertices').classList.toggle('active',editVertices);
   $('zoneEditVertices').textContent=editVertices?'✓ Terminar edición':'Editar zona';
+  const add=$('zoneAddVertex');
+  add.disabled=!zone||!editVertices;
+  add.classList.toggle('active',addingVertex&&editVertices);
+  add.textContent=addingVertex&&editVertices?'✓ Añadiendo puntos':'Añadir vértice';
  }
  function refreshAll(){renderPanel();refresh();}
  function pointerPoint(e){
   const rect=view.getBoundingClientRect();
   mouse.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);
+  camera.updateMatrixWorld(true);
   ray.setFromCamera(mouse,camera);
-  const pt=ray.ray.at(0,new THREE.Vector3());
-  const t=ray.ray.direction.y===0?NaN:(-ray.ray.origin.y)/ray.ray.direction.y;
-  if(!Number.isFinite(t)||t<0)return null;
-  ray.ray.at(t,pt);
-  // Resolve the ray against the live height field by iteration (sloping terrain).
-  for(let i=0;i<8;i++){
-   const h=heightAt(pt.x,pt.z),den=ray.ray.direction.y;
-   const next=(h-ray.ray.origin.y)/den;
-   if(!Number.isFinite(next)||next<0)return null;
-   ray.ray.at(next,pt);
+  // Intersection is calculated from the very same geometry used to display
+  // the terrain; old iteration on the height function could overshoot badly
+  // around steep slopes and at oblique camera angles.
+  pickingSurface.updateMatrixWorld(true);
+  const hit=ray.intersectObject(pickingSurface,false)[0];
+  if(!hit)return null;
+  if(Math.abs(hit.point.x)>max||Math.abs(hit.point.z)>max)return null;
+  return norm(hit.point);
+ }
+ function closestZoneEdge(zone,e){
+  if(!zone?.points?.length)return null;
+  const rect=view.getBoundingClientRect();
+  const pointerX=e.clientX-rect.left,pointerY=e.clientY-rect.top;
+  let best=null;
+  for(let i=0;i<zone.points.length;i++){
+   const p=zone.points[i],q=zone.points[(i+1)%zone.points.length];
+   const projectedA=new THREE.Vector3(p.x,y(p)+.25,p.z).project(camera);
+   const projectedB=new THREE.Vector3(q.x,y(q)+.25,q.z).project(camera);
+   if(projectedA.z< -1||projectedA.z>1||projectedB.z< -1||projectedB.z>1)continue;
+   const ax=(projectedA.x+1)*rect.width/2,ay=(1-projectedA.y)*rect.height/2;
+   const bx=(projectedB.x+1)*rect.width/2,by=(1-projectedB.y)*rect.height/2;
+   const length2=(bx-ax)**2+(by-ay)**2;
+   if(length2<1e-6)continue;
+   const t=Math.max(0,Math.min(1,((pointerX-ax)*(bx-ax)+(pointerY-ay)*(by-ay))/length2));
+   const distance=Math.hypot(pointerX-ax-t*(bx-ax),pointerY-ay-t*(by-ay));
+   if(!best||distance<best.distance)best={index:i,distance};
   }
-  if(Math.abs(pt.x)>max||Math.abs(pt.z)>max)return null;
-  return norm(pt);
+  return best;
+ }
+ function insertZonePoint(e){
+  const zone=items().find(z=>z.id===selected);
+  if(!editVertices||!zone||zone.hidden)return false;
+  const edge=closestZoneEdge(zone,e);
+  // Ordinary clicks only insert on a visible boundary. In explicit Add
+  // mode, users can click anywhere on the terrain: the nearest boundary
+  // segment is split, preserving the polygon's vertex ordering.
+  if(!edge||(!addingVertex&&edge.distance>18))return false;
+  const p=pointerPoint(e);
+  if(!p){toast('El punto debe quedar sobre el terreno');return false}
+  const candidate=zone.points.map(norm);
+  candidate.splice(edge.index+1,0,p);
+  if(!valid(candidate)){
+   toast('No se puede añadir ahí: el contorno se cruzaría o tendría puntos demasiado próximos');
+   return false;
+  }
+  snapshot();zone.points=candidate;
+  commit();refreshAll();
+  toast('Vértice añadido · '+zone.points.length+' puntos en la zona');
+  return true;
  }
  function screenDistance(p,e){
-  const q=new THREE.Vector3(p.x,y(p),p.z).project(camera),r=view.getBoundingClientRect();
+  const q=new THREE.Vector3(p.x,y(p)+.25,p.z).project(camera),r=view.getBoundingClientRect();
   return Math.hypot((q.x+1)*r.width/2-(e.clientX-r.left),(1-q.y)*r.height/2-(e.clientY-r.top));
  }
  function close(){
@@ -121,13 +169,13 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   snapshot();
   const ids=new Set(items().map(z=>z.id));let i=1;while(ids.has('zone-'+i))i++;
   const zone={id:'zone-'+i,name:'Zona '+String(i).padStart(2,'0'),points:pending.map(norm),hidden:false,cliffs:[]};
-  items().push(zone);selected=zone.id;pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;editVertices=false;cliffTool.onZoneChange();
+  items().push(zone);selected=zone.id;pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;editVertices=false;addingVertex=false;cliffTool.onZoneChange();
   commit();refreshAll();toast(zone.name+' creada y guardada');
  }
  function cancel(){pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;dragging=null;clickCandidate=null;cliffTool.cancel();refreshAll();}
  function placePoint(e){
   if(cliffTool.down(e))return;
-  if(editVertices&&selected)return;
+  if(editVertices&&selected){insertZonePoint(e);return;}
   const p=pointerPoint(e);if(!p)return;
   if(pending.length>=3&&screenDistance(pending[0],e)<16){close();return}
   if(pending.length>=2&&Math.hypot(p.x-pending.at(-1).x,p.z-pending.at(-1).z)<.3)return;
@@ -135,7 +183,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
  }
  function down(e){
   if(!isActive()||isBlocked()||e.button!==0||e.ctrlKey||e.altKey)return;
-  if(editVertices&&selected){
+  if(editVertices&&selected&&!addingVertex){
    const z=items().find(z=>z.id===selected);
    const index=z?.points.findIndex(p=>screenDistance(p,e)<15)??-1;
    if(index>=0){
@@ -208,14 +256,20 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
  }
  $('zoneCancel').onclick=cancel;
  $('zoneName').onchange=e=>{const z=items().find(z=>z.id===selected);if(!z)return;snapshot();z.name=e.target.value.trim()||z.name;commit();refreshAll()};
- $('zoneDelete').onclick=()=>{if(!selected)return;const z=items().find(z=>z.id===selected);if(!z||!confirm('¿Eliminar '+z.name+'?'))return;snapshot();live.zones=items().filter(x=>x.id!==selected);selected=null;editVertices=false;cliffTool.onZoneChange();commit();refreshAll()};
+ $('zoneDelete').onclick=()=>{if(!selected)return;const z=items().find(z=>z.id===selected);if(!z||!confirm('¿Eliminar '+z.name+'?'))return;snapshot();live.zones=items().filter(x=>x.id!==selected);selected=null;editVertices=false;addingVertex=false;cliffTool.onZoneChange();commit();refreshAll()};
  $('zoneEditVertices').onclick=()=>{
   if(!items().some(z=>z.id===selected))return;
-  editVertices=!editVertices;
+  editVertices=!editVertices;addingVertex=false;
   pending=[];pendingRedo.length=0;clickCandidate=null;
   onPendingHistoryChange();hover=null;cliffTool.cancel();
   refreshAll();
-  toast(editVertices?'Editar zona activo: arrastra los puntos blancos para moverlos. Puedes seguir rotando y desplazando la cámara.':'Edición de zona finalizada');
+  toast(editVertices?'Editar zona: arrastra puntos blancos; haz clic en una arista para añadir un punto. También puedes activar Añadir vértice.':'Edición de zona finalizada');
+ };
+ $('zoneAddVertex').onclick=()=>{
+  if(!editVertices||!items().some(z=>z.id===selected))return;
+  addingVertex=!addingVertex;clickCandidate=null;
+  refreshAll();
+  toast(addingVertex?'Añadir vértice: haz clic en el terreno; se insertará en la arista más cercana. Arrastra para girar la cámara.':'Inserción finalizada');
  };
  $('zoneBiome').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;snapshot();zone.biomeId=e.target.value||null;if(!zone.biomeId)zone.biomeLocked=false;commit();refreshAll();};
  $('zoneBiomeLocked').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;if(e.target.checked&&!zone.biomeId){e.target.checked=false;toast('Asigna un bioma antes de bloquear la zona');return;}snapshot();zone.biomeLocked=e.target.checked;commit();refreshAll();};
@@ -223,5 +277,5 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
  return {refresh,refreshAll,cancel,undoPoint:undoPending,redoPoint:redoPending,
   hasPending:()=>pending.length>0||cliffTool.isDrawing(),hasRedoPending:()=>pendingRedo.length>0,
   pendingRedoOrder:()=>pendingRedo.at(-1)?.order||0,
-  onModeChange:()=>{pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;dragging=null;clickCandidate=null;editVertices=false;cliffTool.cancel();refreshAll();}};
+  onModeChange:()=>{pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;dragging=null;clickCandidate=null;editVertices=false;addingVertex=false;cliffTool.cancel();refreshAll();}};
 }
