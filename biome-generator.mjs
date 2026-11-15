@@ -92,6 +92,9 @@ export function generateBiomeAssignments(zones,raw){
  for(let i=0;i<fixed.length;i++)for(const j of adjacency[i])
   if(j<i&&!compatible(fixed[i],fixed[j]))
    return {ok:false,error:'Dos zonas bloqueadas y vecinas incumplen las reglas de compatibilidad.'};
+ // Trial with five primary regions: assign one of each of the five biomes.
+ // When a different number of regions exists, retain the ordinary weighted generator.
+ const uniqueFive=zones.length===5&&candidates.length===5&&BIOME_IDS.every(id=>candidates.includes(id));
  const rand=seededRandom(settings.seed);
  const result=fixed.slice(),counts=Object.fromEntries(BIOME_IDS.map(id=>[id,0]));
  for(const id of fixed)if(id)counts[id]++;
@@ -105,7 +108,7 @@ export function generateBiomeAssignments(zones,raw){
   if(index===order.length)return true;
   if(++attempts>120000)return false;
   const pos=order[index];
-  const options=candidates.filter(id=>adjacency[pos].every(n=>compatible(id,result[n])));
+  const options=candidates.filter(id=>(!uniqueFive||counts[id]===0)&&adjacency[pos].every(n=>compatible(id,result[n])));
   const arranged=options.map(id=>({id,r:rand(),score:(counts[id]+1)/settings.weights[id]}))
    .sort((a,b)=>a.score-b.score||a.r-b.r);
   for(const option of arranged){
