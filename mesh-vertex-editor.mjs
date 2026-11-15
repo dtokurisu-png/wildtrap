@@ -323,12 +323,12 @@ export function createMeshVertexEditor({
     const cut=item.id.lastIndexOf(':'),key=item.id.slice(0,cut),index=Number(item.id.slice(cut+1));
     if(g.locked[key]?.includes(index))continue;
     if(!g.sampleOrigins.has(item.id))g.sampleOrigins.set(item.id,item.vertex.clone());
-    // Convert both endpoints with full matrices to handle parent rotation
-    // and non-uniform normalization scales without flipped axes.
+    // Preview uses the SAME root-space displacement that is persisted,
+    // converted through complete world matrices (not quaternion-only math).
+    const worldDisplacement=g.root.localToWorld(rootDelta.clone())
+     .sub(g.root.localToWorld(new THREE.Vector3()));
     const base=g.sampleOrigins.get(item.id).clone().applyMatrix4(item.mesh.matrixWorld);
-    const local=base.add(rootDelta.clone().applyMatrix4(
-      new THREE.Matrix4().copy(g.root.matrixWorld).extractRotation(g.root.matrixWorld)
-    )).applyMatrix4(item.mesh.matrixWorld.clone().invert())
+    const local=base.add(worldDisplacement).applyMatrix4(item.mesh.matrixWorld.clone().invert())
      .sub(g.sampleOrigins.get(item.id));
     item.vertex.copy(g.sampleOrigins.get(item.id)).add(local);
     const originalGeometry=g.dragGeometry?.get(item.mesh)?.original;
