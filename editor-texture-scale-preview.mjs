@@ -13,7 +13,7 @@ export function createTextureScalePreview({onApply,toast}){
  let renderer=null,scene=null,camera=null,orbit=null,plane=null,texture=null,model=null;
  let raf=0,openToken=0,drag=null,request=null,active=null;
  const bounds=(v,min,max)=>Math.max(min,Math.min(max,v));
- const value=()=>bounds(Number(number.value)||8,.25,100);
+ const value=()=>bounds(Number(number.value)||8,.25,1000);
  const label=()=>{
   const v=value(),tile=630/v;
   world.textContent=tile.toFixed(2)+' unidades por repetición · '+v.toFixed(2)+' repeticiones / mapa';
@@ -39,8 +39,9 @@ export function createTextureScalePreview({onApply,toast}){
   if(scene){scene.traverse(o=>{if(o.isMesh&&o!==model&&o!==plane){/* GLB disposes below */}})}
   model?.traverse(o=>{if(o.isMesh){o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material])){if(!m)continue;for(const k of ['map','normalMap','roughnessMap','metalnessMap','emissiveMap','aoMap'])m[k]?.dispose?.();m.dispose();}}});
   plane?.geometry?.dispose();plane?.material?.dispose();texture?.dispose();
-  renderer?.dispose();renderer?.forceContextLoss();
+  renderer?.dispose();
   renderer=null;scene=null;camera=null;plane=null;texture=null;model=null;
+  delete window.__wildtrapTexturePreviewMemory;
  }
  async function loadScene(token,item){
   const scene3d=new THREE.Scene();scene3d.background=new THREE.Color('#253c31');
@@ -66,7 +67,9 @@ export function createTextureScalePreview({onApply,toast}){
    if(canvas.width!==Math.round(width*renderer.getPixelRatio())||canvas.height!==Math.round(height*renderer.getPixelRatio())){
     renderer.setSize(width,height,false);update();
    }
-   orbit.update();renderer.render(scene,camera);raf=requestAnimationFrame(draw);
+   orbit.update();renderer.render(scene,camera);
+   window.__wildtrapTexturePreviewMemory={...renderer.info.memory};
+   raf=requestAnimationFrame(draw);
   };
   draw();
   const url=item.url;
@@ -114,7 +117,7 @@ export function createTextureScalePreview({onApply,toast}){
   if(!drag||e.pointerId!==drag.id)return;
   e.preventDefault();e.stopImmediatePropagation();
   // Drag up enlarges the image footprint; down shrinks it.
-  number.value=String(Math.round(bounds(drag.scale*Math.exp((e.clientY-drag.y)*.012),.25,100)*4)/4);
+  number.value=String(Math.round(bounds(drag.scale*Math.exp((e.clientY-drag.y)*.012),.25,1000)*4)/4);
   update();
  }
  function onUp(e){if(drag?.id===e.pointerId)drag=null}
@@ -135,7 +138,7 @@ export function createTextureScalePreview({onApply,toast}){
    if(dialog.open)dialog.close();
    active=item;request=item.url;
    $('textureScaleTitle').textContent='Editar · '+item.name;
-   number.value=String(bounds(item.scale,.25,100));
+   number.value=String(bounds(item.scale,.25,1000));
    status.textContent='Cargando textura y Explorador 1 WT…';
    dialog.showModal();
    const token=++openToken;
