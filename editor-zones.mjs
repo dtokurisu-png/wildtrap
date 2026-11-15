@@ -127,6 +127,10 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
    snapshot();zone.isCliff=false;zone.cliffParentId=null;
    commit();refreshAll();return;
   }
+  if(items().some(z=>z.isCliff&&z.cliffParentId===id)){
+   toast('Esta región ya tiene acantilados asociados. Reasócialos antes de convertirla en acantilado.');
+   return;
+  }
   const candidates=items().filter(z=>z.id!==id&&!z.isCliff);
   if(!candidates.length){toast('Crea otra región principal para asociarle este acantilado');return;}
   const dialog=$('zoneCliffDialog'),select=$('zoneCliffParent');
