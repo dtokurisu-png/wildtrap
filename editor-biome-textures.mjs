@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS} from './editor-texture-catalog.mjs?v=0.9.62';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS} from './editor-texture-catalog.mjs?v=0.9.65';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
