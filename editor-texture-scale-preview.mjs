@@ -21,7 +21,19 @@ export function createTextureScalePreview({onApply,toast}){
  };
  function update(){
   const tile=label();
-  if(plane)plane.scale.set(tile,tile,1);
+  if(plane){
+   plane.scale.set(tile,tile,1);
+   if(active?.slot==='cliff'){
+    // A cliff is an upright X/Y measurement wall. The plane geometry is
+    // centered, so position its center at half the tile height: foot at Y=0.
+    // Keep the explorer on the camera side of the wall for scale comparison.
+    plane.rotation.set(0,0,0);
+    plane.position.set(0,tile*.5,-.65);
+   }else{
+    plane.rotation.set(-Math.PI/2,0,0);
+    plane.position.set(0,-.008,0);
+   }
+  }
   // Keep the explorer anchored at tile center. Camera distance is a
   // visual choice; changing tile size never alters character dimensions.
   if(camera&&renderer){
@@ -49,16 +61,23 @@ export function createTextureScalePreview({onApply,toast}){
   scene=scene3d;
   const geometry=new THREE.PlaneGeometry(1,1);
   const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,side:THREE.DoubleSide});
-  plane=new THREE.Mesh(geometry,mat);plane.rotation.x=-Math.PI/2;plane.position.y=-.008;scene.add(plane);
+  plane=new THREE.Mesh(geometry,mat);
+  scene.add(plane);
   const base=new THREE.GridHelper(20,20,0x5aa889,0x406959);
   base.position.y=-.025;scene.add(base);
   renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
   camera=new THREE.OrthographicCamera(-5,5,5,-5,.02,3000);
-  camera.position.set(7,10,13);camera.lookAt(0,0,0);
+  if(item.slot==='cliff'){
+   camera.position.set(3,3.2,11);
+   camera.lookAt(0,.5,0);
+  }else{
+   camera.position.set(7,10,13);
+   camera.lookAt(0,0,0);
+  }
   orbit=new OrbitControls(camera,canvas);orbit.enableDamping=true;
-  orbit.target.set(0,0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
+  orbit.target.set(0,item.slot==='cliff'?.5:0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
   update();
   const draw=()=>{
    if(token!==openToken||!dialog.open)return;
@@ -104,7 +123,9 @@ export function createTextureScalePreview({onApply,toast}){
   }
   status.textContent=settled[0].status==='rejected'?'No se pudo cargar la imagen.':
    settled[1].status==='rejected'?'Textura lista; no se pudo cargar Explorador 1 WT.':
-   'Explorador 1 WT (0.9 unidades) · imagen única en escala real';
+   (item.slot==='cliff'?
+    'Acantilado · plano vertical XY desde Y=0 · Explorador 1 WT (0.9 unidades)':
+    'Suelo · plano horizontal XZ · Explorador 1 WT (0.9 unidades)');
  }
  function onDown(e){
   if(e.button!==0||!e.shiftKey)return;
@@ -136,7 +157,7 @@ export function createTextureScalePreview({onApply,toast}){
   open(item){
    if(dialog.open)dialog.close();
    active=item;request=item.url;
-   $('textureScaleTitle').textContent='Editar · '+item.name;
+   $('textureScaleTitle').textContent=(item.slot==='cliff'?'Editar acantilado · ':'Editar suelo · ')+item.name;
    number.value=String(bounds(item.scale,.25,1000));
    status.textContent='Cargando textura y Explorador 1 WT…';
    dialog.showModal();
