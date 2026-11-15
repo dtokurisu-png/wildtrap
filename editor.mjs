@@ -1884,7 +1884,30 @@ async function loadPublishedWorld(){
  }catch(err){console.warn('No se pudo cargar mapa oficial',err);void restoreSavedBase(false)}
 }
 $('loadPublished').onclick=()=>{if(confirm('¿Abrir el mapa publicado en GitHub? El proyecto local será reemplazado. Exporta JSON antes si necesitas conservarlo.')){snapshot();void loadPublishedWorld()}};
-function animate(){requestAnimationFrame(animate);if(!preview.active)orbit.update();if(++axisTick%5===0)refreshAxisGizmo();renderer.render(scene,preview.frame()||camera)}
+let lastMemoryUpdate=0;
+function updateMemoryDisplay(){
+ const output=$('memoryStatus');
+ if(!output)return;
+ const heap=performance.memory;
+ // Chrome exposes JS heap, NOT process RAM or GPU VRAM. Never label it
+ // as total RAM usage or infer byte counts from WebGL object counts.
+ const js=heap&&Number.isFinite(heap.usedJSHeapSize)?
+  'JS '+(heap.usedJSHeapSize/1048576).toFixed(0)+' MB':
+  'JS: no disponible';
+ const main=renderer.info.memory,extra=window.__wildtrapTexturePreviewMemory||{};
+ const textureCount=(main.textures||0)+(extra.textures||0);
+ const geometryCount=(main.geometries||0)+(extra.geometries||0);
+ output.textContent='Memoria '+js+' · GPU '+textureCount+' texturas / '+geometryCount+' geometrías · VRAM: no disponible';
+ output.title='Memoria del heap JavaScript si el navegador lo permite. Los recursos WebGL son cantidades, no megabytes. La RAM total del proceso y la VRAM no pueden medirse de forma fiable desde esta página.';
+}
+function animate(){
+ requestAnimationFrame(animate);
+ if(!preview.active)orbit.update();
+ if(++axisTick%5===0)refreshAxisGizmo();
+ renderer.render(scene,preview.frame()||camera);
+ const now=performance.now();
+ if(now-lastMemoryUpdate>1800){lastMemoryUpdate=now;updateMemoryDisplay();}
+}
 animate();
 window.__editorReady?.();
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
@@ -1909,7 +1932,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.69');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.71');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
  }catch(error){
