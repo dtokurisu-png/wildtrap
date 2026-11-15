@@ -7,7 +7,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
  const commit=()=>{persist();onChange();};
  const layer=new THREE.Group();layer.name='EditorZoneBoundaries';scene.add(layer);
  const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
- let pending=[],hover=null,selected=null,dragging=null,editVertices=false;
+ let pending=[],hover=null,selected=null,dragging=null,editVertices=false,clickCandidate=null;
  const cliffTool=createCliffRegions({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist:commit,toast,
    getZone:()=>items().find(z=>z.id===selected),isActive,isBlocked});
  const max=315;
@@ -123,45 +123,75 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   items().push(zone);selected=zone.id;pending=[];hover=null;editVertices=false;cliffTool.onZoneChange();
   commit();refreshAll();toast(zone.name+' creada y guardada');
  }
- function cancel(){pending=[];hover=null;dragging=null;cliffTool.cancel();refreshAll();}
- function down(e){
-  if(!isActive()||isBlocked()||e.button!==0||e.ctrlKey||e.altKey)return;
-  e.preventDefault();e.stopImmediatePropagation();
+ function cancel(){pending=[];hover=null;dragging=null;clickCandidate=null;cliffTool.cancel();refreshAll();}
+ function placePoint(e){
   if(cliffTool.down(e))return;
-  if(editVertices&&selected){
-   const z=items().find(z=>z.id===selected);
-   const index=z?.points.findIndex(p=>screenDistance(p,e)<15)??-1;
-   if(index>=0){snapshot();dragging={id:selected,index,pointer:e.pointerId,original:z.points.map(norm)};try{view.setPointerCapture(e.pointerId)}catch(_){}return;}
-   return; // Editing a zone cannot accidentally begin another polygon.
-  }
+  if(editVertices&&selected)return;
   const p=pointerPoint(e);if(!p)return;
-  if(pending.length>=3&&screenDistance(pending[0],e)<16){close();return;}
+  if(pending.length>=3&&screenDistance(pending[0],e)<16){close();return}
   if(pending.length>=2&&Math.hypot(p.x-pending.at(-1).x,p.z-pending.at(-1).z)<.3)return;
   pending.push(p);hover=null;refreshAll();
  }
+ function down(e){
+  if(!isActive()||isBlocked()||e.button!==0||e.ctrlKey||e.altKey)return;
+  if(editVertices&&selected){
+   const z=items().find(z=>z.id===selected);
+   const index=z?.points.findIndex(p=>screenDistance(p,e)<15)??-1;
+   if(index>=0){
+    // Only direct vertex editing takes exclusive control of the pointer.
+    e.preventDefault();e.stopImmediatePropagation();
+    snapshot();dragging={id:selected,index,pointer:e.pointerId,original:z.points.map(norm)};
+    try{view.setPointerCapture(e.pointerId)}catch(_){}
+    return;
+   }
+  }
+  // OrbitControls receives the same pointerdown. A short stationary click
+  // places a point on release; a drag rotates the camera without painting.
+  clickCandidate={pointer:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
+ }
  function move(e){
   if(!isActive()||isBlocked())return;
-  e.stopImmediatePropagation();
-  if(cliffTool.move(e))return;
-  const p=pointerPoint(e);
   if(dragging&&dragging.pointer===e.pointerId){
+   e.preventDefault();e.stopImmediatePropagation();
+   const p=pointerPoint(e);
    if(!p)return;
    const zone=items().find(z=>z.id===dragging.id);
-   if(zone){zone.points[dragging.index]=p;refresh();}
+   if(zone){zone.points[dragging.index]=p;refresh()}
    return;
   }
-  hover=p;refresh();
+  if(clickCandidate&&clickCandidate.pointer===e.pointerId&&
+   Math.hypot(e.clientX-clickCandidate.x,e.clientY-clickCandidate.y)>5)
+   clickCandidate.moved=true;
+  // The camera's rotate/pan/zoom listeners must receive all ordinary moves.
+  hover=pointerPoint(e);refresh();
+  if(cliffTool.isDrawing())cliffTool.move(e);
  }
  function up(e){
-  if(!dragging||dragging.pointer!==e.pointerId)return;
-  e.stopImmediatePropagation();
-  const zone=items().find(z=>z.id===dragging.id);
-  if(zone&&!valid(zone.points)){zone.points=dragging.original;toast('Movimiento inválido: se restauran los vértices anteriores');}
-  commit();dragging=null;refreshAll();
+  if(dragging&&dragging.pointer===e.pointerId){
+   e.stopImmediatePropagation();
+   const zone=items().find(z=>z.id===dragging.id);
+   if(zone&&!valid(zone.points)){zone.points=dragging.original;toast('Movimiento inválido: se restauran los vértices anteriores')}
+   commit();dragging=null;refreshAll();
+   try{if(view.hasPointerCapture(e.pointerId))view.releasePointerCapture(e.pointerId)}catch(_){}
+   return;
+  }
+  if(!clickCandidate||clickCandidate.pointer!==e.pointerId)return;
+  const candidate=clickCandidate;clickCandidate=null;
+  if(!isActive()||isBlocked()||candidate.moved||Math.hypot(e.clientX-candidate.x,e.clientY-candidate.y)>5)return;
+  placePoint(e);
+ }
+ function cancelPointer(e){
+  if(clickCandidate?.pointer===e.pointerId)clickCandidate=null;
+  if(dragging?.pointer===e.pointerId){
+   const zone=items().find(z=>z.id===dragging.id);
+   if(zone)zone.points=dragging.original;
+   dragging=null;refreshAll();
+  }
  }
  view.addEventListener('pointerdown',down,true);
  view.addEventListener('pointermove',move,true);
  window.addEventListener('pointerup',up,true);
+ window.addEventListener('pointercancel',cancelPointer,true);
  $('zoneClose').onclick=close;
  $('zoneUndoPoint').onclick=()=>{pending.pop();hover=null;refreshAll()};
  $('zoneCancel').onclick=cancel;
@@ -171,5 +201,5 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
  $('zoneBiome').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;snapshot();zone.biomeId=e.target.value||null;if(!zone.biomeId)zone.biomeLocked=false;commit();refreshAll();};
  $('zoneBiomeLocked').onchange=e=>{const zone=items().find(z=>z.id===selected);if(!zone)return;if(e.target.checked&&!zone.biomeId){e.target.checked=false;toast('Asigna un bioma antes de bloquear la zona');return;}snapshot();zone.biomeLocked=e.target.checked;commit();refreshAll();};
  refreshAll();
- return {refresh,refreshAll,cancel,undoPoint:()=>{if(cliffTool.isDrawing())cliffTool.undo();else{pending.pop();hover=null;refreshAll()}},hasPending:()=>pending.length>0||cliffTool.isDrawing(),onModeChange:()=>{pending=[];hover=null;dragging=null;editVertices=false;cliffTool.cancel();refreshAll();}};
+ return {refresh,refreshAll,cancel,undoPoint:()=>{if(cliffTool.isDrawing())cliffTool.undo();else{pending.pop();hover=null;refreshAll()}},hasPending:()=>pending.length>0||cliffTool.isDrawing(),onModeChange:()=>{pending=[];hover=null;dragging=null;clickCandidate=null;editVertices=false;cliffTool.cancel();refreshAll();}};
 }
