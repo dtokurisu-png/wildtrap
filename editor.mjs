@@ -137,9 +137,26 @@ function commitObjectRename(id,label){
  if(!node||!name||node.name===name)return;
  snapshot();node.name=name;draw();persist();
 }
+// A UI layout error must not prevent loading the user's saved world.
+function ensureSceneManagerPanel(name){
+ const existing=document.querySelector('[data-tab-view="'+name+'"]');
+ if(existing?.firstElementChild)return existing.firstElementChild;
+ // The normal dock builds these panels in editor-workspace.js. If its
+ // initialization failed, provide standalone recovery panels without touching data.
+ let container=document.getElementById('scenePanelFallback-'+name);
+ if(!container){
+  container=document.createElement('section');
+  container.id='scenePanelFallback-'+name;
+  container.className='workspace-section';
+  container.style.cssText='padding:10px;margin:8px;border:1px solid #477e67';
+  const host=document.getElementById('side')||document.body;
+  host.append(container);
+ }
+ return container;
+}
 sceneObjectManager=createSceneObjectManager({
- root:document.querySelector('[data-tab-view="objects"]')?.firstElementChild,
- hierarchyRoot:document.querySelector('[data-tab-view="scene"]')?.firstElementChild,
+ root:ensureSceneManagerPanel('objects'),
+ hierarchyRoot:ensureSceneManagerPanel('scene'),
  getNodes:()=>live.nodes,getGroups:()=>live.objectGroups||[],
  getSelection:()=>[...selectedIds],lookup:prefabById,
  select:ids=>{if(mode==='holePaint')setMode('move');setNodeSelection(ids)},
