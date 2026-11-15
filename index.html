@@ -198,15 +198,15 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <label style="display:flex;align-items:center;gap:7px"><input id="zoneBiomeLocked" type="checkbox"> Mantener este bioma fijo en nuevas generaciones</label>
 
 <p class="hint" id="zonePointCount"></p>
-<div class="grid2"><button id="zoneEditVertices">Editar vértices</button><button id="zoneDelete">Eliminar zona</button></div>
+<button id="zoneDelete" type="button" style="width:100%">Eliminar zona</button>
 <div style="border-top:1px solid #426b5b;margin-top:12px;padding-top:9px">
 <h2>Acantilados de esta zona</h2>
-<p class="hint">Define una o varias superficies inclinadas o verticales sobre la malla 3D. No modifica el terreno.</p>
-<label>Pendiente mínima <output id="zoneCliffSlopeValue">40°</output>
+<p class="hint">Define superficies empinadas o paredes dentro de la zona. No modifica el terreno ni la forma de la zona.</p>
+<label title="Inclinación mínima en grados para considerar una cara del terreno como acantilado. 0° es horizontal; 90° es vertical.">Pendiente mínima <output id="zoneCliffSlopeValue">40°</output>
 <input id="zoneCliffSlope" type="range" min="5" max="85" step="5" value="40" oninput="document.getElementById('zoneCliffSlopeValue').textContent=this.value+'°'"></label>
 <button id="zoneCliffAdd" type="button" style="width:100%">+ Acantilado</button>
 <div class="grid2" style="margin-top:6px">
-<button id="zoneCliffUndo" type="button" disabled>↶ Último punto</button>
+<button id="zoneEditVertices" type="button" title="Mover los puntos de la zona seleccionada">Editar zona</button>
 <button id="zoneCliffClose" type="button" disabled>◇ Cerrar acantilado</button>
 </div>
 <button id="zoneCliffCancel" type="button" style="width:100%;margin-top:5px">Cancelar contorno</button>
