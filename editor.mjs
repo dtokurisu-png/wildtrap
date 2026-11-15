@@ -477,6 +477,7 @@ function updateStatus(){
  $('sculptSelectVertices').disabled=false;
  $('sculptSelectVertices').textContent=mode==='meshEdit'?'✓ Terminar selección de vértices':'✣ Seleccionar vértices';
  $('sculptSelectVertices').classList.toggle('active',mode==='meshEdit');
+ $('sculptSelectVertices').setAttribute('aria-pressed',String(mode==='meshEdit'));
  if(editable){
   const locks=picked.rotationLocks||{};
   // The saved XYZ lock buttons apply to movement AND rotation.
