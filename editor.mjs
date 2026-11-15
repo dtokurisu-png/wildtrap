@@ -474,7 +474,7 @@ function updateStatus(){
    $('sculptShow'+layer).checked=layers[layer.toLowerCase()];
   }
  }
- $('sculptSelectVertices').disabled=!editable;
+ $('sculptSelectVertices').disabled=false;
  $('sculptSelectVertices').textContent=mode==='meshEdit'?'✓ Terminar selección de vértices':'✣ Seleccionar vértices';
  $('sculptSelectVertices').classList.toggle('active',mode==='meshEdit');
  if(editable){
@@ -528,9 +528,9 @@ document.querySelectorAll('[data-sculpt-vertex-axis]').forEach(button=>{
  });
 });
 $('sculptSelectVertices').addEventListener('click',()=>{
- const node=live.nodes.find(n=>n.id===selectedId&&n.kind==='prefab');
- if(!node){toast('Selecciona primero una cueva o un modelo');return}
- $('modelVertexEditToggle').click();
+ // Directly activate the tool. Do not proxy a click to a control in another dock.
+ // Selecting a model in the viewport is also supported after enabling it.
+ setMode(mode==='meshEdit'?'move':'meshEdit');
 });
 for(const layer of ['Faces','Edges','Vertices','Xray']){
  $('sculptShow'+layer).addEventListener('change',()=>{
@@ -578,7 +578,14 @@ function setMode(v){
   updateSelectionHighlights();
  }
  mode=v;pending=null;
- cursor.visible=v!=='holePaint'&&v!=='zones'&&v!=='textures'&&v!=='meshEdit'&&!placementGhost;
+ if(v==='meshEdit'){
+  // Never let a previous brush stroke or its influence ring remain active.
+  pointerDown=false;changed=false;cursor.visible=false;
+  if(modelSculptSession){modelSculptSession=null}
+  view.style.cursor='crosshair';
+ }else{
+  cursor.visible=v!=='holePaint'&&v!=='zones'&&v!=='textures'&&!placementGhost;
+ }
  updateMeshInspection();
  if(v!=='holePaint')holesEditor?.hoverAt(null);
  zoneTool?.refreshAll();
@@ -1185,7 +1192,22 @@ function marqueeHits(x,y){
 // Vertex picking owns the left button while Ver malla is active.
 view.addEventListener('pointerdown',e=>{
  if(preview.active||preview.busy||e.button!==0)return;
- if(mode==='meshEdit')vertexEditor?.pointerdown(e);
+ if(mode==='meshEdit'){
+  // If no model is selected, the first click chooses a real model, not terrain.
+  if(!vertexEditor?.getState().active){
+   const found=pickedNodeAt(e);
+   if(found?.kind==='prefab'){
+    setNodeSelection([found.id]);
+    cursor.visible=false;
+   }else{
+    e.preventDefault();e.stopImmediatePropagation();
+    toast('Haz clic en la cueva y después en un vértice');
+    return;
+   }
+  }
+  if(vertexEditor?.getState().active)vertexEditor.pointerdown(e);
+  else{e.preventDefault();e.stopImmediatePropagation()}
+ }
  else if(terrainPropertiesSelected&&live.settings?.terrainMeshVisible&&mode!=='holePaint'){
   if(terrainInspector?.inspect(e)){e.preventDefault();e.stopImmediatePropagation()}
  }
