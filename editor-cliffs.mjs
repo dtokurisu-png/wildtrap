@@ -118,14 +118,14 @@ export function createCliffRegions({scene,terrainGeo,view,camera,live,heightAt,s
   if(cliff){$('zoneCliffName').value=cliff.name;$('zoneCliffFaces').textContent=(cliff.faces?.length||0)+' triángulos de terreno';}
   $('zoneCliffAdd').disabled=!zone||zone.hidden;
   $('zoneCliffClose').disabled=!drawing||points.length<3;
-  $('zoneCliffUndo').disabled=!points.length;
   $('zoneCliffAdd').classList.toggle('active',drawing);
   $('zoneCliffAdd').textContent=drawing?'✓ Marcando acantilado…':'+ Acantilado';
   $('zoneCliffHint').textContent=drawing?
-   points.length+' puntos · dibuja sobre la pared y cierra sobre el primero':'Selecciona una zona y pulsa + Acantilado para marcar sus caras.';
+   points.length+' puntos · haz clic para marcar sobre la pared. Cierra el contorno o pulsa de nuevo «Marcando acantilado» para salir':'Selecciona una zona y pulsa + Acantilado para marcar sus caras.';
  }
  function refresh(){refreshPanel();render();}
  function start(){
+  if(drawing){cancel();return;}
   if(!getZone()||getZone().hidden)return;
   drawing=true;points=[];hover=null;selectedId=null;refresh();
  }
@@ -159,7 +159,6 @@ export function createCliffRegions({scene,terrainGeo,view,camera,live,heightAt,s
  }
  $('zoneCliffAdd').onclick=start;
  $('zoneCliffClose').onclick=close;
- $('zoneCliffUndo').onclick=()=>{points.pop();hover=null;refresh();};
  $('zoneCliffCancel').onclick=cancel;
  $('zoneCliffName').onchange=e=>{const cliff=getZone()?.cliffs?.find(c=>c.id===selectedId);if(!cliff)return;snapshot();cliff.name=e.target.value.trim()||cliff.name;persist();refresh();};
  $('zoneCliffDelete').onclick=()=>{
