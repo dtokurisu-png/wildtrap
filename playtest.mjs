@@ -140,7 +140,8 @@ const hiddenDebugMarkers=[];
     }
     if(!Number.isFinite(h)||h<1e-5)
       throw Error('No se puede calcular el tamaño del Explorador: '+meshes+' mallas, '+vertices+' vértices');
-    visual.scale.setScalar(clamp(1.8/h,.00001,10000));
+    // World playtest avatar is half the former 1.8-unit height.
+    visual.scale.setScalar(clamp(.9/h,.00001,10000));
     visual.updateMatrixWorld(true);
     actual=new THREE.Box3().setFromObject(visual);
     if(!actual.isEmpty()&&Number.isFinite(actual.min.y)){
@@ -277,7 +278,8 @@ const hiddenDebugMarkers=[];
   // W goes where the camera faces; A/D strafe left/right relative to its yaw.
   // The camera never moves the player without keyboard input.
   const move=movementAxes(keys,yaw),moving=move.moving;
-  const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?6.0:3.8;
+  // Half of the original world traversal speeds (3.8 / 6.0).
+  const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?3.0:1.9;
   let moved=false;
   if(moving){
     const nx=clamp(player.position.x+move.x*speed*dt,-live.size/2+3,live.size/2-3);
@@ -285,7 +287,7 @@ const hiddenDebugMarkers=[];
     const dx=nx-player.position.x,dz=nz-player.position.z;
     // Use real post-cut triangles. A polygon opening is genuinely passable.
     // Probe the width and height of the Explorer, not a solid heightmap cell.
-    if(!collider.blocked(player.position.x,player.position.y,player.position.z,dx,dz)){
+    if(!collider.blocked(player.position.x,player.position.y,player.position.z,dx,dz,{radius:.21,height:.875})){
       const futureGround=collider.floorAt(nx,nz,player.position.y);
       // Don't climb an abrupt vertical ledge. Descending into a cave is allowed.
       if(!futureGround||futureGround.y-player.position.y<=.70){
@@ -307,7 +309,8 @@ const hiddenDebugMarkers=[];
     if(floor&&nextY<=floor.y){player.position.y=floor.y;verticalSpeed=0;}
     else player.position.y=nextY;
   }
-  setMovingAnimation(keys.has('KeyW')||keys.has('ArrowUp'));
+  // Same in-place running clip for W/A/S/D and diagonals, only while moving.
+  setMovingAnimation(moved);
   if(mixer)mixer.update(dt);
   // Classic Farolera-style chase: camera BEHIND and ABOVE the player,
   // looking slightly ahead. Mouse orbit changes only direction/aim.
