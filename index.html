@@ -11,7 +11,7 @@ small,.hint{font-size:11px;color:#abc6ba;line-height:1.45}
 section{padding:10px 0;border-bottom:1px solid #385548}
 button,.fileBtn{padding:8px 9px;background:#254739;color:#eafff6;border:1px solid #497967;border-radius:7px;cursor:pointer;text-align:center;font-size:12px}
 button:hover,.fileBtn:hover{background:#326f57}.active{background:#007f69;border-color:#96ffe0;font-weight:700}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.flatten-combo{display:flex;min-width:0;height:100%;gap:1px;border-radius:7px}.flatten-combo #flattenMain{flex:1;min-width:0;border-radius:7px 0 0 7px;padding:8px 2px}.flatten-directions{width:25%;min-width:25px;display:flex;flex-direction:column;gap:1px}.flatten-directions button{flex:1;min-height:16px;padding:0 2px;font-weight:800;font-size:12px;line-height:1;border-radius:0 5px 5px 0}.flatten-directions button[aria-pressed="true"]{background:#007f69;border-color:#96ffe0;color:#fff}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
 label{display:block;font-size:12px;margin:8px 0 5px}
 input[type=number],input[type=range]{width:100%}input[type=number]{border-radius:6px;padding:6px;color:#fff;background:#1e4034;border:1px solid #598071}
 input[type=checkbox]{accent-color:#00bfa8}.fileBtn input{display:none}
@@ -117,7 +117,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 
  </div>
 <div class="grid">
-<button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><button data-tool="flatten">Aplanar</button><button data-tool="smooth">Suavizar</button><button data-tool="relax">Distribuir</button><button data-tool="trim">Recortar</button><button type="button" id="sculptSelectVertices">Seleccionar vértices</button><button data-tool="move">Mover</button>
+<button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><div class="flatten-combo" role="group" aria-label="Aplanar por altura"><button data-tool="flatten" id="flattenMain" type="button">Aplanar</button><div class="flatten-directions"><button type="button" id="flattenMax" aria-label="Aplanar hacia el vértice más alto" title="Igualar a la altura máxima" aria-pressed="true">↑</button><button type="button" id="flattenMin" aria-label="Aplanar hacia el vértice más bajo" title="Igualar a la altura mínima" aria-pressed="false">↓</button></div></div><button data-tool="smooth">Suavizar</button><button data-tool="relax">Distribuir</button><button data-tool="trim">Recortar</button><button type="button" id="sculptSelectVertices">Seleccionar vértices</button><button data-tool="move">Mover</button>
 </div>
 <label>Radio del pincel <output id="brushRadiusValue">12</output><input id="brushRadius" type="range" min="1" max="65" step=".5" value="12"></label>
 <label>Intensidad <output id="brushStrengthValue">12</output><input id="strength" type="range" min="1" max="30" value="12"></label>
