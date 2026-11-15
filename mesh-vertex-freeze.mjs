@@ -80,6 +80,11 @@ export function sculptRootPoints(points,stamps,locked=[],meshKey='0',topology=nu
      // Avoid the near-zero old stroke factor that made Smooth imperceptible.
      for(const j of neighbors)for(let k=0;k<3;k++)move[k]+=before[j][k]-p[k];
      for(let k=0;k<3;k++)move[k]/=neighbors.length;
+     // Smooth height/shape along the brush surface normal only.
+     // Tangential Laplacian averaging would collapse densely packed edges;
+     // Distribute handles edge spacing independently.
+     const depth=move[0]*n[0]+move[1]*n[1]+move[2]*n[2];
+     for(let k=0;k<3;k++)move[k]=n[k]*depth;
     }else{
      // Estimate the characteristic edge length from the local two-ring,
      // rather than from compressed incident edges alone.
