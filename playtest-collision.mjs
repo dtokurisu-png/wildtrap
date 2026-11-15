@@ -14,6 +14,8 @@ export function createPlaytestCollider({THREE,terrain,roots=[]}){
   const visit=obj=>{
    if(!obj.visible||obj.userData?.editorOnly||obj.userData?.editorIntangible)return;
    if(obj.isMesh&&obj.geometry?.attributes?.position&&!unique.has(obj)){
+    // Ignore decorative / non-solid helpers even when parent geometry is visible.
+    if(obj.userData?.editorIntangible||obj.userData?.noCollision)return;
     unique.add(obj);meshList.push(obj);
     // Raycast cave interiors from either side. Restore on stop.
     const materials=Array.isArray(obj.material)?obj.material:[obj.material];
@@ -41,8 +43,8 @@ export function createPlaytestCollider({THREE,terrain,roots=[]}){
   normalMatrix.getNormalMatrix(hit.object.matrixWorld);
   return normal.copy(hit.face.normal).applyMatrix3(normalMatrix).normalize();
  }
- // Ground must be below the character's feet (up to a small step upward);
- // a cave roof over the avatar must never snap the player onto its top.
+ // Ground queries use the actual post-cut render meshes only.
+ // A cave roof over the avatar must never snap the player onto its top.
  function floorAt(x,z,feetY,{stepUp=.65,searchDepth=18}={}){
   const above=feetY+stepUp;
   const intersections=hits(x,above,z,down,stepUp+searchDepth);
