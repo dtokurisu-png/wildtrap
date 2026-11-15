@@ -10,7 +10,7 @@ import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overla
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.58';
-import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.55';
+import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.58';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
