@@ -25,13 +25,13 @@ export function normalAnchorRootPoint(anchor,currentScale){
 }
 export function cleanSculptStamps(stamps){
  if(!Array.isArray(stamps))return [];
- return stamps.slice(0,240).filter(s=>s&&['raise','lower','flatten','smooth'].includes(s.mode)&&
+ return stamps.slice(0,240).filter(s=>s&&['raise','lower','flatten','smooth','trim'].includes(s.mode)&&
   validVec(s.center)&&validVec(s.normal)&&Number.isFinite(s.radius)&&s.radius>.02&&s.radius<=500&&
   Number.isFinite(s.strength)&&s.strength>.00001&&s.strength<=100
  ).map(s=>({mode:s.mode,center:s.center.slice(),normal:s.normal.slice(),
   radius:s.radius,strength:s.strength,locked:normalizedLocks(s.locked)}));
 }
-export function sculptRootPoints(points,stamps,locked=[],meshKey='0'){
+export function sculptRootPoints(points,stamps,locked=[],meshKey='0',topology=null){
  const safe=cleanSculptStamps(stamps);
  const result=points.map(p=>p.slice());
  for(const stamp of safe){
@@ -50,38 +50,40 @@ export function sculptRootPoints(points,stamps,locked=[],meshKey='0'){
    if(stamp.mode==='raise'||stamp.mode==='lower'){
     const d=(stamp.mode==='raise'?1:-1)*stamp.strength*.11*falloff;
     p[0]+=normal[0]*d;p[1]+=normal[1]*d;p[2]+=normal[2]*d;
-   }else if(stamp.mode==='flatten'){
+   }else if(stamp.mode==='flatten'||stamp.mode==='trim'){
     const delta=(p[0]-cx)*normal[0]+(p[1]-cy)*normal[1]+(p[2]-cz)*normal[2];
-    p[0]-=normal[0]*delta*factor;p[1]-=normal[1]*delta*factor;p[2]-=normal[2]*delta*factor;
+    if(stamp.mode==='flatten'||delta>0){
+     p[0]-=normal[0]*delta*factor;p[1]-=normal[1]*delta*factor;p[2]-=normal[2]*delta*factor;
+    }
    }else affected.push({i,falloff});
   }
   if(before&&affected.length){
-   // Spatial hash: smoothing a dense GLB must not compare every active
-   // vertex against EVERY other vertex (quadratic lockups).
-   const near=stamp.radius*.35,nearSq=near*near,inv=1/Math.max(.00001,near);
-   const key=(x,y,z)=>x+','+y+','+z;
-   const cells=new Map(),grid=[];
-   for(let j=0;j<before.length;j++){
-    const p=before[j],x=Math.floor(p[0]*inv),y=Math.floor(p[1]*inv),z=Math.floor(p[2]*inv);
-    grid[j]=[x,y,z];
-    const token=key(x,y,z),cell=cells.get(token)||[];
-    cell.push(j);cells.set(token,cell);
-   }
-   for(const {i,falloff} of affected){
-    const p=before[i],neighbors=[0,0,0];let count=0;
-    const [x,y,z]=grid[i];
-    for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)for(let c=-1;c<=1;c++){
-     for(const j of cells.get(key(x+a,y+b,z+c))||[]){
-      const other=before[j];
-      const d2=(p[0]-other[0])**2+(p[1]-other[1])**2+(p[2]-other[2])**2;
-      if(d2>nearSq)continue;
-      neighbors[0]+=other[0];neighbors[1]+=other[1];neighbors[2]+=other[2];count++;
+   // Connectivity-aware Laplacian: only vertices sharing real triangle edges
+   // influence one another. Spatially nearby opposite cave walls never mix.
+   // Keep the normal component of the neighbor correction to prevent
+   // tangential contraction and collapsing a narrow tunnel.
+   if(Array.isArray(topology)&&topology.length===before.length){
+    for(const {i,falloff} of affected){
+     const linked=topology[i];if(!linked?.length)continue;
+     const p=before[i],avg=[0,0,0];
+     let count=0;
+     for(const j of linked){
+      if(j===i||!before[j])continue;
+      const q=before[j];
+      for(let k=0;k<3;k++)avg[k]+=q[k];
+      count++;
      }
+     if(count<2)continue;
+     const correction=avg.map((v,k)=>v/count-p[k]);
+     // Limit individual changes relative to radius; never snap to a centroid.
+     const maxStep=Math.max(.001,stamp.radius*.035);
+     const magnitude=Math.hypot(...correction);
+     const rate=Math.min(.32,stamp.strength*.035*falloff);
+     const fraction=rate*Math.min(1,maxStep/Math.max(1e-8,magnitude));
+     for(let k=0;k<3;k++)result[i][k]+=correction[k]*fraction;
     }
-    if(count<2)continue;
-    const t=Math.min(.65,stamp.strength*.04*falloff);
-    for(let k=0;k<3;k++)result[i][k]+=(neighbors[k]/count-p[k])*t;
    }
+
   }
  }
  return result;
