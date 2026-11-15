@@ -152,10 +152,17 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <section id="texturePanel">
 <h2>▧ Texturizado · Materiales por bioma</h2>
 
-<p class="hint">Biblioteca de texturas del repositorio. Filtra por bioma y asigna etiquetas a cada textura; «Usar» la aplica a una ranura del escenario.</p>
+<p class="hint">Biblioteca de texturas del repositorio. Filtra por bioma y ajusta el tamaño de cada textura con «Editar». La vista muestra una sola repetición junto al explorador.</p>
 <label>Bioma<select id="textureBiome" style="width:100%;padding:7px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px"></select></label>
 <label style="display:flex;align-items:center;gap:8px"><input id="textureShow" type="checkbox" checked> Mostrar texturas en el escenario</label>
 <p id="textureRenderStatus" class="hint">Preparando materiales del terreno…</p>
+<dialog id="textureScaleDialog" style="border:1px solid #5f927e;border-radius:12px;background:#122b24;color:#eafff2;width:min(94vw,960px);max-width:960px;padding:15px">
+ <h2 id="textureScaleTitle" style="margin:0 0 7px">Editar aspecto de textura</h2>
+ <p class="hint">Una repetición real de la textura con Explorador 1 WT como referencia. Shift + arrastrar verticalmente escala solamente la textura. Arrastra sin Shift para girar la vista; rueda para acercar o alejar.</p>
+ <canvas id="textureScaleCanvas" style="display:block;width:100%;height:min(54vh,480px);background:#243a32;border-radius:9px;touch-action:none;cursor:grab"></canvas>
+ <div class="grid2" style="margin-top:8px"><label>Repeticiones en el mapa (630 unidades)<input id="textureScaleNumber" type="number" min=".25" max="100" step=".25" value="8" style="display:block;width:100%;color:white;background:#193b30;border:1px solid #568674;padding:7px"></label><div><strong id="textureScaleWorld">78.75 unidades por repetición</strong><p class="hint" id="textureScalePreviewStatus">Cargando vista 3D…</p></div></div>
+ <div class="grid2" style="margin-top:10px"><button id="textureScaleCancel" type="button">Cancelar</button><button id="textureScaleApply" type="button">Guardar escala</button></div>
+ </dialog>
 <h2>Texturas del repositorio</h2><p id="textureCatalogCount" class="hint"></p><div id="textureCatalog"></div><h2 id="textureActiveSlotsTitle">Ranuras activas del bioma</h2><div id="textureSlots"></div>
 <h2>Propiedades procedurales</h2>
 <label>Escala del ruido <output id="textureNoiseValue">20</output><input id="textureNoise" type="range" min="1" max="200" step="1" value="20"></label>
@@ -345,7 +352,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
-<div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div></div>
+<div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
 <div id="toast"></div>
 <div id="playHud">
