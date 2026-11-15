@@ -29,7 +29,7 @@ export function cleanSculptStamps(stamps){
   validVec(s.center)&&validVec(s.normal)&&Number.isFinite(s.radius)&&s.radius>.02&&s.radius<=500&&
   Number.isFinite(s.strength)&&s.strength>.00001&&s.strength<=100
  ).map(s=>({mode:s.mode,center:s.center.slice(),normal:s.normal.slice(),
-  radius:s.radius,strength:s.strength,locked:normalizedLocks(s.locked)}));
+  radius:s.radius,strength:s.strength,flatDirection:s.flatDirection==='min'?'min':s.flatDirection==='max'?'max':null,locked:normalizedLocks(s.locked)}));
 }
 // Local, topology-only sculpting. Smooth reduces irregular height changes;
 // Distribute equalizes connected edge spacing (no new vertices or remeshing).
@@ -43,6 +43,16 @@ export function sculptRootPoints(points,stamps,locked=[],meshKey='0',topology=nu
   const strength=Math.min(30,stamp.strength);
   const r=stamp.radius;
   if(stamp.mode==='raise'||stamp.mode==='lower'||stamp.mode==='flatten'||stamp.mode==='trim'){
+   // New directional Flatten uses the actual highest/lowest Y within the brush.
+   // Old saved stamps have no flatDirection and keep their original plane behavior.
+   let referenceHeight=null;
+   if(stamp.mode==='flatten'&&stamp.flatDirection){
+    for(const p of result){
+     if(Math.hypot(p[0]-center[0],p[1]-center[1],p[2]-center[2])>=r)continue;
+     if(referenceHeight===null)referenceHeight=p[1];
+     else referenceHeight=stamp.flatDirection==='max'?Math.max(referenceHeight,p[1]):Math.min(referenceHeight,p[1]);
+    }
+   }
    for(let i=0;i<result.length;i++){
     if(locks.has(i))continue;
     const p=result[i],d=Math.hypot(p[0]-center[0],p[1]-center[1],p[2]-center[2]);
@@ -51,6 +61,9 @@ export function sculptRootPoints(points,stamps,locked=[],meshKey='0',topology=nu
     if(stamp.mode==='raise'||stamp.mode==='lower'){
      const value=(stamp.mode==='raise'?1:-1)*strength*.11*fade;
      for(let k=0;k<3;k++)p[k]+=n[k]*value;
+    }else if(stamp.mode==='flatten'&&referenceHeight!==null){
+     const factor=Math.min(.95,strength*.075*fade);
+     p[1]+=(referenceHeight-p[1])*factor;
     }else{
      const delta=(p[0]-center[0])*n[0]+(p[1]-center[1])*n[1]+(p[2]-center[2])*n[2];
      if(stamp.mode==='trim'&&delta<=0)continue;
