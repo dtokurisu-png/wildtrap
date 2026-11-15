@@ -50,6 +50,55 @@ void main(){
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`;
+// A separate transparent pass. It cannot affect the base shader or its
+// visibility even if detail artwork fails to load. One sampler per pass keeps
+// the material compatible with WebGL 1 as well as WebGL 2.
+const DETAIL_FRAGMENT=`
+uniform sampler2D detailTexture;
+uniform sampler2D regionMask;
+uniform float repeats;
+uniform float variationSeed;
+uniform float slotNumber;
+uniform float intensity;
+varying vec2 vTerrainXZ;
+float rand2(vec2 p){
+ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
+}
+void main(){
+ vec2 maskUV=vec2(vTerrainXZ.x/630.0+.5,.5-vTerrainXZ.y/630.0);
+ float inside=texture2D(regionMask,maskUV).a;
+ if(inside<.01)discard;
+ // 200 repeats -> 50 potential appearances over the whole 630 x 630 map.
+ // The approximate count is per complementary image, NOT 200 x 200 tiles.
+ float target=clamp(floor(repeats*.25+.5),1.0,250.0);
+ float columns=ceil(sqrt(target));
+ float probability=target/(columns*columns);
+ vec2 unit=(vTerrainXZ+315.0)/630.0*columns;
+ vec2 cell=floor(unit);
+ if(cell.x<0.0||cell.y<0.0||cell.x>=columns||cell.y>=columns)discard;
+ vec2 id=cell+vec2(variationSeed*.117+slotNumber*17.3,variationSeed*.071+slotNumber*31.9);
+ if(rand2(id+43.0)>probability)discard;
+ // Only one independently positioned and rotated patch per chosen cell.
+ float cellSize=630.0/columns;
+ float extent=min(630.0/max(repeats,.25),cellSize*.72);
+ vec2 jitter=vec2(rand2(id+12.0),rand2(id+25.0));
+ vec2 center=-315.0+(cell+.22+.56*jitter)*cellSize;
+ vec2 local=(vTerrainXZ-center)/extent;
+ float angle=6.28318530718*rand2(id+65.0);
+ float c=cos(angle), sn=sin(angle);
+ vec2 rotated=vec2(c*local.x-sn*local.y,sn*local.x+c*local.y);
+ float edge=max(abs(rotated.x),abs(rotated.y));
+ // The interior keeps color, but the outer 46% softly fades to alpha=0.
+ float feather=1.0-smoothstep(.27,.5,edge);
+ if(feather<.002)discard;
+ vec4 sampleColor=texture2D(detailTexture,rotated+.5);
+ float patchOpacity=.5+.3*rand2(id+94.0);
+ float alpha=inside*sampleColor.a*feather*patchOpacity*intensity;
+ if(alpha<.002)discard;
+ gl_FragColor=vec4(sampleColor.rgb,alpha);
+ #include <tonemapping_fragment>
+ #include <colorspace_fragment>
+}`;
 function fullResolutionSource(image){
  if(Math.max(image.width||0,image.height||0)<=4096)return image;
  // Cap extremely large PNGs to keep GPU texture allocations reasonable.
@@ -65,9 +114,10 @@ function fullResolutionSource(image){
 export function createTerrainGPULayers({scene,terrain}){
  let records=[];
  function clear(){
+  const releasedMasks=new Set();
   for(const entry of records){
    scene.remove(entry.mesh);
-   entry.mask.dispose();
+   if(!releasedMasks.has(entry.mask)){entry.mask.dispose();releasedMasks.add(entry.mask)}
    entry.texture.dispose();
    entry.material.dispose();
   }
@@ -115,6 +165,45 @@ export function createTerrainGPULayers({scene,terrain}){
    // Not editorOnly: the same material MUST appear while playing.
    scene.add(mesh);
    records.push({mesh,mask,texture,material:shader});
+   // Add three separate, optional complementary layers on top of the base.
+   // Their shaders use the SAME zone mask and terrain geometry, but never
+   // modify the base material. ?noDetails=1 is an instant safe fallback.
+   const detailsEnabled=!new URLSearchParams(window.location.search).has('noDetails');
+   if(!detailsEnabled)continue;
+   for(let i=1;i<=3;i++){
+    const detailSlot=materials[biome].slots['detail'+i];
+    const detailImage=loaded.get(detailSlot?.image);
+    if(!detailImage)continue;
+    const opacity=limit(Number(detailSlot?.opacity??.5)*2,0,1);
+    if(opacity<=0)continue;
+    const detailTexture=new THREE.Texture(fullResolutionSource(detailImage));
+    detailTexture.wrapS=detailTexture.wrapT=THREE.ClampToEdgeWrapping;
+    detailTexture.colorSpace=THREE.SRGBColorSpace;
+    detailTexture.minFilter=THREE.LinearMipmapLinearFilter;
+    detailTexture.magFilter=THREE.LinearFilter;
+    detailTexture.generateMipmaps=true;
+    detailTexture.anisotropy=8;
+    detailTexture.needsUpdate=true;
+    const detailMaterial=new THREE.ShaderMaterial({
+     uniforms:{
+      regionMask:{value:mask},
+      detailTexture:{value:detailTexture},
+      repeats:{value:limit(Number(detailSlot.scale)||8,.25,1000)},
+      variationSeed:{value:Number(materials[biome].noise?.seed)||1},
+      slotNumber:{value:i},
+      intensity:{value:opacity}
+     },
+     vertexShader:VERTEX,fragmentShader:DETAIL_FRAGMENT,
+     side:THREE.DoubleSide,transparent:true,depthWrite:false,depthTest:true,
+     polygonOffset:true,polygonOffsetFactor:-3-i,polygonOffsetUnits:-3-i
+    });
+    const detailMesh=new THREE.Mesh(terrain.geometry,detailMaterial);
+    detailMesh.name='BiomeComplement '+biome+' '+i;
+    detailMesh.renderOrder=3+i*.01;
+    detailMesh.frustumCulled=false;
+    scene.add(detailMesh);
+    records.push({mesh:detailMesh,mask,texture:detailTexture,material:detailMaterial});
+   }
   }
  }
  function sync(visible=true){
