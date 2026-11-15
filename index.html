@@ -184,8 +184,9 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 <section id="zonesPanel">
 <h2>◇ Creador de zonas · Terreno</h2>
-<p class="hint">Delimita regiones lógicas sin cortar la malla. Activa la herramienta y marca los vértices con clics. Cierra el contorno pulsando el primer punto o usando «Cerrar zona».</p>
+<p class="hint">Clic izquierdo: marcar puntos. Mantener clic izquierdo y arrastrar: rotar cámara. Rueda presionada: desplazar cámara. Rueda: acercar o alejar. Cierra el contorno pulsando el primer punto o «Cerrar zona».</p>
 <button data-tool="zones" style="width:100%">◇ Activar Creador de zonas</button>
+<button id="zoneCenterView" type="button" style="width:100%;margin-top:6px">Centrar cámara en el mapa</button>
 <div class="grid2" style="margin-top:6px">
 <button id="zoneUndoPoint" disabled>↶ Último punto</button><button id="zoneClose" disabled>◇ Cerrar zona</button>
 </div>
@@ -398,5 +399,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.62').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.63').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
