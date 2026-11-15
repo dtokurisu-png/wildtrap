@@ -34,7 +34,7 @@ export function normalizeBiomeMaterials(raw){
    // Only user-uploaded images, never externally supplied script/URLs.
    const src=typeof v.image==='string'?v.image:'';
    target.image=REPO_TEXTURES.some(t=>textureUrl(t)===src)?src:
-    /^data:image\\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(src)&&src.length<=MAX_IMAGE*1.4?src:'';
+    /^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(src)&&src.length<=MAX_IMAGE*1.4?src:'';
    target.scale=cl(Number(v.scale)||8,.25,100);
    target.opacity=cl(Number.isFinite(Number(v.opacity))?Number(v.opacity):target.opacity,0,1);
   }
