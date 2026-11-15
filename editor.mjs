@@ -9,10 +9,10 @@ import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17'
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.50';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.56';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.57';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.55';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
-import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.56';
+import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.57';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
@@ -20,6 +20,7 @@ import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altit
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const sculptTools={raise:1,lower:1,flatten:1,smooth:1,trim:1,relax:1};
+let flattenDirection='max';
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
@@ -555,6 +556,14 @@ for(const layer of ['Faces','Edges','Vertices','Xray']){
   draw();persist();
  });
 }
+function setFlattenDirection(direction){
+ flattenDirection=direction==='min'?'min':'max';
+ $('flattenMax').setAttribute('aria-pressed',String(flattenDirection==='max'));
+ $('flattenMin').setAttribute('aria-pressed',String(flattenDirection==='min'));
+ setMode('flatten');
+}
+$('flattenMax').addEventListener('click',()=>setFlattenDirection('max'));
+$('flattenMin').addEventListener('click',()=>setFlattenDirection('min'));
 function setMode(v){
  if(mode==='zones'&&v!=='zones')zoneTool?.onModeChange();
  if(modelSculptSession){
@@ -636,15 +645,26 @@ window.addEventListener('pointerup',finishBrushGesture,true);
 window.addEventListener('pointercancel',finishBrushGesture,true);
 window.addEventListener('blur',()=>finishBrushGesture());
 function brush(x,z){
-const radius=Number($('brushRadius').value),strength=Number($('strength').value),target=Number($('flatHeight').value),cell=SIZE/(N-1);
+const radius=Number($('brushRadius').value),strength=Number($('strength').value),cell=SIZE/(N-1);
 const cx=Math.round((x/SIZE+.5)*(N-1)),cz=Math.round((z/SIZE+.5)*(N-1));const r=Math.ceil(radius/cell);
 let source=(mode==='smooth'||mode==='trim')?live.heights.slice():null;
+let target=null;
+if(mode==='flatten'){
+ // Capture maximum or minimum from the entire circular brush BEFORE any vertex moves.
+ for(let j=Math.max(0,cz-r);j<=Math.min(N-1,cz+r);j++)
+ for(let i=Math.max(0,cx-r);i<=Math.min(N-1,cx+r);i++){
+  const px=(i/(N-1)-.5)*SIZE,pz=(j/(N-1)-.5)*SIZE;
+  if(Math.hypot(px-x,pz-z)>radius)continue;
+  const h=live.heights[index(i,j)];
+  target=target===null?h:flattenDirection==='max'?Math.max(target,h):Math.min(target,h);
+ }
+}
 for(let j=Math.max(0,cz-r);j<=Math.min(N-1,cz+r);j++)for(let i=Math.max(0,cx-r);i<=Math.min(N-1,cx+r);i++){
 const px=(i/(N-1)-.5)*SIZE,pz=(j/(N-1)-.5)*SIZE,d=Math.hypot(px-x,pz-z);
 if(d>radius)continue;const falloff=(1-d/radius)**2,k=index(i,j),old=live.heights[k],delta=strength*.12*falloff;
 if(mode==='raise')live.heights[k]=clamp(old+delta,0,Number($('maxHeight').value));
 if(mode==='lower')live.heights[k]=clamp(old-delta,0,Number($('maxHeight').value));
-if(mode==='flatten')live.heights[k]=clamp(old+(target-old)*clamp(delta*.17,0,1),0,Number($('maxHeight').value));
+if(mode==='flatten'&&target!==null)live.heights[k]=clamp(old+(target-old)*clamp(strength*.075*falloff,0,.95),0,Number($('maxHeight').value));
 if(mode==='smooth'||mode==='trim'){
  let v=0,weight=0;
  for(let yy=Math.max(0,j-1);yy<=Math.min(N-1,j+1);yy++)
@@ -710,6 +730,7 @@ function sculptModelAt(node,hit,{start=false}={}){
  // A stroke snapshot, not the currently locked set at reload time.
  node.meshSculptOps=[...stamps,{
   mode,center:hit.point,normal:hit.normal,radius,strength,
+  ...(mode==='flatten'?{flatDirection:flattenDirection}:{}),
   locked:normalizedLocks(node.vertexLocks)
  }];
  draw();
