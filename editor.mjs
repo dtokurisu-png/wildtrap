@@ -12,7 +12,7 @@ import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.61';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
-import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.98';
+import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.103';
 import {restoreTerrainSeams,seamVertexIds} from './terrain-seams.mjs?v=0.9.94';
 import {straightenCliffZone} from './editor-cliff-alignment.mjs?v=0.9.96';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
@@ -2078,7 +2078,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.102');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.103');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
  }catch(error){
@@ -2115,7 +2115,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.102');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.103');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false});
   window.__terrainTexturePainter=terrainPainter;
