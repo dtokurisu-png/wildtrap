@@ -1,9 +1,12 @@
-name: Validar acantilado Top Body heightmaps
+name: Validar acantilados Body Height + subdivisión
 on:
   push:
     branches: [main]
     paths:
       - 'editor-cliff-top-body.mjs'
+      - 'editor-cliff-body-heightmap.mjs'
+      - 'editor-cliff-mesh.mjs'
+      - 'terrain-mesh-inspector.mjs'
       - 'editor-terrain-texture-renderer.mjs'
       - 'editor-texture-catalog.mjs'
       - 'editor-biome-textures.mjs'
@@ -19,6 +22,9 @@ on:
   pull_request:
     paths:
       - 'editor-cliff-top-body.mjs'
+      - 'editor-cliff-body-heightmap.mjs'
+      - 'editor-cliff-mesh.mjs'
+      - 'terrain-mesh-inspector.mjs'
       - 'editor-terrain-texture-renderer.mjs'
       - 'editor-texture-catalog.mjs'
       - 'editor-biome-textures.mjs'
@@ -40,22 +46,26 @@ jobs:
       - name: Verify syntax
         run: |
           node --check editor-cliff-top-body.mjs
+          node --check editor-cliff-body-heightmap.mjs
+          node --check editor-cliff-mesh.mjs
+          node --check terrain-mesh-inspector.mjs
           node --check editor-terrain-texture-renderer.mjs
           node --check editor-texture-catalog.mjs
           node --check editor.mjs
           node --check playtest-collision.mjs
           node --check playtest.mjs
-      - name: Verify UV, real mesh displacement and protected seams
+      - name: Verify Body UV, minimum 6x subdivision and protected seams
         run: |
           node tests/cliff-top-body-heightmap.test.mjs
           node tests/cliff-horizontal-seams.mjs
+          node tests/cliff-mesh-refinement.mjs
           node tests/cliff-zone-alignment.test.mjs
           node tests/terrain-seams.test.mjs
       - name: Start local server
         run: |
           python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-top-body-http.log 2>&1 &
           sleep 2
-      - name: Verify real PNG rendering in Chromium
+      - name: Verify real Body PNG rendering and subdivision in Chromium
         env:
           WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
         run: node tests/browser-cliff-top-body.mjs
