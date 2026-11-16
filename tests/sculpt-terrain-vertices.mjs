@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const editor=readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
+const terrain=readFileSync(new URL('../terrain-vertex-editor.mjs',import.meta.url),'utf8');
+assert.match(editor,/createTerrainVertexEditor\(\{scene,terrain,terrainGeo,camera,view/,'Main editor initializes terrain vertex selection');
+assert.match(editor,/terrainVertexEditor\?\.pointerdown\(e\)/,'Terrain points receive pointer selection');
+assert.match(editor,/terrainVertexEditor\?\.pointermove\(e\)/,'Terrain vertices receive dragging');
+assert.match(editor,/terrainVertexEditor\?\.pointerup\(e\)/,'Terrain edits finish on pointer release');
+assert.match(editor,/editingTerrain=mode==='meshEdit'&&!testingScene&&!editing/,'Terrain selection is active when no GLB editing target exists');
+assert.match(terrain,/selected\.add\(i\)/,'Rectangle selects terrain vertices');
+assert.match(terrain,/live\.heights\[i\]=h/,'Vertex moves update the persistent heightmap');
+assert.match(terrain,/attr\.setY\(i,h\)/,'Vertex moves update the visible terrain');
+assert.match(terrain,/if\(!g\.snapshotted\)\{snapshot\(\)/,'History snapshot is taken before a deformation');
+assert.match(terrain,/if\(g\.moved\)\{refreshTerrain\(\);persist\(\);\}/,'Vertex changes synchronize the rest of terrain');
+assert.doesNotMatch(terrain,/attr\.setX\(|attr\.setZ\(/,'Fixed-grid terrain XZ positions must stay stable');
+console.log('PASS: Sculpt selects and moves terrain Y vertices while preserving saved grid and undo');
