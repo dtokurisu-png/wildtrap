@@ -104,10 +104,10 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 <section>
 <h2>1. Esculpir · Terreno o modelo seleccionado</h2>
-<p class="hint" id="sculptTargetHint">Sin un modelo seleccionado, editas el terreno. «Seleccionar vértices» permite editar puntos del escenario libremente en X/Y/Z y crear costuras protegidas.</p>
+<p class="hint" id="sculptTargetHint" hidden></p>
 <div id="sculptMeshTools" style="padding:8px;margin:8px 0;border:1px solid #477e67;border-radius:8px">
  <strong>Malla del terreno o modelo · Esculpir</strong>
- <p class="hint">Selecciona un modelo. Las capas se muestran también mientras utilizas los pinceles.</p>
+ 
  <div class="terrain-mesh-toggles">
  <label><input id="sculptShowFaces" type="checkbox" checked> Caras</label>
  <label><input id="sculptShowEdges" type="checkbox" checked> Aristas</label>
@@ -119,17 +119,24 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="grid">
 <button data-tool="raise">Subir</button><button data-tool="lower">Bajar</button><div class="flatten-combo" role="group" aria-label="Aplanar por altura"><button data-tool="flatten" id="flattenMain" type="button">Aplanar</button><div class="flatten-directions"><button type="button" id="flattenMax" aria-label="Aplanar hacia el vértice más alto" title="Igualar a la altura máxima" aria-pressed="true">↑</button><button type="button" id="flattenMin" aria-label="Aplanar hacia el vértice más bajo" title="Igualar a la altura mínima" aria-pressed="false">↓</button></div></div><button data-tool="smooth">Suavizar</button><button data-tool="relax">Distribuir</button><button data-tool="trim">Recortar</button><button type="button" id="sculptSelectVertices">Seleccionar vértices</button><button data-tool="move">Mover</button>
 </div>
-<div id="terrainSeamTools" style="padding:10px;margin:9px 0;border:1px solid #8d7250;border-radius:8px">
- <strong>🔒 Crear costuras · Malla del escenario</strong>
- <p class="hint">Activa «Seleccionar vértices». Haz clic en el inicio y Ctrl + clic en el final: se selecciona toda la ruta por las aristas. Puedes encadenar más puntos.</p>
+<div id="terrainSeamTools" style="padding:8px;margin:8px 0;border:1px solid #8d7250;border-radius:8px">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+  <strong>Crear costuras</strong>
+  <button type="button" id="terrainSeamHelp" title="Información sobre costuras" aria-label="Información sobre crear costuras" style="width:28px;min-width:28px;height:28px;padding:0;border-radius:50%">ⓘ</button>
+ </div>
  <div class="grid2">
-  <button type="button" id="terrainCreateSeam" disabled>🔒 Crear costura</button>
+  <button type="button" id="terrainCreateSeam">🔒 Crear costura</button>
   <button type="button" id="terrainClearVertexSelection" disabled>Limpiar selección</button>
  </div>
- <p id="terrainSeamCount" class="hint">0 costuras · 0 vértices protegidos</p>
+ <output id="terrainSeamCount" aria-live="polite" hidden>0 costuras · 0 vértices protegidos</output>
  <div id="terrainSeamList" aria-label="Costuras guardadas del terreno"></div>
- <p class="hint">Las costuras conservan X, Y y Z durante esculpido y regeneración. Solo se editan manualmente con el selector de vértices. «Quitar» retira la protección sin mover los vértices.</p>
 </div>
+<dialog id="terrainSeamHelpDialog" aria-labelledby="terrainSeamHelpTitle" style="background:#18372c;color:#e5fff0;border:1px solid #55977c;border-radius:12px;max-width:min(430px,90vw);padding:16px">
+ <h3 id="terrainSeamHelpTitle" style="margin:0 0 10px">Crear costuras</h3>
+ <p>Primero pulsa «Crear costura» para activar el selector de vértices del escenario. Haz clic en el vértice inicial y después Ctrl + clic en otro vértice para seleccionar la ruta completa.</p>
+ <p>Pulsa «Crear costura» de nuevo para guardar y bloquear la línea. La costura conserva las posiciones X, Y y Z frente a modificaciones automáticas. Puedes mover sus vértices manualmente o quitar la protección desde la lista.</p>
+ <form method="dialog"><button type="submit">Cerrar</button></form>
+</dialog>
 <label>Radio del pincel <output id="brushRadiusValue">12</output><input id="brushRadius" type="range" min="1" max="65" step=".5" value="12"></label>
 <label>Intensidad <output id="brushStrengthValue">12</output><input id="strength" type="range" min="1" max="30" value="12"></label>
 <p class="hint"><b>Alt + clic derecho + arrastrar:</b> derecha/izquierda modifica radio; arriba/abajo cambia intensidad. Sin pintar ni rotar la cámara.</p>
