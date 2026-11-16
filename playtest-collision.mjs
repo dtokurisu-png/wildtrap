@@ -26,7 +26,8 @@ export function createPlaytestCollider({THREE,terrain,roots=[]}){
    for(const child of obj.children||[])visit(child);
   };
   visit(terrain);
-  for(const root of roots)if(root)visit(root);
+  const sceneRoots=typeof roots==='function'?roots():roots;
+  for(const root of sceneRoots||[])if(root)visit(root);
   for(const obj of meshList)obj.updateWorldMatrix(true,false);
   return meshList.length;
  }
