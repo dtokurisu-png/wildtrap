@@ -28,6 +28,7 @@ export function createTerrainVertexEditor({
  outlines.userData.editorOnly=true;outlines.renderOrder=79;
  outlines.visible=false;outlines.raycast=()=>{};scene.add(outlines);
  const projected=new Array(count);
+ // Updates the actual cut terrain mesh during drag, not only the selection dots.
  const v=new THREE.Vector3();
  function updateCloud(){
   const attr=terrainGeo.attributes.position;
@@ -122,7 +123,8 @@ export function createTerrainVertexEditor({
    const pixelsPerUnit=(p0.y-p1.y)*box.height*.5;
    gesture={pointerId:e.pointerId,kind:'move',x:e.clientX,y:e.clientY,
     moved:false,snapshotted:false,startHeights,
-    pixelsPerUnit:Math.abs(pixelsPerUnit)>.001?pixelsPerUnit:box.height/Math.max(1,camera.top-camera.bottom)};
+    // Positive screen-up means positive height, regardless of camera direction.
+    pixelsPerUnit:Math.abs(pixelsPerUnit)>.001?pixelsPerUnit:Math.max(1,box.height/100)};
   }
   try{view.setPointerCapture(e.pointerId)}catch(_){}
   return true;
@@ -159,6 +161,9 @@ export function createTerrainVertexEditor({
   geo.attributes.position.needsUpdate=true;
   geo.computeBoundingSphere();
   terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();
+  // Rebuild the visible (possibly cut) terrain on EVERY pointer move.
+  // Previously only the vertex markers moved; the real mesh caught up on release.
+  refreshTerrain();
   updateSelection();
   return true;
  }
