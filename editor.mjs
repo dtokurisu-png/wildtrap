@@ -998,7 +998,14 @@ vertexEditor=createMeshVertexEditor({
 window.__meshEditor=vertexEditor;
 terrainVertexEditor=createTerrainVertexEditor({scene,terrain,terrainGeo,camera,view,
  marquee:$('selectionMarquee'),live,snapshot,
-  refreshTerrain:()=>{refreshTerrain();terrainInspector?.refresh(true)},persist});
+  refreshTerrain:()=>{refreshTerrain();terrainInspector?.refresh(true)},persist,toast,
+  beginTerrainSelection:()=>{
+   // Creating a seam targets scenario vertices, never the previously selected GLB.
+   if(preview.active||preview.busy||testingScene)return false;
+   setNodeSelection([]);
+   setMode('meshEdit');
+   return terrainVertexEditor?.getState().active===true;
+  }});
 window.__terrainVertexEditor=terrainVertexEditor;
 objectMeshOverlays=createObjectMeshOverlays({
  getNodes:()=>live.nodes,getRoots:id=>renderedNodes.get(id)||[]
