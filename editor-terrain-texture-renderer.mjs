@@ -210,7 +210,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     pointInZone(zone.points,{x:p[0],z:p[2]})));
    // Keep the historical cliff-edge trimming where there is no explicitly
    // locked seam. Never cut away a manually corrected upper/lower rim.
-   const aligned=zone.isCliff&&!zoneSeams.length?
+   const aligned=zone.isCliff&&!plains&&!zoneSeams.length?
     straightenCliffSeams(triangles):{triangles,seams:null};
    const source=aligned.triangles;
    if(!source.length)continue;
