@@ -4,7 +4,8 @@ import {buildTerrainVertexGraph,shortestTerrainVertexPath,addTerrainSeam,removeT
 // Terrain vertices are editable in all three dimensions. Displacements in X/Z
 // are stored independently of the heightmap so saves and geometry rebuilds keep them.
 export function createTerrainVertexEditor({
- scene,terrain,terrainGeo,camera,view,marquee,live,snapshot,refreshTerrain,persist
+ scene,terrain,terrainGeo,camera,view,marquee,live,snapshot,refreshTerrain,persist,
+ beginTerrainSelection=()=>false,toast=()=>{}
 }){
  const count=terrainGeo.attributes.position.count;
  const maxSelected=40000;
@@ -66,7 +67,14 @@ export function createTerrainVertexEditor({
   seamGeo.computeBoundingSphere();seamDotsGeo.computeBoundingSphere();
   seamLines.visible=seamDots.visible=active;
   const button=$('terrainCreateSeam'),clear=$('terrainClearVertexSelection');
-  if(button)button.disabled=!active||selected.size<2;
+  // This is an ACTION, not a disabled indicator: first click opens terrain
+  // vertex editing; a later click saves the chosen line as a seam.
+  if(button){
+   button.disabled=false;
+   button.classList.toggle('active',active);
+   button.setAttribute('aria-pressed',String(active));
+   button.title=active?'Guarda los vértices seleccionados como costura protegida':'Activa la selección de vértices para crear una costura';
+  }
   if(clear)clear.disabled=!active||selected.size===0;
   if($('terrainSeamCount'))$('terrainSeamCount').textContent=
    seams().length+' costura(s) · '+locked.size+' vértices protegidos · '+selected.size+' seleccionados';
@@ -100,13 +108,31 @@ export function createTerrainVertexEditor({
  }
  const createBtn=$('terrainCreateSeam'),clearBtn=$('terrainClearVertexSelection');
  createBtn?.addEventListener('click',()=>{
-  if(!active||selected.size<2)return;
+  // The former disabled-first-click behaviour made the visible tool inert.
+  // A click now ALWAYS has an observable result, even before selection.
+  if(!active){
+   const started=beginTerrainSelection();
+   if(!started||!active){
+    toast('No se pudo activar la selección del terreno');
+   }else{
+    toast('Selecciona el primer vértice y usa Ctrl + clic para marcar la ruta');
+   }
+   updateSeamVisuals();
+   return;
+  }
+  if(selected.size<2){
+   toast('Selecciona al menos dos vértices. Ctrl + clic completa la línea.');
+   return;
+  }
   const attr=terrainGeo.attributes.position;
+  const path=selectionRoute.length>1?selectionRoute:[...selected];
   snapshot();
   const seam=addTerrainSeam(live,[...selected],id=>[
-   attr.getX(id),attr.getY(id),attr.getZ(id)],selectionRoute);
-  if(!seam)return;
-  persist();refresh();updateSeamVisuals();
+   attr.getX(id),attr.getY(id),attr.getZ(id)],path);
+  if(!seam){toast('No se pudo crear la costura: selección inválida');return}
+  persist();
+  selected.clear();lastAnchor=null;selectionRoute=[];updateSelection();
+  toast(seam.name+' guardada · '+seam.vertices.length+' vértices protegidos');
  });
  clearBtn?.addEventListener('click',()=>{
   selected.clear();lastAnchor=null;selectionRoute=[];updateSelection();
