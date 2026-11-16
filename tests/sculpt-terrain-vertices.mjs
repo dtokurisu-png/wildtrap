@@ -9,8 +9,11 @@ assert.match(editor,/terrainVertexEditor\??\.pointerup\(e\)/,'Terrain edits fini
 assert.match(editor,/editingTerrain=mode==='meshEdit'&&!testingScene&&!editing/,'Terrain selection is active when no GLB editing target exists');
 assert.match(terrain,/selected\.add\(i\)/,'Rectangle selects terrain vertices');
 assert.match(terrain,/live\.heights\[i\]=h/,'Vertex moves update the persistent heightmap');
-assert.match(terrain,/attr\.setY\(i,h\)/,'Vertex moves update the visible terrain');
+assert.match(terrain,/live\.terrainVertexOffsets/,'Free XZ vertex displacements are stored');
+assert.match(terrain,/intersectPlane\(e,g\.dragPlane\)/,'Mouse movement intersects camera-facing drag plane');
+assert.match(editor,/live\.terrainVertexOffsets\?\.\[i\]/,'Full XYZ vertex coordinates survive terrain rebuild');
+assert.match(terrain,/attr\.setXYZ\(i,x,h,z\)/,'Vertex moves update all three axes of terrain geometry');
 assert.match(terrain,/if\(!g\.snapshotted\)\{snapshot\(\)/,'History snapshot is taken before a deformation');
 assert.match(terrain,/if\(g\.moved\)\{refreshTerrain\(\);persist\(\);\}/,'Vertex changes synchronize the rest of terrain');
-assert.doesNotMatch(terrain,/attr\.setX\(|attr\.setZ\(/,'Fixed-grid terrain XZ positions must stay stable');
-console.log('PASS: Sculpt selects and moves terrain Y vertices while preserving saved grid and undo');
+assert.match(editor,/terrainVertexOffsets=\{\}/,'Reset clears free vertex offsets');
+console.log('PASS: Sculpt selects and drags terrain vertices freely in XYZ with persistent XZ offsets and undo');
