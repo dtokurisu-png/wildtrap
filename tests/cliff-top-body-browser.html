@@ -55,7 +55,7 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.105'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.106'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
@@ -101,6 +101,14 @@
   for(const file of paths){
    const response=await fetch('../assets/terrain/texturas/'+encodeURIComponent(file));
    assert(response.ok,'Falta recurso '+file+' HTTP '+response.status);
+  }
+  for(const retired of [
+   'Textura de Acantilado llanura Cubierto de Hierba.png',
+   'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png',
+   'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png'
+  ]){
+   const reply=await fetch('../assets/terrain/texturas/'+encodeURIComponent(retired),{method:'HEAD'});
+   assert(reply.status===404,'Una textura de hierba retirada sigue existiendo: '+retired);
   }
   stage='generate';
   const before=JSON.parse(localStorage.getItem(key));
