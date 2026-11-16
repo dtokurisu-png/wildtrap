@@ -6,7 +6,7 @@ import {putDraft,getDraft} from './editor-draft-storage.mjs?v=0.9.59';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
 // Playtest is loaded on demand. Broken external GLB/FBX cannot prevent the editor boot.
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.96';
-import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.17';
+import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.104';
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.50';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
@@ -991,7 +991,7 @@ holesEditor=createTerrainHoles({
  renderCuts:!recoveryMode,nextUndoSerial
 });
 terrainInspector=createTerrainMeshInspector({scene,camera,view,terrain,$,
- isSelected:()=>terrainPropertiesSelected});
+ isSelected:()=>terrainPropertiesSelected,getCliffOverlay:()=>terrainPainter?.collisionRoot()});
 window.__terrainMeshInspector=terrainInspector;
 // No network, FBX parser or animation adapter is required to open the editor.
 let preview={
@@ -1054,10 +1054,7 @@ function loadSavedPlainsCliffSettings(source){
   const n=(v,fallback,min,max)=>Number.isFinite(Number(v))?
    Math.max(min,Math.min(max,Number(v))):fallback;
   live.cliffHeightmapPlains={
-   enabled:from.enabled===true,strength:n(from.strength,1.5,0,4),
-   topFraction:n(from.topFraction,.23,.08,.45),
-   bodyTileWidth:n(from.bodyTileWidth,20,2,200),
-   bodyTileHeight:n(from.bodyTileHeight,16,2,200)
+   enabled:from.enabled===true,strength:n(from.strength,1.5,0,4)
   };
  }
  syncPlainsCliffSettings();
@@ -1078,8 +1075,7 @@ $('plainsCliffGenerate')?.addEventListener('click',()=>{
  if(!available){toast('Primero asigna una zona de acantilado a una región de Llanura');return}
  snapshot();
  live.cliffHeightmapPlains={...(live.cliffHeightmapPlains||{}),
-  enabled:true,strength:Math.max(0,Math.min(4,Number(plainsStrength.value)||0)),
-  topFraction:.23,bodyTileWidth:20,bodyTileHeight:16};
+  enabled:true,strength:Math.max(0,Math.min(4,Number(plainsStrength.value)||0))};
  const status=$('plainsCliffStatus');if(status){status.hidden=false;status.textContent='Generando…'}
  terrainPainter?.schedule();
  persist();
@@ -2078,7 +2074,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.103');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.104');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
  }catch(error){
@@ -2115,9 +2111,10 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.103');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.104');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
-   isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false});
+   isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
+   onCliffsGenerated:()=>terrainInspector?.refresh(true)});
   window.__terrainTexturePainter=terrainPainter;
   const toggle=$('textureShow');
   toggle.checked=live.settings?.biomeTexturesVisible!==false;
