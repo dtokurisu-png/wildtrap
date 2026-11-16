@@ -68,7 +68,7 @@
   assert(body.material.map.wrapT===w.THREE?.RepeatWrapping||body.material.map.wrapT===1000,
    'Body debe repetir la textura verticalmente');
   const topUV=top.geometry.attributes.uv.array,bodyUV=body.geometry.attributes.uv.array;
-  const range=a=>[Math.min(...a),Math.max(...a)];
+  const range=a=>{let min=Infinity,max=-Infinity;for(const v of a){min=Math.min(min,v);max=Math.max(max,v)}return[min,max]};
   const topRange=range(topUV),bodyRange=range(bodyUV);
   assert(topRange[0]>=-.001&&topRange[1]<=1.001,'El Top salió de UV [0..1]');
   assert(bodyRange[1]>1.01,'El Body no repite para la altura generada: '+bodyRange[1]);
