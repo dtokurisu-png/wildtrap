@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES} from './editor-texture-catalog.mjs?v=0.9.104';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES,PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.106';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -13,7 +13,7 @@ const SLOTS=[
  {id:'detail1',name:'Complementaria 1',type:'blend'},
  {id:'detail2',name:'Complementaria 2',type:'blend'},
  {id:'detail3',name:'Complementaria 3',type:'blend'},
- {id:'cliff',name:'Acantilado anterior',type:'cliff'},
+ {id:'cliff',name:'Acantilado · Base',type:'cliff'},
  {id:'cliffBodyColor',name:'Acantilado · Body Color',type:'cliffMap'},
  {id:'cliffBodyHeight',name:'Acantilado · Body Height',type:'cliffMap'}
 ];
@@ -30,6 +30,10 @@ const defaults=()=>{
   const target=data.plains.slots[file.role];
   target.image=textureUrl(file);target.name=file.file;target.scale=8;target.opacity=1;
  }
+ const cliff=data.plains.slots.cliff;
+ cliff.image=PLAINS_CLIFF_MAPS.base;
+ cliff.name='Textura de Acantilado llanura  CUERPO.png';
+ cliff.scale=8;cliff.opacity=1;
  return data;
 };
 // Keep explicit user overrides, but seed empty slots with the 25 committed PNGs.
@@ -215,7 +219,12 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   $('textureTransition').value=data.edgeBlend;
   $('textureTransitionValue').textContent=String(data.edgeBlend);
   const plainCards=[];
-  for(const file of PLAINS_CLIFF_TEXTURE_FILES){
+  const plainCliffAssets=[
+   {id:'tx16',file:'Textura de Acantilado llanura  CUERPO.png',
+    biome:'plains',kind:'cliff',role:'cliff'},
+   ...PLAINS_CLIFF_TEXTURE_FILES
+  ];
+  for(const file of plainCliffAssets){
    if(biomeId!=='plains')break;
    const def=SLOTS.find(s=>s.id===file.role),item=data.slots[def.id];
    const card=element('div');card.dataset.cliffMapSlot=file.role;
@@ -247,24 +256,28 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
     });
    };
    card.append(choose);
-   if(file.role==='cliffBodyColor'){
+   if(file.role==='cliff'||file.role==='cliffBodyColor'){
     const label=element('label','','Repeticiones (630 unidades)');
     const scale=element('input');scale.type='number';
     scale.min='.25';scale.max='1000';scale.step='.25';
     scale.value=String(item.scale);
-    scale.title='Repeticiones reales del Body Color y Body Height en todo el mapa';
-    scale.setAttribute('aria-label','Repeticiones acantilado Body');
+    scale.title=file.role==='cliff'?
+     'Repeticiones de la textura principal CUERPO':
+     'Repeticiones reales del Body Color y Body Height';
+    scale.setAttribute('aria-label',file.role==='cliff'?
+     'Repeticiones acantilado base':'Repeticiones acantilado Body');
     scale.style.cssText='width:100%;background:#1e4034;color:#fff;border:1px solid #588c77;padding:6px';
     scale.onchange=()=>{
      const next=cl(Number(scale.value)||8,.25,1000);
-     mutate(m=>{m.slots.cliffBodyColor.scale=next;m.slots.cliffBodyHeight.scale=next});
+     mutate(m=>{m.slots[file.role].scale=next;
+      if(file.role==='cliffBodyColor')m.slots.cliffBodyHeight.scale=next});
     };
     label.append(scale);card.append(label);
     const edit=element('button','','Editar escala');
     edit.type='button';edit.title='Ajustar el Body junto al Explorador WT';
     edit.onclick=()=>{
      const chosen=REPO_TEXTURES.find(t=>textureUrl(t)===(item.image||textureUrl(file)));
-     if(chosen)void openEditor(chosen,'plains','cliffBodyColor');
+     if(chosen)void openEditor(chosen,'plains',file.role);
      else toast('Selecciona una imagen del repositorio para editar su escala');
     };
     card.append(edit);
@@ -274,7 +287,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   if(biomeId==='plains'){
    const section=element('div');section.id='plainsCliffActiveMaps';
    section.style.cssText='margin:9px 0;padding:8px;border:1px solid #5b927a;border-radius:9px';
-   section.append(element('h3','','Acantilado · Body'));
+   section.append(element('h3','','Acantilado · Llanura'));
    const grid=element('div');grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px';
    grid.append(...plainCards);section.append(grid);slots.append(section);
   }
