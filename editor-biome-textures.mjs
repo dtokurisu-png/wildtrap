@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES,PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.106';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES,PLAINS_CLIFF_MAPS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.108';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -66,7 +66,10 @@ export function normalizeBiomeMaterials(raw){
    target.name=typeof v.name==='string'?v.name.slice(0,130):'';
    // Only user-uploaded images, never externally supplied script/URLs.
    const imageSource=typeof v.image==='string'?v.image:'';
-   target.image=REPO_TEXTURES.some(t=>textureUrl(t)===imageSource)?imageSource:
+   // Preserve old same-origin PNG paths when files have been removed:
+   // show a missing warning rather than silently rewriting the user's map.
+   target.image=(REPO_TEXTURES.some(t=>textureUrl(t)===imageSource)||
+    /^\.\/assets\/terrain\/texturas\/[^?#]{1,300}\.(png|jpe?g|webp)$/i.test(imageSource))?imageSource:
     /^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(imageSource)&&imageSource.length<=MAX_IMAGE*1.4?imageSource:'';
    target.scale=cl(Number(v.scale)||8,.25,1000);
    target.opacity=cl(Number.isFinite(Number(v.opacity))?Number(v.opacity):target.opacity,0,1);
@@ -229,7 +232,10 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    const def=SLOTS.find(s=>s.id===file.role),item=data.slots[def.id];
    const card=element('div');card.dataset.cliffMapSlot=file.role;
    card.style.cssText='min-width:0;background:#1b3930;border:1px solid #4c7866;border-radius:8px;padding:7px;display:grid;gap:5px';
-   const heading=element('b','',def.name);heading.style.fontSize='12px';card.append(heading);
+   const missing=item.image&&!isPublishedTextureUrl(item.image);
+   const heading=element('b','',def.name+(missing?' ⚠':''));heading.style.fontSize='12px';
+   if(missing)heading.title='Imagen retirada de GitHub. Selecciona otra existente.';
+   card.append(heading);
    const img=element('img');img.alt=def.name;img.src=getTextureAssetUrl(item.image||textureUrl(file));
    img.loading='lazy';img.style.cssText='width:100%;height:104px;object-fit:cover;border-radius:5px';
    card.append(img);
@@ -296,7 +302,10 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    const item=data.slots[def.id];
    const card=element('div','');
    card.style.cssText='border:1px solid #3d6a56;border-radius:9px;padding:9px;margin:9px 0;background:#1c3b30';
-   const heading=element('b','',def.name);card.append(heading);
+   const missing=item.image&&!isPublishedTextureUrl(item.image);
+   const heading=element('b','',def.name+(missing?' ⚠':''));
+   if(missing)heading.title='Imagen retirada de GitHub. Selecciona otra existente.';
+   card.append(heading);
    const preview=element('div');
    preview.style.cssText='min-height:64px;margin:7px 0;border-radius:6px;background:#294c3e;display:flex;align-items:center;justify-content:center;overflow:hidden';
    if(item.image){
