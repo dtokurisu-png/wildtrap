@@ -1,0 +1,57 @@
+name: Validar acantilado Top Body heightmaps
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'editor-cliff-top-body.mjs'
+      - 'editor-terrain-texture-renderer.mjs'
+      - 'editor-texture-catalog.mjs'
+      - 'playtest-collision.mjs'
+      - 'playtest.mjs'
+      - 'editor.mjs'
+      - 'index.html'
+      - 'tests/cliff-top-body-heightmap.test.mjs'
+      - 'tests/cliff-top-body-browser.html'
+      - 'tests/browser-cliff-top-body.mjs'
+      - '.github/workflows/cliff-top-body.yml'
+  pull_request:
+    paths:
+      - 'editor-cliff-top-body.mjs'
+      - 'editor-terrain-texture-renderer.mjs'
+      - 'editor-texture-catalog.mjs'
+      - 'editor.mjs'
+      - 'tests/cliff-top-body-heightmap.test.mjs'
+      - 'tests/cliff-top-body-browser.html'
+      - 'tests/browser-cliff-top-body.mjs'
+      - '.github/workflows/cliff-top-body.yml'
+jobs:
+  geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify syntax
+        run: |
+          node --check editor-cliff-top-body.mjs
+          node --check editor-terrain-texture-renderer.mjs
+          node --check editor-texture-catalog.mjs
+          node --check editor.mjs
+          node --check playtest-collision.mjs
+          node --check playtest.mjs
+      - name: Verify UV, real mesh displacement and protected seams
+        run: |
+          node tests/cliff-top-body-heightmap.test.mjs
+          node tests/cliff-horizontal-seams.mjs
+          node tests/cliff-zone-alignment.test.mjs
+          node tests/terrain-seams.test.mjs
+      - name: Start local server
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-top-body-http.log 2>&1 &
+          sleep 2
+      - name: Verify real PNG rendering in Chromium
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-cliff-top-body.mjs
