@@ -991,7 +991,8 @@ vertexEditor=createMeshVertexEditor({
 });
 window.__meshEditor=vertexEditor;
 terrainVertexEditor=createTerrainVertexEditor({scene,terrain,terrainGeo,camera,view,
- marquee:$('selectionMarquee'),live,snapshot,refreshTerrain,persist});
+ marquee:$('selectionMarquee'),live,snapshot,
+  refreshTerrain:()=>{refreshTerrain();terrainInspector?.refresh(true)},persist});
 window.__terrainVertexEditor=terrainVertexEditor;
 objectMeshOverlays=createObjectMeshOverlays({
  getNodes:()=>live.nodes,getRoots:id=>renderedNodes.get(id)||[]
