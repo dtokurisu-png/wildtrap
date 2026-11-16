@@ -108,6 +108,25 @@ function persist(immediate=false){
  if(immediate)return saveProject();
  saveTimer=setTimeout(()=>{void saveProject()},700);
 }
+// Preserve the latest edited world even if the browser closes before a timer
+// or an IndexedDB transaction can complete. The matching timestamp prevents
+// an older IndexedDB copy from overriding the synchronous emergency copy.
+function flushWorldOnExit(){
+ if(saveTimer!==null){clearTimeout(saveTimer);saveTimer=null}
+ try{
+  const json=JSON.stringify(live);
+  const stamp=Date.now();
+  localStorage.setItem(draftKey,json);
+  localStorage.setItem(localStampKey,String(stamp));
+  // Best effort if the page remains alive (background tab). localStorage above
+  // already provides the synchronous fallback on actual navigation.
+  void putDraft(draftKey,json).catch(()=>{});
+ }catch(_){void saveProject()}
+}
+window.addEventListener('pagehide',flushWorldOnExit);
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden&&saveTimer!==null)void saveProject();
+});
 
 let mode='raise',pointerDown=false,dragId=null,selectedId=null,pending=null,changed=false;
 const selectedIds=new Set();let marqueeStart=null,moveBases=null;
