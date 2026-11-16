@@ -19,7 +19,7 @@ const flat=straightenCliffSeams([[[0,2,0],[1,2,0],[0,2,1]]]);
 assert.equal(flat.seams,null,'Flat areas should not be clipped as a cliff');
 assert.equal(flat.triangles.length,1,'Small-height faces remain intact');
 const renderer=readFileSync(new URL('../editor-terrain-texture-renderer.mjs',import.meta.url),'utf8');
-assert.match(renderer,/zone\.isCliff&&!zoneSeams\.length\?/,'Legacy seam trimming runs only when no protected rim exists');
+assert.match(renderer,/zone\.isCliff&&!plains&&!zoneSeams\.length\?/,'Legacy edge trims affect only non-Llanura cliffs without protected rims');
 assert.match(renderer,/straightenCliffSeams\(triangles\)/,'Original clipped cliff material procedure is retained');
 assert.match(renderer,/buildRefinedCliffGeometry\(batch/,'Every marked cliff zone is subdivided in batches');
 assert.match(renderer,/isHoleAt\(c\[0\],c\[1\],c\[2\]\)/,'Holes remain excluded before seam construction');
