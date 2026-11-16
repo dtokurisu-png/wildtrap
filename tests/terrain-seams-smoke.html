@@ -19,8 +19,18 @@
   const w=frame.contentWindow,d=frame.contentDocument,canvas=d.getElementById('viewport');
   const create=d.getElementById('terrainCreateSeam');
   assert(create&&d.getElementById('terrainSeamList'),'Falta herramienta Crear costuras');
-  d.getElementById('sculptSelectVertices').click();
-  assert(editor.getState().active,'No activó selección de vértices de escenario');
+  assert(!create.disabled,'El botón principal no debe iniciar deshabilitado');
+  assert(d.getElementById('terrainSeamCount').hidden,'El contador no debe invadir la interfaz');
+  const info=d.getElementById('terrainSeamHelp'),dialog=d.getElementById('terrainSeamHelpDialog');
+  assert(info&&dialog,'Falta botón de ayuda y modal');
+  info.click();
+  assert(dialog.open,'El botón de información no abrió el modal');
+  dialog.close();
+  assert(!dialog.open,'No se pudo cerrar el modal');
+  // Important: click the ACTUAL Create Seam button as the first user action;
+  // never bypass it by clicking Select Vertices.
+  create.click();
+  assert(editor.getState().active,'Crear costura no activó selección de vértices del escenario');
   const p1=editor.debugProjectVertex(k),p2=editor.debugProjectVertex(finish);
   assert(p1&&p2,'No proyectó puntos seleccionables');
   const emit=(type,x,y,pointerId,ctrlKey=false,buttons=1)=>{
@@ -33,7 +43,7 @@
   let picked=editor.getSelectedIndices();
   assert(picked.includes(k)&&picked.includes(finish),'Ctrl+clic no seleccionó ambos extremos');
   assert(picked.length>=7,'Ctrl+clic no seleccionó vértices intermedios: '+picked.length);
-  assert(!create.disabled,'No habilitó Crear costura');
+  assert(!create.disabled,'Crear costura debe permanecer habilitado para guardar');
   create.click();
   assert(editor.getState().seams===1,'No creó la costura');
   assert(editor.getState().protectedVertices>=7,'Faltan vértices protegidos');
@@ -83,7 +93,7 @@
   assert(editor.getState().seams===0,'Rehacer no volvió a retirar la protección');
   document.body.dataset.result='PASS';
   d.getElementById('viewport').style.display='none';
-  document.getElementById('result').textContent='PASS · Ctrl+clic, crear costura, pincel protegido, edición manual, persistencia, quitar y deshacer/rehacer';
+  document.getElementById('result').textContent='PASS · botón funcional desde primer clic, ayuda modal, Ctrl+clic, costura protegida, edición manual y Undo/Redo';
  }catch(e){document.body.dataset.result='FAIL';document.getElementById('result').textContent='FAIL: '+e.message;}
 })();
 </script></body></html>
