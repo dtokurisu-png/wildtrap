@@ -10,6 +10,7 @@ on:
       - 'editor-terrain-texture-renderer.mjs'
       - 'editor-texture-catalog.mjs'
       - 'editor-biome-textures.mjs'
+      - 'editor-texture-scale-preview.mjs'
       - 'playtest-collision.mjs'
       - 'playtest.mjs'
       - 'editor.mjs'
@@ -28,6 +29,7 @@ on:
       - 'editor-terrain-texture-renderer.mjs'
       - 'editor-texture-catalog.mjs'
       - 'editor-biome-textures.mjs'
+      - 'editor-texture-scale-preview.mjs'
       - 'editor.mjs'
       - 'tests/cliff-top-body-heightmap.test.mjs'
       - 'tests/cliff-horizontal-seams.mjs'
@@ -51,6 +53,7 @@ jobs:
           node --check terrain-mesh-inspector.mjs
           node --check editor-terrain-texture-renderer.mjs
           node --check editor-texture-catalog.mjs
+          node --check editor-texture-scale-preview.mjs
           node --check editor.mjs
           node --check playtest-collision.mjs
           node --check playtest.mjs
