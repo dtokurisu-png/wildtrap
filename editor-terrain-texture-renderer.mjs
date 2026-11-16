@@ -2,9 +2,9 @@ import {buildRefinedCliffGeometry} from './editor-cliff-mesh.mjs?v=0.9.104';
 import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
-import {BIOMES} from './editor-biome-textures.mjs?v=0.9.104';
+import {BIOMES} from './editor-biome-textures.mjs?v=0.9.105';
 import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.104';
-import {buildCliffBodyHeightmapBuffers} from './editor-cliff-body-heightmap.mjs?v=0.9.104';
+import {buildCliffBodyHeightmapBuffers} from './editor-cliff-body-heightmap.mjs?v=0.9.105';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
 export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false,isHoleAt=()=>false,onCliffsGenerated=()=>{}}){
