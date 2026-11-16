@@ -42,7 +42,7 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.102'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.103'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
@@ -128,7 +128,7 @@
   assert(JSON.stringify(saved.terrainSeams)===JSON.stringify(before.terrainSeams),
    'Una costura protegida cambió de posición o desapareció');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · v0.9.102, cuatro mapas visibles y configurables, relieve Top/Body, colisiones y costuras protegidas';
+  document.getElementById('result').textContent='PASS · v0.9.103, cuatro mapas visibles y configurables, relieve Top/Body, colisiones y costuras protegidas';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>
