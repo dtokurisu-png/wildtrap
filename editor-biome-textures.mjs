@@ -88,7 +88,7 @@ export function normalizeBiomeMaterials(raw){
  }
  return out;
 }
-export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=()=>{}}){
+export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=()=>{},getTextureAssetUrl=url=>url}){
  const $=id=>document.getElementById(id);
  const root=$('texturePanel');if(!root)throw Error('Falta panel de texturizado');
  let biomeId=BIOMES[0].id,normalizedRef=null;
@@ -122,7 +122,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   try{
    if(!previewController){
     const {createTextureScalePreview}=await import('./editor-texture-scale-preview.mjs?v=0.9.106');
-    previewController=createTextureScalePreview({toast,onApply:next=>{
+    previewController=createTextureScalePreview({toast,getTextureAssetUrl,onApply:next=>{
      snapshot();
      const current=ensure()[next.biome]?.slots?.[next.slot];
      if(!current)return;
@@ -174,7 +174,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    for(const t of files){
     shown++;
     const card=element('div');card.style.cssText='padding:7px;margin:7px 0;background:#1b3930;border:1px solid #406c5c;border-radius:8px';
-    const picture=element('img');picture.src=textureUrl(t);picture.alt=t.file;picture.loading='lazy';
+    const picture=element('img');picture.src=getTextureAssetUrl(textureUrl(t));picture.alt=t.file;picture.loading='lazy';
     picture.style.cssText='height:100px;width:100%;object-fit:cover;border-radius:6px';card.append(picture);
     const caption=element('small','',t.file);caption.style.cssText='display:block;margin:4px 0;overflow-wrap:anywhere';card.append(caption);
     const row=element('div');row.style.cssText='display:flex;align-items:center;gap:4px';
@@ -230,7 +230,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    const card=element('div');card.dataset.cliffMapSlot=file.role;
    card.style.cssText='min-width:0;background:#1b3930;border:1px solid #4c7866;border-radius:8px;padding:7px;display:grid;gap:5px';
    const heading=element('b','',def.name);heading.style.fontSize='12px';card.append(heading);
-   const img=element('img');img.alt=def.name;img.src=item.image||textureUrl(file);
+   const img=element('img');img.alt=def.name;img.src=getTextureAssetUrl(item.image||textureUrl(file));
    img.loading='lazy';img.style.cssText='width:100%;height:104px;object-fit:cover;border-radius:5px';
    card.append(img);
    // Every visible map is a real saved slot; users may substitute a repository
@@ -300,7 +300,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    const preview=element('div');
    preview.style.cssText='min-height:64px;margin:7px 0;border-radius:6px;background:#294c3e;display:flex;align-items:center;justify-content:center;overflow:hidden';
    if(item.image){
-    const img=element('img');img.alt=def.name;img.src=item.image;
+    const img=element('img');img.alt=def.name;img.src=getTextureAssetUrl(item.image);
     img.style.cssText='width:100%;height:100px;object-fit:cover';preview.append(img);
    }else preview.append(element('small','', 'Sin textura cargada'));
    card.append(preview);
@@ -354,5 +354,10 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   mutate(()=>{ensure()[biomeId]=defaults()[biomeId]});
  };
  render();
- return {refresh:render};
+ return {refresh:render,refreshAssets:()=>{
+  // Repaint every visible thumbnail without changing saved slot paths or
+  // material scales, then update an already-open 3D preview.
+  render();
+  previewController?.refreshTexture?.();
+ }};
 }
