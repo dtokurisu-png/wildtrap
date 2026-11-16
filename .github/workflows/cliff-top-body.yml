@@ -11,6 +11,8 @@ on:
       - 'editor-texture-catalog.mjs'
       - 'editor-biome-textures.mjs'
       - 'editor-texture-scale-preview.mjs'
+      - 'editor-texture-live-refresh.mjs'
+      - 'tests/texture-live-refresh.test.mjs'
       - 'playtest-collision.mjs'
       - 'playtest.mjs'
       - 'editor.mjs'
@@ -30,6 +32,8 @@ on:
       - 'editor-texture-catalog.mjs'
       - 'editor-biome-textures.mjs'
       - 'editor-texture-scale-preview.mjs'
+      - 'editor-texture-live-refresh.mjs'
+      - 'tests/texture-live-refresh.test.mjs'
       - 'editor.mjs'
       - 'tests/cliff-top-body-heightmap.test.mjs'
       - 'tests/cliff-horizontal-seams.mjs'
@@ -54,11 +58,13 @@ jobs:
           node --check editor-terrain-texture-renderer.mjs
           node --check editor-texture-catalog.mjs
           node --check editor-texture-scale-preview.mjs
+          node --check editor-texture-live-refresh.mjs
           node --check editor.mjs
           node --check playtest-collision.mjs
           node --check playtest.mjs
       - name: Verify Body UV, minimum 6x subdivision and protected seams
         run: |
+          node tests/texture-live-refresh.test.mjs
           node tests/cliff-top-body-heightmap.test.mjs
           node tests/cliff-horizontal-seams.mjs
           node tests/cliff-mesh-refinement.mjs

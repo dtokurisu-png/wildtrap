@@ -55,7 +55,7 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.106'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.107'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
@@ -65,7 +65,7 @@
   assert(d.getElementById('textureBiome').value==='plains','La selección de bioma no cambió a Llanura');
   for(const role of ['cliff','cliffBodyColor','cliffBodyHeight']){
    const row=allMaps.querySelector('[data-cliff-map-slot="'+role+'"]');
-   assert(row&&row.querySelector('img')?.getAttribute('src')?.endsWith('.png'),'Imagen de '+role+' no visible');
+   assert(row&&new URL(row.querySelector('img')?.src||'',location.href).pathname.endsWith('.png'),'Imagen de '+role+' no visible');
    assert(row.querySelector('select')?.options.length>0,'El usuario no puede seleccionar '+role);
   }
   const mainCliff=allMaps.querySelector('[data-cliff-map-slot="cliff"]');
@@ -186,8 +186,37 @@
    'La geometría original se desplazó');
   assert(JSON.stringify(saved.terrainSeams)===JSON.stringify(before.terrainSeams),
    'Una costura protegida cambió de posición o desapareció');
+  stage='live texture refresh';
+  const revisionWatcher=w.__wildtrapTextureRevisionWatcher;
+  assert(revisionWatcher&&typeof revisionWatcher.refreshNow==='function',
+   'No existe la actualización automática/manual de imágenes');
+  const beforeRevision=revisionWatcher.getRevision();
+  const beforeImage=d.querySelector('[data-cliff-map-slot="cliffBodyColor"] img')?.src;
+  assert(beforeImage?.includes('wt_texture_revision='),'La miniatura no utiliza versión de PNG');
+  const beforeMesh=painter.collisionRoot().children.find(m=>m.userData.cliffZoneId==='cliff1');
+  d.getElementById('textureReloadImages').click();
+  const updated=await wait(()=>{
+   const img=d.querySelector('[data-cliff-map-slot="cliffBodyColor"] img')?.src;
+   return revisionWatcher.getRevision()!==beforeRevision&&img&&img!==beforeImage?
+    img:null;
+  },'miniaturas con PNG nuevos');
+  assert(updated.includes('wt_texture_revision=manual-'),
+   'El botón no fuerza URL de una versión de la imagen');
+  const replacement=await wait(()=>{
+   const next=painter.collisionRoot().children.find(m=>m.userData.cliffZoneId==='cliff1');
+   return next&&next!==beforeMesh?next:null;
+  },'geometría y materiales regenerados con nuevos PNG');
+  assert(replacement.material.map.image?.src?.includes('wt_texture_revision=manual-'),
+   'La GPU sigue usando la imagen antigua');
+  const afterRefresh=JSON.parse(localStorage.getItem(key));
+  assert(JSON.stringify(afterRefresh.heights)===JSON.stringify(saved.heights),
+   'Actualizar imágenes alteró la malla del terreno');
+  assert(JSON.stringify(afterRefresh.terrainSeams)===JSON.stringify(saved.terrainSeams),
+   'Actualizar imágenes alteró las costuras');
+  assert(JSON.stringify(afterRefresh.biomeMaterials)===JSON.stringify(saved.biomeMaterials),
+   'Actualizar imágenes cambió las texturas guardadas');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · base CUERPO recuperada de la hierba antigua, 3 materiales correctos, Body Color/Height vertical, escala y subdivisión';
+  document.getElementById('result').textContent='PASS · v0.9.107, PNG nuevos en GPU y miniaturas, escala y costuras conservadas';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>
