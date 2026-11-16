@@ -1,0 +1,84 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Wildtrap protected seams regression</title></head>
+<body data-result="PENDING"><div id="result">Probando rutas y costuras persistentes</div><script>
+(async()=>{
+ const assert=(test,message)=>{if(!test)throw Error(message)};
+ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ const wait=async(check,label)=>{
+  for(let i=0;i<170;i++){const result=check();if(result)return result;await sleep(200);}
+  throw Error('Timeout '+label);
+ };
+ const n=129,k=64*n+62,finish=64*n+68,key='wildtrap-editor-draft-safe-v1';
+ try{
+  localStorage.setItem(key,JSON.stringify({version:3,size:630,resolution:n,
+   heights:Array(n*n).fill(20),nodes:[],objectGroups:[],holes:[],cuts3d:[],
+   zones:[],nextId:1,settings:{heightMax:120}}));
+  const frame=document.createElement('iframe');frame.id='seam-app';
+  frame.width=1440;frame.height=900;frame.src='../?safe=1';document.body.append(frame);
+  const editor=await wait(()=>frame.contentWindow?.__terrainVertexEditor?.getState()?.vertices===n*n&&
+   frame.contentDocument?.querySelector('#boot[hidden]')&&frame.contentWindow.__terrainVertexEditor,'editor');
+  const w=frame.contentWindow,d=frame.contentDocument,canvas=d.getElementById('viewport');
+  const create=d.getElementById('terrainCreateSeam');
+  assert(create&&d.getElementById('terrainSeamList'),'Falta herramienta Crear costuras');
+  d.getElementById('sculptSelectVertices').click();
+  assert(editor.getState().active,'No activó selección de vértices de escenario');
+  const p1=editor.debugProjectVertex(k),p2=editor.debugProjectVertex(finish);
+  assert(p1&&p2,'No proyectó puntos seleccionables');
+  const emit=(type,x,y,pointerId,ctrlKey=false,buttons=1)=>{
+   const event=new w.PointerEvent(type,{bubbles:true,cancelable:true,clientX:x,
+    clientY:y,button:0,buttons,pointerId,pointerType:'mouse',ctrlKey});
+   (type==='pointerup'?w:canvas).dispatchEvent(event);
+  };
+  emit('pointerdown',p1.x,p1.y,21);emit('pointerup',p1.x,p1.y,21,false,0);
+  emit('pointerdown',p2.x,p2.y,22,true);emit('pointerup',p2.x,p2.y,22,true,0);
+  let picked=editor.getSelectedIndices();
+  assert(picked.includes(k)&&picked.includes(finish),'Ctrl+clic no seleccionó ambos extremos');
+  assert(picked.length>=7,'Ctrl+clic no seleccionó vértices intermedios: '+picked.length);
+  assert(!create.disabled,'No habilitó Crear costura');
+  create.click();
+  assert(editor.getState().seams===1,'No creó la costura');
+  assert(editor.getState().protectedVertices>=7,'Faltan vértices protegidos');
+  assert(d.getElementById('terrainSeamList').children.length===1,'Costura no aparece en la lista');
+  const stored=await wait(()=>{
+   const raw=localStorage.getItem(key),saved=raw&&JSON.parse(raw);
+   return saved?.terrainSeams?.length===1?saved:null;
+  },'persistencia');
+  assert(stored.terrainSeams[0].vertices.includes(k),'Se perdió el ID estable del primer vértice');
+  const orig=stored.heights[k];
+  // A sculpt brush on the locked rail should not move its protected vertex,
+  // although adjacent unlocked vertices may be sculpted normally.
+  d.querySelector('[data-tool="raise"]').click();
+  emit('pointerdown',p1.x,p1.y,25);emit('pointerup',p1.x,p1.y,25,false,0);
+  const afterBrush=await wait(()=>{
+   const raw=localStorage.getItem(key),saved=raw&&JSON.parse(raw);
+   return saved&&saved.heights.some((v,i)=>v>20&&i!==k)?saved:null;
+  },'pincel');
+  assert(afterBrush.heights[k]===orig,'Pincel modificó una costura protegida');
+  // The user can intentionally move a seam vertex in the manual selector.
+  d.getElementById('sculptSelectVertices').click();
+  assert(editor.getState().active,'No pudo volver a edición manual');
+  const p=editor.debugProjectVertex(k);
+  emit('pointerdown',p.x,p.y,26);
+  emit('pointermove',p.x+26,p.y-22,26);
+  emit('pointerup',p.x+26,p.y-22,26,false,0);
+  const newSave=await wait(()=>{
+   const raw=localStorage.getItem(key),saved=raw&&JSON.parse(raw);
+   const a=saved?.terrainSeams?.[0]?.anchors?.[k];
+   return a&&Math.abs(a[0]-stored.terrainSeams[0].anchors[k][0])+
+     Math.abs(a[1]-stored.terrainSeams[0].anchors[k][1])+
+     Math.abs(a[2]-stored.terrainSeams[0].anchors[k][2])>.01?saved:null;
+  },'edición manual');
+  assert(newSave.terrainSeams[0].anchors[k].every(Number.isFinite),'Ancla XYZ inválida');
+  const remove=d.querySelector('#terrainSeamList button');
+  assert(remove,'No hay acción para quitar protección');
+  remove.click();
+  const unlocked=await wait(()=>{
+   const raw=localStorage.getItem(key),saved=raw&&JSON.parse(raw);
+   return saved?.terrainSeams?.length===0?saved:null;
+  },'quitar protección');
+  assert(unlocked.heights[k]===newSave.heights[k],'Quitar protección cambió forma');
+  document.body.dataset.result='PASS';
+  d.getElementById('viewport').style.display='none';
+  document.getElementById('result').textContent='PASS · Ctrl+clic, crear costura, pincel protegido, mover manualmente, persistencia y desbloqueo';
+ }catch(e){document.body.dataset.result='FAIL';document.getElementById('result').textContent='FAIL: '+e.message;}
+})();
+</script></body></html>
