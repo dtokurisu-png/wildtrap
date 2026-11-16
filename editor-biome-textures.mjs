@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS} from './editor-texture-catalog.mjs?v=0.9.65';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES} from './editor-texture-catalog.mjs?v=0.9.102';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -13,14 +13,27 @@ const SLOTS=[
  {id:'detail1',name:'Complementaria 1',type:'blend'},
  {id:'detail2',name:'Complementaria 2',type:'blend'},
  {id:'detail3',name:'Complementaria 3',type:'blend'},
- {id:'cliff',name:'Acantilado',type:'cliff'}
+ {id:'cliff',name:'Acantilado anterior',type:'cliff'},
+ {id:'cliffTopColor',name:'Top · Color',type:'cliffMap'},
+ {id:'cliffTopHeight',name:'Top · Heightmap',type:'cliffMap'},
+ {id:'cliffBodyColor',name:'Body · Color',type:'cliffMap'},
+ {id:'cliffBodyHeight',name:'Body · Heightmap',type:'cliffMap'}
 ];
 const MAX_IMAGE=380*1024,MAX_TOTAL=2600*1024;
 const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
-const defaults=()=>Object.fromEntries(BIOMES.map(b=>[b.id,{
- slots:Object.fromEntries(SLOTS.map(s=>[s.id,{name:'',image:'',scale:8,opacity:s.id==='ground'||s.id==='cliff'?1:.5}])),
- noise:{scale:20,seed:1},edgeBlend:4
-}]));
+const defaults=()=>{
+ const data=Object.fromEntries(BIOMES.map(b=>[b.id,{
+  slots:Object.fromEntries(SLOTS.map(s=>[s.id,{name:'',image:'',scale:8,opacity:s.id==='ground'||s.id==='cliff'?1:.5}])),
+  noise:{scale:20,seed:1},edgeBlend:4
+ }]));
+ // The four repository assets are visible immediately in Llanura,
+ // including in scenes saved before the heightmap generator existed.
+ for(const file of PLAINS_CLIFF_TEXTURE_FILES){
+  const target=data.plains.slots[file.role];
+  target.image=textureUrl(file);target.name=file.file;target.scale=1;target.opacity=1;
+ }
+ return data;
+};
 // Keep explicit user overrides, but seed empty slots with the 25 committed PNGs.
 // The exported JSON stores URLs, never base64 copies of repo textures.
 export function ensureBiomeTextureDefaults(raw){
@@ -158,7 +171,10 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
     row.append(biome);
     const slot=element('select');slot.setAttribute('aria-label','Ranura de '+t.file);
     slot.style.cssText='width:80px;min-width:0;background:#1e4034;color:#fff;padding:6px';
-    const validSlots=t.kind==='ground'?['ground']:t.kind==='cliff'?['cliff']:['detail1','detail2','detail3'];
+    const validSlots=t.kind==='ground'?['ground']:
+     t.kind==='heightmap'?['cliffTopHeight','cliffBodyHeight']:
+     t.kind==='cliff'?['cliff','cliffTopColor','cliffBodyColor']:
+     ['detail1','detail2','detail3'];
     for(const key of validSlots){const option=element('option','',SLOTS.find(s=>s.id===key).name);option.value=key;slot.append(option)}
     row.append(slot);
     const edit=element('button','','Editar');edit.type='button';
@@ -185,7 +201,49 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   $('textureSeed').value=data.noise.seed;
   $('textureTransition').value=data.edgeBlend;
   $('textureTransitionValue').textContent=String(data.edgeBlend);
+  const plainCards=[];
+  for(const file of PLAINS_CLIFF_TEXTURE_FILES){
+   if(biomeId!=='plains')break;
+   const def=SLOTS.find(s=>s.id===file.role),item=data.slots[def.id];
+   const card=element('div');card.dataset.cliffMapSlot=file.role;
+   card.style.cssText='min-width:0;background:#1b3930;border:1px solid #4c7866;border-radius:8px;padding:7px;display:grid;gap:5px';
+   const heading=element('b','',def.name);heading.style.fontSize='12px';card.append(heading);
+   const img=element('img');img.alt=def.name;img.src=item.image||textureUrl(file);
+   img.loading='lazy';img.style.cssText='width:100%;height:104px;object-fit:cover;border-radius:5px';
+   card.append(img);
+   // Every visible map is a real saved slot; users may substitute a repository
+   // image without changing procedural geometry or uploading duplicate bytes.
+   const choose=element('select');
+   choose.setAttribute('aria-label','Imagen para '+def.name);
+   choose.style.cssText='width:100%;min-width:0;color:#fff;background:#20473a;border:1px solid #527c6c;padding:5px;font-size:11px';
+   const candidates=REPO_TEXTURES.filter(t=>file.kind==='heightmap'?
+    t.kind==='heightmap':t.kind==='cliff');
+   for(const t of candidates){
+    const opt=element('option','',t.file);opt.value=textureUrl(t);choose.append(opt);
+   }
+   // Custom images saved earlier remain usable after reload.
+   if(item.image&&!candidates.some(t=>textureUrl(t)===item.image)){
+    const opt=element('option','',item.name||'Imagen personalizada');opt.value=item.image;choose.append(opt);
+   }
+   choose.value=item.image||textureUrl(file);
+   choose.onchange=()=>{
+    const t=REPO_TEXTURES.find(t=>textureUrl(t)===choose.value);
+    mutate(m=>{
+     m.slots[def.id].image=choose.value;
+     m.slots[def.id].name=t?.file||item.name||def.name;
+    });
+   };
+   card.append(choose);plainCards.push(card);
+  }
+  if(biomeId==='plains'){
+   const section=element('div');section.id='plainsCliffActiveMaps';
+   section.style.cssText='margin:9px 0;padding:8px;border:1px solid #5b927a;border-radius:9px';
+   section.append(element('h3','','Acantilado · Top / Body'));
+   const grid=element('div');grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px';
+   grid.append(...plainCards);section.append(grid);slots.append(section);
+  }
   for(const def of SLOTS){
+   if(def.type==='cliffMap'||(biomeId==='plains'&&def.id==='cliff'))continue;
    const item=data.slots[def.id];
    const card=element('div','');
    card.style.cssText='border:1px solid #3d6a56;border-radius:9px;padding:9px;margin:9px 0;background:#1c3b30';
@@ -243,7 +301,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
  $('textureTransition').oninput=e=>$('textureTransitionValue').textContent=e.target.value;
  $('textureTransition').onchange=e=>mutate(m=>m.edgeBlend=Number(e.target.value));
  $('textureResetBiome').onclick=()=>{
-  if(!confirm('¿Restablecer las cinco ranuras y parámetros de '+BIOMES.find(b=>b.id===biomeId).name+'?'))return;
+  if(!confirm('¿Restablecer las ranuras y parámetros de '+BIOMES.find(b=>b.id===biomeId).name+'?'))return;
   mutate(()=>{ensure()[biomeId]=defaults()[biomeId]});
  };
  render();
