@@ -11,8 +11,14 @@ export function buildRefinedCliffGeometry(triangles,{repeat=8,maxEdge=3.0,maxTri
  // Use a single subdivision count for the entire selected patch so that
  // adjoining source triangles share the exact same edge vertices. Adaptive
  // per-face counts introduce T junctions and visible cracks.
- let divisions=clamp(Math.ceil(longest/maxEdge),1,12);
- while(divisions>1&&triangles.length*divisions*divisions>maxTriangles)divisions--;
+ // Every cliff-marked region MUST have at least 6× its source face
+ // density. Three divisions produce 9 small, conforming triangles per
+ // source triangle; never silently fall back to the coarse source grid.
+ // The caller chunks large zones before tessellation to bound memory.
+ let divisions=clamp(Math.ceil(longest/maxEdge),3,6);
+ while(divisions>3&&triangles.length*divisions*divisions>maxTriangles)divisions--;
+ if(triangles.length*divisions*divisions>maxTriangles)
+  throw Error('Acantilado demasiado grande para un bloque: subdividir en lotes');
  const vertices=[],faces=[],uvFaces=[];
  const lookup=new Map(),edgeCounts=new Map();
  const key=p=>p.map(v=>Math.round(v*10000)).join(':');
@@ -135,5 +141,7 @@ export function buildRefinedCliffGeometry(triangles,{repeat=8,maxEdge=3.0,maxTri
  geometry.setAttribute('normal',new THREE.Float32BufferAttribute(norm,3));
  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
  geometry.computeBoundingSphere();
+ geometry.userData={sourceTriangles:triangles.length,
+  divisions,generatedTriangles:pos.length/9,subdivisionRatio:(pos.length/9)/triangles.length};
  return geometry;
 }
