@@ -28,6 +28,10 @@
    cliffParentId:null,points:otherPoints,hidden:false,
    cliffAlignmentSignature:'rail-v1:'+
     JSON.stringify(otherPoints.map(p=>[p.x,p.z]))};
+  const desertPoints=rect(140,-43,185,24),desertRegion=rect(125,-115,200,115);
+  const desertZone={id:'cliff-desert',isCliff:true,cliffParentId:'desert-parent',
+   points:desertPoints,hidden:false,cliffAlignmentSignature:'rail-v1:'+
+    JSON.stringify(desertPoints.map(p=>[p.x,p.z]))};
   // Preserve a manually edited upper rim on this same cliff zone.
   const seamIds=Array.from({length:9},(_,j)=>60*n+60+j);
   const seamAnchors=Object.fromEntries(seamIds.map(i=>[i,[
@@ -37,7 +41,9 @@
    vertices:seamIds,path:seamIds,anchors:seamAnchors};
   const project={version:3,size:630,resolution:n,heights,nodes:[],holes:[],cuts3d:[],
    objectGroups:[],nextId:1,terrainSeams:[manualSeam],terrainVertexOffsets:{},
-   zones:[{id:'plain1',name:'Llanura',isCliff:false,biomeId:'plains',points:plainsPoints},zone,otherZone],
+   zones:[{id:'plain1',name:'Llanura',isCliff:false,biomeId:'plains',points:plainsPoints},
+    {id:'desert-parent',name:'Desierto',isCliff:false,biomeId:'desert',points:desertRegion},
+    zone,otherZone,desertZone],
    // Simulate a user's older project still referencing the retired grass map.
    biomeMaterials:{plains:{slots:{cliff:{
     name:'Textura de Acantilado llanura Cubierto de Hierba.png',
@@ -55,7 +61,7 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.107'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.109'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
@@ -69,16 +75,17 @@
    assert(row.querySelector('select')?.options.length>0,'El usuario no puede seleccionar '+role);
   }
   const mainCliff=allMaps.querySelector('[data-cliff-map-slot="cliff"]');
-  assert(mainCliff&&decodeURIComponent(mainCliff.querySelector('img').getAttribute('src')).includes('Textura de Acantilado llanura  CUERPO.png'),
-   'La ranura normal de llanura sigue usando la textura vieja de hierba');
+  assert(mainCliff&&decodeURIComponent(mainCliff.querySelector('img').getAttribute('src')).includes('Cubierto de Hierba.png'),
+   'Las opciones de material antiguas deben conservarse hasta que el usuario elija reemplazo');
   assert(mainCliff.querySelector('input[type="number"]').value==='100',
    'La escala 100 del acantilado original no sobrevivió a la migración');
   const initial=await wait(()=>{
    const root=painter.collisionRoot(),mesh=root.children.find(x=>x.userData.cliffZoneId==='cliff1');
    return mesh?.userData.cliffPart==='Base'?mesh:null;
   },'material base CUERPO del acantilado');
-  assert(decodeURIComponent(initial.userData.cliffImage).includes('Textura de Acantilado llanura  CUERPO.png'),
-   'La malla normal no está utilizando CUERPO.png');
+  assert(decodeURIComponent(initial.userData.cliffImage).includes('Cubierto de Hierba.png'),
+   'La malla conservó una selección antigua en lugar de modificar el archivo del proyecto');
+  assert(initial.material.map===null,'No se debe reutilizar un PNG de hierba que ya no existe');
   assert(initial.userData.repetition===100,'La escala 100 del acantilado original no se aplicó');
     assert(!allMaps.querySelector('[data-cliff-map-slot="cliffTopColor"]'),'Top Color must be absent');
   assert(!allMaps.querySelector('[data-cliff-map-slot="cliffTopHeight"]'),'Top Height must be absent');
@@ -94,15 +101,14 @@
   dialog.close();
   assert(!dialog.open,'La ayuda no cerró');
   stage='assets';
-  const paths=[
-   'Textura de Acantilado llanura  CUERPO.png',
-   'Textura de Acantilado llanura  CUERPO- COLOR.png',
-   'Textura de Acantilado llanura CUERPO-HEIGTH.png'];
+  const paths=['Textura de Acantilado llanura CUERPO-HEIGTH.png'];
   for(const file of paths){
    const response=await fetch('../assets/terrain/texturas/'+encodeURIComponent(file));
    assert(response.ok,'Falta recurso '+file+' HTTP '+response.status);
   }
   for(const retired of [
+   'Textura de Acantilado llanura  CUERPO.png',
+   'Textura de Acantilado llanura  CUERPO- COLOR.png',
    'Textura de Acantilado llanura Cubierto de Hierba.png',
    'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png',
    'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png'
@@ -128,8 +134,11 @@
   assert(parts.every(m=>m.userData.refinedTriangles>=6*m.userData.sourceTriangles),
    'Hay bloques de acantilado con subdivisión inferior a 6x');
   const body=parts[0];
-  assert(body.material.map.wrapS===1000&&body.material.map.wrapT===1000,
-   'Body Color debe repetirse en ambas dimensiones');
+  assert(body.material.map===null,'El archivo Body Color eliminado no debe mostrarse como PNG antiguo');
+  const desertMesh=root.children.find(m=>m.userData.cliffZoneId==='cliff-desert');
+  assert(desertMesh?.material.map?.image,'El acantilado actualizado de desierto no se cargó');
+  assert(desertMesh.material.map.wrapS===1000&&desertMesh.material.map.wrapT===1000,
+   'La textura de desierto debe repetirse en ambas dimensiones');
   const bodyUV=body.geometry.attributes.uv.array;
   const range=a=>{let min=Infinity,max=-Infinity;for(const v of a){min=Math.min(min,v);max=Math.max(max,v)}return[min,max]};
   const bodyRange=range(bodyUV);
@@ -206,8 +215,12 @@
    const next=painter.collisionRoot().children.find(m=>m.userData.cliffZoneId==='cliff1');
    return next&&next!==beforeMesh?next:null;
   },'geometría y materiales regenerados con nuevos PNG');
-  assert(replacement.material.map.image?.src?.includes('wt_texture_revision=manual-'),
-   'La GPU sigue usando la imagen antigua');
+  const desertUpdated=await wait(()=>{
+   const next=painter.collisionRoot().children.find(m=>m.userData.cliffZoneId==='cliff-desert');
+   return next&&next!==desertMesh?next:null;
+  },'material de desierto actualizado');
+  assert(desertUpdated.material.map.image?.src?.includes('wt_texture_revision=manual-'),
+   'La GPU conserva la versión antigua de la textura de desierto');
   const afterRefresh=JSON.parse(localStorage.getItem(key));
   assert(JSON.stringify(afterRefresh.heights)===JSON.stringify(saved.heights),
    'Actualizar imágenes alteró la malla del terreno');
@@ -216,7 +229,7 @@
   assert(JSON.stringify(afterRefresh.biomeMaterials)===JSON.stringify(saved.biomeMaterials),
    'Actualizar imágenes cambió las texturas guardadas');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · v0.9.107, PNG nuevos en GPU y miniaturas, escala y costuras conservadas';
+  document.getElementById('result').textContent='PASS · v0.9.109, nueva textura de desierto en GPU, heightmap de Llanura, avisos 404 y costuras intactas';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>
