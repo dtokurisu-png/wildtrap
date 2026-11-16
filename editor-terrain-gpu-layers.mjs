@@ -68,11 +68,11 @@ void main(){
  vec2 maskUV=vec2(vTerrainXZ.x/630.0+.5,.5-vTerrainXZ.y/630.0);
  float inside=texture2D(regionMask,maskUV).a;
  if(inside<.01)discard;
- // Denser distribution: 200 repeats -> ~300 potential appearances on the whole map.
- // The approximate count is per complementary image, NOT 200 x 200 tiles.
- float target=clamp(floor(repeats*1.5+.5),1.0,1200.0);
- float columns=ceil(sqrt(target));
- float probability=target/(columns*columns);
+ // The saved repeat count defines the number of candidate tiles per axis.
+ // Show 85% of those candidate patches, independently for each detail image.
+ // At 200 repeats: 200*200*0.85 = ~34,000 appearances per detail.
+ float columns=max(1.0,floor(repeats+.5));
+ float probability=0.85;
  vec2 unit=(vTerrainXZ+315.0)/630.0*columns;
  vec2 cell=floor(unit);
  if(cell.x<0.0||cell.y<0.0||cell.x>=columns||cell.y>=columns)discard;
@@ -80,17 +80,18 @@ void main(){
  if(rand2(id+43.0)>probability)discard;
  // One randomly positioned patch per chosen cell, always axis-aligned.
  float cellSize=630.0/columns;
- float extent=min(630.0/max(repeats,.25),cellSize*.72);
+ float extent=630.0/max(repeats,.25);
  vec2 jitter=vec2(rand2(id+12.0),rand2(id+25.0));
- vec2 center=-315.0+(cell+.22+.56*jitter)*cellSize;
+ vec2 center=-315.0+(cell+.12+.76*jitter)*cellSize;
  vec2 local=(vTerrainXZ-center)/extent;
  vec2 rotated=local;
  float edge=max(abs(rotated.x),abs(rotated.y));
- // Wide, squared feather: the perimeter fades to fully transparent.
- float feather=pow(1.0-smoothstep(.12,.5,edge),2.0);
+ // Keep the assigned opacity from the center to half the image radius;
+ // then smoothly fade to fully transparent at the outer image border.
+ float feather=1.0-smoothstep(.25,.5,edge);
  if(feather<.002)discard;
  vec4 sampleColor=texture2D(detailTexture,rotated+.5);
- float patchOpacity=.28+.22*rand2(id+94.0);
+ float patchOpacity=.5+.3*rand2(id+94.0);
  float alpha=inside*sampleColor.a*feather*patchOpacity*intensity;
  if(alpha<.002)discard;
  gl_FragColor=vec4(sampleColor.rgb,alpha);
