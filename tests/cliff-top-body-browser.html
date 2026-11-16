@@ -42,19 +42,26 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.103'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.104'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
   showMaps.click();
-  const allMaps=await wait(()=>d.getElementById('plainsCliffActiveMaps')?.querySelectorAll('[data-cliff-map-slot]').length===4?
+  const allMaps=await wait(()=>d.getElementById('plainsCliffActiveMaps')?.querySelectorAll('[data-cliff-map-slot]').length===2?
    d.getElementById('plainsCliffActiveMaps'):null,'cuatro mapas en propiedades de Llanura');
   assert(d.getElementById('textureBiome').value==='plains','La selección de bioma no cambió a Llanura');
-  for(const role of ['cliffTopColor','cliffTopHeight','cliffBodyColor','cliffBodyHeight']){
+  for(const role of ['cliffBodyColor','cliffBodyHeight']){
    const row=allMaps.querySelector('[data-cliff-map-slot="'+role+'"]');
    assert(row&&row.querySelector('img')?.getAttribute('src')?.endsWith('.png'),'Imagen de '+role+' no visible');
    assert(row.querySelector('select')?.options.length>0,'El usuario no puede seleccionar '+role);
   }
+  assert(!allMaps.querySelector('[data-cliff-map-slot="cliffTopColor"]'),'Top Color must be absent');
+  assert(!allMaps.querySelector('[data-cliff-map-slot="cliffTopHeight"]'),'Top Height must be absent');
+  // Set the SAME scale the user sees in the existing texture editor. There
+  // must not be an unrelated hidden Body tile size.
+  const scale=allMaps.querySelector('[data-cliff-map-slot="cliffBodyColor"] input[type="number"]');
+  assert(scale,'El Body Color no muestra su escala real');
+  scale.value='450';scale.dispatchEvent(new Event('change',{bubbles:true}));
   stage='help-modal';
   const dialog=d.getElementById('plainsCliffHelpDialog');
   d.getElementById('plainsCliffHelp').click();
@@ -63,8 +70,6 @@
   assert(!dialog.open,'La ayuda no cerró');
   stage='assets';
   const paths=[
-   'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png',
-   'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png',
    'Textura de Acantilado llanura  CUERPO- COLOR.png',
    'Textura de Acantilado llanura CUERPO-HEIGTH.png'];
   for(const file of paths){
@@ -77,22 +82,27 @@
   generate.click();
   const stats=await wait(()=>painter.getPlainsCliffStats().zones>=1&&
     painter.getPlainsCliffStats().moved>0?painter.getPlainsCliffStats():null,'heightmaps');
-  assert(stats.topTriangles>0&&stats.bodyTriangles>0,'Falta Top o Body');
+  assert(stats.bodyTriangles>=stats.sourceTriangles*6,'La malla no está subdividida al menos 6 veces');
+  assert(stats.subdivisionRatio>=6,'No se está aplicando subdivisión suficiente');
   assert(stats.maxOffset>0&&stats.maxOffset<=2.001,'Desplazamiento fuera del control de Relieve');
   const root=painter.collisionRoot(),parts=root.children.filter(x=>x.userData.cliffZoneId==='cliff1');
-  assert(parts.length===2,'Deben generarse exactamente dos partes, Top y Body: '+parts.length);
-  assert(parts.some(m=>m.userData.cliffPart==='Top')&&parts.some(m=>m.userData.cliffPart==='Body'),
-   'No se distinguieron los materiales de Top y Body');
-  const top=parts.find(m=>m.userData.cliffPart==='Top'),body=parts.find(m=>m.userData.cliffPart==='Body');
-  assert(top.material.map.wrapS===w.THREE?.ClampToEdgeWrapping||top.material.map.wrapS===1001,
-   'La textura Top no debe repetirse');
-  assert(body.material.map.wrapT===w.THREE?.RepeatWrapping||body.material.map.wrapT===1000,
-   'Body debe repetir la textura verticalmente');
-  const topUV=top.geometry.attributes.uv.array,bodyUV=body.geometry.attributes.uv.array;
+  assert(parts.length>=1,'No se generó ninguna malla Body');
+  assert(parts.every(m=>m.userData.cliffPart==='Body'),'No debe existir Top ni material adicional');
+  assert(parts.every(m=>m.userData.repetition===450),'La repetición visible 450 no coincide con la malla');
+  assert(parts.every(m=>m.userData.refinedTriangles>=6*m.userData.sourceTriangles),
+   'Hay bloques de acantilado con subdivisión inferior a 6x');
+  const body=parts[0];
+  assert(body.material.map.wrapS===1000&&body.material.map.wrapT===1000,
+   'Body Color debe repetirse en ambas dimensiones');
+  const bodyUV=body.geometry.attributes.uv.array;
   const range=a=>{let min=Infinity,max=-Infinity;for(const v of a){min=Math.min(min,v);max=Math.max(max,v)}return[min,max]};
-  const topRange=range(topUV),bodyRange=range(bodyUV);
-  assert(topRange[0]>=-.001&&topRange[1]<=1.001,'El Top salió de UV [0..1]');
-  assert(bodyRange[1]>1.01,'El Body no repite para la altura generada: '+bodyRange[1]);
+  const bodyRange=range(bodyUV);
+  assert(bodyRange[1]>1.01,'Body no utiliza la repetición 450 del editor: '+bodyRange[1]);
+  const inspector= w.__terrainMeshInspector;
+  assert(inspector&&typeof inspector.getState==='function','El inspector de malla no funciona');
+  const cliffStats=painter.getCliffSubdivisionStats();
+  assert(cliffStats.refinedTriangles>=cliffStats.sourceTriangles*6,
+   'Los triángulos reales del acantilado no se multiplicaron 6x');
   assert(root.visible,'El grupo de acantilados no es visible');
   stage='collision';
   const script=d.createElement('script');script.type='module';
@@ -112,7 +122,7 @@
   d.head.append(script);
   const probe=await wait(()=>w.__plainsCollisionProbe,'raycast collisions');
   assert(!probe.error,'Colisión generada falló: '+probe.error);
-  assert(probe.count===2,'Los dos materiales deben estar en el sistema de colisiones: '+probe.count);
+  assert(probe.count===parts.length,'La malla Body debe estar completa en colisiones: '+probe.count);
   assert(probe.wall===true,'El relieve del cuerpo no detuvo al personaje');
   assert(probe.top!==null,'El borde superior no tiene superficie caminable');
   stage='persist-and-seams';
@@ -121,6 +131,10 @@
    return r?.cliffHeightmapPlains?.enabled===true?r:null;
   },'save');
   assert(saved.cliffHeightmapPlains.strength===2,'No se guardó la intensidad');
+  assert(saved.biomeMaterials?.plains?.slots?.cliffBodyColor?.scale===450,
+   'No se guardó la repetición visible de Body Color');
+  assert(saved.biomeMaterials?.plains?.slots?.cliffBodyHeight?.scale===450,
+   'Body Height debe compartir escala con el color');
   assert(saved.heights.every((h,i)=>h===before.heights[i]),
    'La herramienta alteró el terreno original o los vértices editados');
   assert(JSON.stringify(saved.terrainVertexOffsets)===JSON.stringify(before.terrainVertexOffsets),
@@ -128,7 +142,7 @@
   assert(JSON.stringify(saved.terrainSeams)===JSON.stringify(before.terrainSeams),
    'Una costura protegida cambió de posición o desapareció');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · v0.9.103, cuatro mapas visibles y configurables, relieve Top/Body, colisiones y costuras protegidas';
+  document.getElementById('result').textContent='PASS · v0.9.104 Body Color/Height, escala 450 exacta, subdivisión 9x, colisiones y costuras';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>
