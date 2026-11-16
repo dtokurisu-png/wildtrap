@@ -1,4 +1,5 @@
 import {buildRefinedCliffGeometry} from './editor-cliff-mesh.mjs?v=0.9.86';
+import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
@@ -154,7 +155,12 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     triangles.push(tri);
    }
    if(!triangles.length)continue;
-   const geometry=buildRefinedCliffGeometry(triangles,{
+   // Do not allow triangular fragments to terminate the top and foot.
+   // All cliff faces in this zone share two horizontal cut planes.
+   // Keep this change render-only, so holes, collision and saved terrain
+   // retain their exact geometry. Legacy face selections stay unchanged.
+   const aligned=zone.isCliff?straightenCliffSeams(triangles):{triangles,seams:null};
+   const geometry=buildRefinedCliffGeometry(aligned.triangles,{
     repeat:Math.max(.25,Number(slot.scale)||8),maxEdge:3.0,maxTriangles:90000
    });
    if(!geometry)continue;
@@ -164,6 +170,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     map:tex,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,
     depthWrite:false,transparent:true,opacity:1
    }));
+   mesh.userData.cliffSeams=aligned.seams;
    mesh.renderOrder=4; // Terrain cliff texture remains visible in Play.
    cliffLayer.add(mesh);hasCliffs=true;
    mesh.userData.disposeTexture=tex;
