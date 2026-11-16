@@ -197,7 +197,7 @@ export const PLAINS_CLIFF_MAPS={
 // only lists images; it NEVER changes the current world's saved selections.
 let publishedFiles=null;
 const classifyTexture=file=>{
- const name=file.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+ const name=file.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const kind=/height|heigth|desplazamiento/.test(name)?'heightmap':
   /acantilado|muro|pared|roca labrada/.test(name)?'cliff':
   /suelo base|piso base/.test(name)?'ground':'blend';
@@ -211,7 +211,7 @@ const classifyTexture=file=>{
 export function syncPublishedTextureFiles(entries){
  if(!Array.isArray(entries))return {added:0,removed:0,total:REPO_TEXTURES.length};
  const valid=entries.filter(x=>typeof x.file==='string'&&
-  /\\.(png|jpe?g|webp)$/i.test(x.file)&&x.file.length<=240);
+  /\.(png|jpe?g|webp)$/i.test(x.file)&&x.file.length<=240);
  const old=new Map(REPO_TEXTURES.map(x=>[x.file,x]));
  const list=[],seen=new Set();
  let added=0;
