@@ -3,8 +3,8 @@ import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
-import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.99';
-import {buildCliffTopBodyBuffers,PLAINS_CLIFF_DEFAULTS} from './editor-cliff-top-body.mjs?v=0.9.99';
+import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.101';
+import {buildCliffTopBodyBuffers,PLAINS_CLIFF_DEFAULTS} from './editor-cliff-top-body.mjs?v=0.9.101';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
 export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false,isHoleAt=()=>false}){
@@ -190,7 +190,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    const aligned=zone.isCliff&&!plains?
     straightenCliffSeams(triangles):{triangles,seams:null};
    const geometry=buildRefinedCliffGeometry(aligned.triangles,{
-    repeat:Math.max(.25,Number(slot.scale)||8),maxEdge:3.0,maxTriangles:90000
+    repeat:Math.max(.25,Number(slot?.scale)||8),maxEdge:3.0,maxTriangles:90000
    });
    if(!geometry)continue;
    function addMaterial(buffer,colorImage,part,repeat){
