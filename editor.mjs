@@ -13,6 +13,7 @@ import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.61';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
 import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.90';
+import {straightenCliffZone} from './editor-cliff-alignment.mjs?v=0.9.92';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
@@ -1933,15 +1934,37 @@ function animate(){
 animate();
 window.__editorReady?.();
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
+// A cliff zone is an editable contour. Apply one undoable correction per
+// contour revision, to the real terrain vertices (height + XZ offsets).
+// Existing projects with already-marked cliff zones are aligned on first load.
+function alignMarkedCliffZones({recordHistory=false}={}){
+ const pending=(Array.isArray(live.zones)?live.zones:[]).filter(zone=>{
+  if(!zone?.isCliff||!Array.isArray(zone.points)||zone.points.length<3)return false;
+  const signature='rail-v1:'+JSON.stringify(zone.points.map(p=>[Number(p.x)||0,Number(p.z)||0]));
+  return zone.cliffAlignmentSignature!==signature;
+ });
+ if(!pending.length)return 0;
+ if(recordHistory)snapshot();
+ let total=0;
+ for(const zone of pending){
+  const result=straightenCliffZone(live,zone,{size:SIZE,resolution:N});
+  total+=result.changed;
+  zone.cliffAlignmentSignature='rail-v1:'+JSON.stringify(zone.points.map(p=>[Number(p.x)||0,Number(p.z)||0]));
+ }
+ if(total)refreshTerrain();
+ persist();
+ return total;
+}
 async function initializeZoneTool(){
  try{
   const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.69');
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
-   onChange:()=>{terrainPainter?.schedule();biomeGeneratorTool?.refresh();},
+   onChange:()=>{alignMarkedCliffZones();terrainPainter?.schedule();biomeGeneratorTool?.refresh();},
    nextHistorySerial:nextUndoSerial,onPendingHistoryChange:updateHistoryButtons,
    onPendingEdit:()=>{redo.length=0;updateHistoryButtons()}});
+  alignMarkedCliffZones({recordHistory:true});
   zoneTool.refreshAll();updateHistoryButtons();
   if(window.__workspaceLayout?.getState().workspace==='zones')setMode('zones');
  }catch(error){
