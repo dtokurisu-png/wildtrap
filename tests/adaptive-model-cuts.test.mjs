@@ -86,7 +86,7 @@ test('sin intersección espacial, no reconstruye mallas lejanas',()=>{
 
 test('el cuchillo poligonal tiene prioridad sobre selección y arrastre de GLB',()=>{
  const editor=fs.readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
- const selectionGuard=editor.indexOf("if(v==='holePaint'){");
+ const selectionGuard=editor.indexOf("if(v==='holePaint'||");
  const down=editor.indexOf("view.addEventListener('pointerdown',e=>{",editor.indexOf("function completeModelDrag"));
  const modelPicking=editor.indexOf('const hovered=pickedNodeAt(e);',down);
  const knifeBranch=editor.indexOf("if(mode==='holePaint'){",down);
