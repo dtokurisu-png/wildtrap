@@ -178,23 +178,20 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
   <strong>Acantilado · Llanura</strong>
   <button id="plainsCliffHelp" type="button" title="Información sobre heightmaps de acantilados" aria-label="Ayuda: heightmaps de acantilado" style="width:28px;min-width:28px;height:28px;padding:0;border-radius:50%">ⓘ</button>
  </div>
- <div class="grid2" style="margin:6px 0">
-  <span title="Imagen de la franja superior, sin repetición">Top ✓</span>
-  <span title="Imagen del cuerpo, repetible verticalmente">Body ✓</span>
- </div>
+ <div style="margin:6px 0;color:#c9ffe4;font-size:12px">Body Color + Body Height</div>
  <label>Relieve <output id="plainsCliffStrengthValue">1.5</output>
   <input id="plainsCliffStrength" type="range" min="0" max="4" step=".25" value="1.5">
  </label>
  <div class="grid2" style="margin-top:6px">
- <button id="plainsCliffViewMaps" type="button">Ver 4 mapas</button>
+ <button id="plainsCliffViewMaps" type="button">Ver materiales</button>
  <button id="plainsCliffGenerate" type="button">Generar</button>
  </div>
  <output id="plainsCliffStatus" class="hint" hidden></output>
 </div>
 <dialog id="plainsCliffHelpDialog" aria-labelledby="plainsCliffHelpTitle" style="background:#18372c;color:#e5fff0;border:1px solid #55977c;border-radius:12px;max-width:min(420px,92vw);padding:16px">
  <h3 id="plainsCliffHelpTitle" style="margin:0 0 9px">Acantilado de llanura</h3>
- <p>Top: una sola imagen de color y un heightmap en la franja superior, sin repetición. Body: color y heightmap independientes que se repiten según la altura.</p>
- <p>Relieve modifica la profundidad de los salientes geométricos. Los bordes y costuras protegidas conservan su posición. El generador solo actúa sobre acantilados asociados al bioma Llanura.</p>
+ <p>Llanura utiliza una sola textura de acantilado: Body Color. Su Body Height deforma la malla real subdividida. Ambas imágenes utilizan la misma repetición indicada en las propiedades del Body.</p>
+ <p>«Generar» añade relieve a Llanura; las demás zonas de acantilado también reciben al menos 9 triángulos por cada triángulo original. Las costuras siguen protegidas.</p>
  <p>La geometría se genera sin modificar los vértices originales ni las costuras guardadas. El modo Probar la incorpora en las colisiones.</p>
  <form method="dialog"><button type="submit">Cerrar</button></form>
 </dialog>
@@ -395,7 +392,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
-<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.103
+<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.104
  <span id="editorSaveState" style="font-weight:400;display:block;opacity:.8">Guardado local</span></div>
 <div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
@@ -436,5 +433,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.103').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.104').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
