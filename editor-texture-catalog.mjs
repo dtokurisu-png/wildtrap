@@ -176,4 +176,13 @@ export const REPO_TEXTURES=[
  }
 ];
 export const textureUrl=texture=>'./assets/terrain/texturas/'+encodeURIComponent(texture.file);
+// Existing repository PNGs: the TOP color is a single-use strip, the BODY
+// color repeats with height; their respective heightmaps drive real geometry.
+// Keep this four-map prototype separate from the old single 'cliff' slot.
+export const PLAINS_CLIFF_MAPS={
+ topColor:textureUrl({file:'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png'}),
+ topHeight:textureUrl({file:'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png'}),
+ bodyColor:textureUrl({file:'Textura de Acantilado llanura  CUERPO- COLOR.png'}),
+ bodyHeight:textureUrl({file:'Textura de Acantilado llanura CUERPO-HEIGTH.png'})
+};
 export const TEXTURE_KINDS=[{id:'ground',name:'Texturas base'},{id:'blend',name:'Complementarias'},{id:'cliff',name:'Acantilados'}];
