@@ -106,10 +106,10 @@ export const REPO_TEXTURES=[
  },
  {
   "id": "tx16",
-  "file": "Textura de Acantilado llanura Cubierto de Hierba.png",
+  "file": "Textura de Acantilado llanura  CUERPO.png",
   "biome": "plains",
   "kind": "cliff",
-  "size": 2185783
+  "size": 1853214
  },
  {
   "id": "tx17",
@@ -175,21 +175,20 @@ export const REPO_TEXTURES=[
   "size": 2333667
  }
 ];
-// Llanura has ONE cliff material and its corresponding displacement map.
-// Historical Top images remain in the repository (not deleted) but are no
-// longer offered or applied in the new single-body generator.
+// Llanura has one normal cliff image (CUERPO.png), plus dedicated
+// CUERPO Color/Height assets for the optional heightmap generator.
+// Deprecated "Cubierto de Hierba" assets are no longer offered or referenced.
 export const PLAINS_CLIFF_TEXTURE_FILES=[
  {id:'tx28',file:'Textura de Acantilado llanura  CUERPO- COLOR.png',biome:'plains',kind:'cliff',role:'cliffBodyColor',size:934326},
  {id:'tx29',file:'Textura de Acantilado llanura CUERPO-HEIGTH.png',biome:'plains',kind:'heightmap',role:'cliffBodyHeight',size:457558}
 ];
 REPO_TEXTURES.push(...PLAINS_CLIFF_TEXTURE_FILES);
 export const textureUrl=texture=>'./assets/terrain/texturas/'+encodeURIComponent(texture.file);
-// Existing repository PNGs: the TOP color is a single-use strip, the BODY
-// color repeats with height; their respective heightmaps drive real geometry.
-// Keep this four-map prototype separate from the old single 'cliff' slot.
+// Llanura source files verified in assets/terrain/texturas.
+// "cliff" is the original single-material cliff, restored to CUERPO.png.
+// The optional procedural generator uses the other two dedicated images.
 export const PLAINS_CLIFF_MAPS={
- topColor:textureUrl({file:'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png'}),
- topHeight:textureUrl({file:'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png'}),
+ base:textureUrl({file:'Textura de Acantilado llanura  CUERPO.png'}),
  bodyColor:textureUrl({file:'Textura de Acantilado llanura  CUERPO- COLOR.png'}),
  bodyHeight:textureUrl({file:'Textura de Acantilado llanura CUERPO-HEIGTH.png'})
 };

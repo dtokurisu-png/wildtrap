@@ -1,5 +1,5 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><title>Cliff Top Body heightmaps - Wildtrap</title></head>
-<body data-result="PENDING"><div id="result">Validando los cuatro PNG originales en el editor</div>
+<body data-result="PENDING"><div id="result">Validando CUERPO base, CUERPO Color y CUERPO Height</div>
 <script>
 (async()=>{
  const fail=(stage,e)=>{document.body.dataset.result='FAIL';document.getElementById('result').textContent='FAIL '+stage+': '+e.message;};
@@ -38,6 +38,12 @@
   const project={version:3,size:630,resolution:n,heights,nodes:[],holes:[],cuts3d:[],
    objectGroups:[],nextId:1,terrainSeams:[manualSeam],terrainVertexOffsets:{},
    zones:[{id:'plain1',name:'Llanura',isCliff:false,biomeId:'plains',points:plainsPoints},zone,otherZone],
+   // Simulate a user's older project still referencing the retired grass map.
+   biomeMaterials:{plains:{slots:{cliff:{
+    name:'Textura de Acantilado llanura Cubierto de Hierba.png',
+    image:'./assets/terrain/texturas/'+encodeURIComponent('Textura de Acantilado llanura Cubierto de Hierba.png'),
+    scale:100,opacity:1
+   }}}},
    settings:{heightMax:120,biomeTexturesVisible:true}};
   localStorage.setItem(key,JSON.stringify(project));
   const f=document.createElement('iframe');f.width=1400;f.height=900;f.src='../?safe=1';
@@ -49,20 +55,32 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.105'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.106'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
   showMaps.click();
-  const allMaps=await wait(()=>d.getElementById('plainsCliffActiveMaps')?.querySelectorAll('[data-cliff-map-slot]').length===2?
-   d.getElementById('plainsCliffActiveMaps'):null,'cuatro mapas en propiedades de Llanura');
+  const allMaps=await wait(()=>d.getElementById('plainsCliffActiveMaps')?.querySelectorAll('[data-cliff-map-slot]').length===3?
+   d.getElementById('plainsCliffActiveMaps'):null,'tres materiales de CUERPO en Llanura');
   assert(d.getElementById('textureBiome').value==='plains','La selección de bioma no cambió a Llanura');
-  for(const role of ['cliffBodyColor','cliffBodyHeight']){
+  for(const role of ['cliff','cliffBodyColor','cliffBodyHeight']){
    const row=allMaps.querySelector('[data-cliff-map-slot="'+role+'"]');
    assert(row&&row.querySelector('img')?.getAttribute('src')?.endsWith('.png'),'Imagen de '+role+' no visible');
    assert(row.querySelector('select')?.options.length>0,'El usuario no puede seleccionar '+role);
   }
-  assert(!allMaps.querySelector('[data-cliff-map-slot="cliffTopColor"]'),'Top Color must be absent');
+  const mainCliff=allMaps.querySelector('[data-cliff-map-slot="cliff"]');
+  assert(mainCliff&&decodeURIComponent(mainCliff.querySelector('img').getAttribute('src')).includes('Textura de Acantilado llanura  CUERPO.png'),
+   'La ranura normal de llanura sigue usando la textura vieja de hierba');
+  assert(mainCliff.querySelector('input[type="number"]').value==='100',
+   'La escala 100 del acantilado original no sobrevivió a la migración');
+  const initial=await wait(()=>{
+   const root=painter.collisionRoot(),mesh=root.children.find(x=>x.userData.cliffZoneId==='cliff1');
+   return mesh?.userData.cliffPart==='Base'?mesh:null;
+  },'material base CUERPO del acantilado');
+  assert(decodeURIComponent(initial.userData.cliffImage).includes('Textura de Acantilado llanura  CUERPO.png'),
+   'La malla normal no está utilizando CUERPO.png');
+  assert(initial.userData.repetition===100,'La escala 100 del acantilado original no se aplicó');
+    assert(!allMaps.querySelector('[data-cliff-map-slot="cliffTopColor"]'),'Top Color must be absent');
   assert(!allMaps.querySelector('[data-cliff-map-slot="cliffTopHeight"]'),'Top Height must be absent');
   // Set the SAME scale the user sees in the existing texture editor. There
   // must not be an unrelated hidden Body tile size.
@@ -77,11 +95,20 @@
   assert(!dialog.open,'La ayuda no cerró');
   stage='assets';
   const paths=[
+   'Textura de Acantilado llanura  CUERPO.png',
    'Textura de Acantilado llanura  CUERPO- COLOR.png',
    'Textura de Acantilado llanura CUERPO-HEIGTH.png'];
   for(const file of paths){
    const response=await fetch('../assets/terrain/texturas/'+encodeURIComponent(file));
    assert(response.ok,'Falta recurso '+file+' HTTP '+response.status);
+  }
+  for(const retired of [
+   'Textura de Acantilado llanura Cubierto de Hierba.png',
+   'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png',
+   'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png'
+  ]){
+   const reply=await fetch('../assets/terrain/texturas/'+encodeURIComponent(retired),{method:'HEAD'});
+   assert(reply.status===404,'Una textura de hierba retirada sigue existiendo: '+retired);
   }
   stage='generate';
   const before=JSON.parse(localStorage.getItem(key));
@@ -95,6 +122,8 @@
   const root=painter.collisionRoot(),parts=root.children.filter(x=>x.userData.cliffZoneId==='cliff1');
   assert(parts.length>=1,'No se generó ninguna malla Body');
   assert(parts.every(m=>m.userData.cliffPart==='Body'),'No debe existir Top ni material adicional');
+  assert(parts.every(m=>decodeURIComponent(m.userData.cliffImage).includes('CUERPO- COLOR.png')),
+   'El material generado no está usando CUERPO- COLOR.png');
   assert(parts.every(m=>m.userData.repetition===450),'La repetición visible 450 no coincide con la malla');
   assert(parts.every(m=>m.userData.refinedTriangles>=6*m.userData.sourceTriangles),
    'Hay bloques de acantilado con subdivisión inferior a 6x');
@@ -158,7 +187,7 @@
   assert(JSON.stringify(saved.terrainSeams)===JSON.stringify(before.terrainSeams),
    'Una costura protegida cambió de posición o desapareció');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · v0.9.105 Body Color/Height, escala 450, malla 9x en todos los acantilados, inspección y costuras';
+  document.getElementById('result').textContent='PASS · base CUERPO recuperada de la hierba antigua, 3 materiales correctos, Body Color/Height vertical, escala y subdivisión';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>

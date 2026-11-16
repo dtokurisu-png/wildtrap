@@ -13,6 +13,8 @@ export function createTextureScalePreview({onApply,toast}){
  let renderer=null,scene=null,camera=null,orbit=null,plane=null,texture=null,model=null;
  let raf=0,openToken=0,drag=null,request=null,active=null;
  const bounds=(v,min,max)=>Math.max(min,Math.min(max,v));
+ // Base CUERPO, dedicated Body Color and Body Height are all vertical cliff maps.
+ const isCliffSlot=slot=>slot==='cliff'||slot==='cliffBodyColor'||slot==='cliffBodyHeight';
  const value=()=>bounds(Number(number.value)||8,.25,1000);
  const label=()=>{
   const v=value(),tile=630/v;
@@ -69,7 +71,7 @@ export function createTextureScalePreview({onApply,toast}){
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
   camera=new THREE.OrthographicCamera(-5,5,5,-5,.02,3000);
-  if(item.slot==='cliff'){
+  if(isCliffSlot(item.slot)){
    camera.position.set(3,3.2,11);
    camera.lookAt(0,.5,0);
   }else{
@@ -77,7 +79,7 @@ export function createTextureScalePreview({onApply,toast}){
    camera.lookAt(0,0,0);
   }
   orbit=new OrbitControls(camera,canvas);orbit.enableDamping=true;
-  orbit.target.set(0,item.slot==='cliff'?.5:0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
+  orbit.target.set(0,isCliffSlot(item.slot)?.5:0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
   update();
   const draw=()=>{
    if(token!==openToken||!dialog.open)return;
@@ -123,7 +125,7 @@ export function createTextureScalePreview({onApply,toast}){
   }
   status.textContent=settled[0].status==='rejected'?'No se pudo cargar la imagen.':
    settled[1].status==='rejected'?'Textura lista; no se pudo cargar Explorador 1 WT.':
-   (item.slot==='cliff'?
+   (isCliffSlot(item.slot)?
     'Acantilado · plano vertical XY desde Y=0 · Explorador 1 WT (0.9 unidades)':
     'Suelo · plano horizontal XZ · Explorador 1 WT (0.9 unidades)');
  }
@@ -157,7 +159,7 @@ export function createTextureScalePreview({onApply,toast}){
   open(item){
    if(dialog.open)dialog.close();
    active=item;request=item.url;
-   $('textureScaleTitle').textContent=(item.slot==='cliff'?'Editar acantilado · ':'Editar suelo · ')+item.name;
+   $('textureScaleTitle').textContent=(isCliffSlot(item.slot)?'Editar acantilado · ':'Editar suelo · ')+item.name;
    number.value=String(bounds(item.scale,.25,1000));
    status.textContent='Cargando textura y Explorador 1 WT…';
    dialog.showModal();
