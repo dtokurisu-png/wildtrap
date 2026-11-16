@@ -67,8 +67,8 @@ const legacy=ensureBiomeTextureDefaults({plains:{slots:{
  cliffBodyColor:{image:PLAINS_CLIFF_MAPS.bodyColor,name:'Body',scale:8},
  cliffBodyHeight:{image:PLAINS_CLIFF_MAPS.bodyHeight,name:'Height',scale:8}
 }}});
-assert.equal(legacy.plains.slots.cliff.image,PLAINS_CLIFF_MAPS.base,
- 'Old saved grassy cliff must migrate automatically to CUERPO.png');
+assert.equal(legacy.plains.slots.cliff.image,textureUrl({file:grass}),
+ 'Old saved material choice must be retained, even after the PNG disappears');
 assert.equal(legacy.plains.slots.cliff.scale,100,
  'Existing user-selected normal cliff scale must be preserved on migration');
 
