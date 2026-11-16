@@ -1793,7 +1793,7 @@ void import('./map-publisher.mjs?v=0.9.40').then(({createMapPublisher})=>{
  createMapPublisher({getScene:()=>({...live,editorCamera:currentEditorCamera()})});
 }).catch(error=>{const status=$('publishStatus');if(status)status.textContent='No se pudo iniciar el publicador: '+error.message;});
 $('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
-updateMaxHeightControl();refreshTerrain();draw();
+updateMaxHeightControl();refreshTerrain();alignMarkedCliffZones();draw();
 if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
 persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
@@ -1902,7 +1902,7 @@ async function loadPublishedWorld(){
   // Do not reset the user's last camera merely because the published map loaded.
   if(!restoreEditorCamera(world.editorCamera,{remember:true}))
    live.editorCamera=currentEditorCamera();
-  playerSpawnPanel?.refresh();updateMaxHeightControl();refreshTerrain();draw();persist();
+  playerSpawnPanel?.refresh();updateMaxHeightControl();refreshTerrain();alignMarkedCliffZones();draw();persist();
   toast('Escenario oficial cargado desde el repositorio');
  }catch(err){console.warn('No se pudo cargar mapa oficial',err);void restoreSavedBase(false)}
 }
@@ -1957,7 +1957,7 @@ function alignMarkedCliffZones({recordHistory=false}={}){
 }
 async function initializeZoneTool(){
  try{
-  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.69');
+  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.92');
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
