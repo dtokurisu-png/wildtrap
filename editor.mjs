@@ -20,7 +20,7 @@ import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createTextureRevisionWatcher,revisionedTextureUrl} from './editor-texture-live-refresh.mjs?v=0.9.109';
-import {syncPublishedTextureCatalog} from './editor-texture-catalog.mjs?v=0.9.109';
+import {syncPublishedTextureCatalog,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.109';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
@@ -2138,10 +2138,19 @@ async function reloadPublishedTextureCatalog(){
  try{
   const result=await syncPublishedTextureCatalog();
   textureTool?.refreshAssets?.();
-  if(result.added||result.removed){
-   const el=$('textureUpdateStatus');
-   if(el)el.title='Catálogo GitHub: '+result.added+' nuevas · '+
-    result.removed+' retiradas. Las referencias guardadas no se modificaron.';
+  const missing=[];
+  for(const biome of Object.values(live.biomeMaterials||{})){
+   for(const slot of Object.values(biome?.slots||{})){
+    if(slot?.image&&!isPublishedTextureUrl(slot.image))
+     missing.push(slot.name||slot.image);
+   }
+  }
+  const el=$('textureUpdateStatus');
+  if(el){
+   el.title='GitHub: '+result.added+' archivos nuevos · '+result.removed+
+    ' retirados. '+(missing.length?missing.length+' asignaciones sin archivo: '+
+     missing.join(', '):'Sin asignaciones faltantes.');
+   if(missing.length)el.textContent='⚠ '+missing.length+' faltan';
   }
  }catch(error){
   // Asset loading remains usable offline. The manual refresh still bypasses
