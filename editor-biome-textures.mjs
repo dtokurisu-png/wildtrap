@@ -75,7 +75,7 @@ export function normalizeBiomeMaterials(raw){
    const cliffRaw=src.slots?.cliff;
    const originalScale=Number(cliffRaw?.scale);
    if(Number.isFinite(originalScale)&&originalScale>=.25&&
-      (!bodyRaw||Math.abs(Number(bodyRaw.scale)-1)<1e-9))
+      (!bodyRaw||(Number(bodyRaw.scale)<=8&&originalScale>8)))
     dest.slots.cliffBodyColor.scale=cl(originalScale,.25,1000);
   }
   dest.noise.scale=cl(Number(src.noise?.scale)||20,1,200);
@@ -159,7 +159,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   const filter=select.value;
   let shown=0;
   for(const category of TEXTURE_KINDS){
-   const files=REPO_TEXTURES.filter(t=>t.kind===category.id&&(filter==='all'||(filter==='untagged'?!tagFor(t):tagFor(t)===filter)));
+   const files=REPO_TEXTURES.filter(t=>!(filter==='plains'&&t.kind==='cliff'&&t.biome==='plains'&&!t.role)&&t.kind===category.id&&(filter==='all'||(filter==='untagged'?!tagFor(t):tagFor(t)===filter)));
    const group=element('section');
    group.style.cssText='border:1px solid #406c5c;border-radius:9px;padding:8px;margin:8px 0';
    group.append(element('h3','',category.name+' ('+files.length+')'));
