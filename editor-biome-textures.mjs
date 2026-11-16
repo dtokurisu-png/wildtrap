@@ -121,7 +121,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   if(!record){toast('No se encontró la ranura de la textura');return}
   try{
    if(!previewController){
-    const {createTextureScalePreview}=await import('./editor-texture-scale-preview.mjs?v=0.9.77');
+    const {createTextureScalePreview}=await import('./editor-texture-scale-preview.mjs?v=0.9.106');
     previewController=createTextureScalePreview({toast,onApply:next=>{
      snapshot();
      const current=ensure()[next.biome]?.slots?.[next.slot];
