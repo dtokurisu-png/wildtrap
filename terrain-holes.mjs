@@ -316,14 +316,31 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   if(!anchors.size)return false;
   const overlaps=p=>isTerrainCutAt(p[0],p[1],p[2],new Set(),stamps,live.size,live.resolution);
   for(const p of anchors.values())if(overlaps(p))return true;
+  function segmentIntersectsStamp(a,b,stamp){
+   // Liang–Barsky clipping in 3D: catches even very narrow cuts between
+   // two protected vertices, where finite point sampling can miss a cut.
+   const hits=(part)=>{
+    let enter=0,exit=1;
+    for(const plane of part.planes){
+     const da=plane.n[0]*a[0]+plane.n[1]*a[1]+plane.n[2]*a[2]-plane.limit;
+     const db=plane.n[0]*b[0]+plane.n[1]*b[1]+plane.n[2]*b[2]-plane.limit;
+     if(da>1e-6&&db>1e-6)return false;
+     if(da<=1e-6&&db<=1e-6)continue;
+     const t=da/(da-db);
+     if(da>db)enter=Math.max(enter,t);
+     else exit=Math.min(exit,t);
+     if(enter>exit+1e-8)return false;
+    }
+    return true;
+   };
+   return (stamp.parts||[stamp]).some(hits);
+  }
   for(const seam of live.terrainSeams||[]){
    const path=Array.isArray(seam.path)?seam.path:[];
    for(let i=1;i<path.length;i++){
     const a=anchors.get(path[i-1]),b=anchors.get(path[i]);
     if(!a||!b)continue;
-    for(const t of [.25,.5,.75]){
-     if(overlaps([0,1,2].map(k=>a[k]+(b[k]-a[k])*t)))return true;
-    }
+    if(stamps.some(stamp=>segmentIntersectsStamp(a,b,stamp)))return true;
    }
   }
   return false;
