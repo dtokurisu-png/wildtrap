@@ -28,7 +28,7 @@ const watcher=createTextureRevisionWatcher({
  onStatus:msg=>messages.push(msg),
  host:null,page:null
 });
-assert.equal(watcher.getRevision(),'editor-0.9.107');
+assert.equal(watcher.getRevision(),'editor-0.9.109');
 assert.equal(await watcher.check(true),true);
 assert.equal(watcher.getRevision(),'git-'+commit.slice(0,16));
 assert.equal(updates.length,1);
