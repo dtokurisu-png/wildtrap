@@ -158,7 +158,9 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   for(const zone of live.zones||[]){
    const slot=live.biomeMaterials?.[parentBiome(zone)]?.slots?.cliff;
    const img=loaded.get(slot?.image);
-   if(!img)continue;
+   const candidatePlains=zone.isCliff&&parentBiome(zone)==='plains'&&
+    live.cliffHeightmapPlains?.enabled===true;
+   if(!img&&!candidatePlains)continue;
    // A cliff is now an explicitly outlined zone. Apply the inherited cliff
    // material to faces located inside its XZ contour, with no slope threshold.
    // Older stored face-based cliffs remain supported for existing projects.
@@ -184,8 +186,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    if(!triangles.length)continue;
    // The plains four-map prototype keeps the original user-edited rim
    // instead of trimming it with horizontal cutoff planes.
-   const plains=zone.isCliff&&parentBiome(zone)==='plains'&&
-    live.cliffHeightmapPlains?.enabled===true;
+   const plains=candidatePlains;
    const aligned=zone.isCliff&&!plains?
     straightenCliffSeams(triangles):{triangles,seams:null};
    const geometry=buildRefinedCliffGeometry(aligned.triangles,{
@@ -236,8 +237,9 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
      continue;
     }
    }
-   // Preserve existing single-material renderer for other biomes and
-   // for missing files, unsupported or flat cliff regions.
+   // Legacy fallback needs the legacy color image; never crash when only
+   // the four-map prototype is configured.
+   if(!img){geometry.dispose();continue}
    const tex=new THREE.Texture(img);tex.needsUpdate=true;tex.colorSpace=THREE.SRGBColorSpace;
    tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.anisotropy=4;
    const mesh=new THREE.Mesh(geometry,new THREE.MeshLambertMaterial({
