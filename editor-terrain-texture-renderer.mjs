@@ -3,7 +3,7 @@ import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
-import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.101';
+import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.103';
 import {buildCliffTopBodyBuffers,PLAINS_CLIFF_DEFAULTS} from './editor-cliff-top-body.mjs?v=0.9.101';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
