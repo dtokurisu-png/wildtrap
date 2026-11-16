@@ -21,6 +21,13 @@
   const zone={id:'cliff1',name:'Cliff sample',isCliff:true,cliffParentId:'plain1',
    points:cliffPoints,hidden:false,cliffAlignmentSignature:'rail-v1:'+
     JSON.stringify(cliffPoints.map(p=>[p.x,p.z]))};
+  // Every marked cliff must subdivide, including a zone with NO biome or
+  // color material. It should render with the neutral fallback.
+  const otherPoints=rect(-180,-43,-140,24);
+  const otherZone={id:'cliff-unassigned',name:'Cliff without biome',isCliff:true,
+   cliffParentId:null,points:otherPoints,hidden:false,
+   cliffAlignmentSignature:'rail-v1:'+
+    JSON.stringify(otherPoints.map(p=>[p.x,p.z]))};
   // Preserve a manually edited upper rim on this same cliff zone.
   const seamIds=Array.from({length:9},(_,j)=>60*n+60+j);
   const seamAnchors=Object.fromEntries(seamIds.map(i=>[i,[
@@ -30,7 +37,7 @@
    vertices:seamIds,path:seamIds,anchors:seamAnchors};
   const project={version:3,size:630,resolution:n,heights,nodes:[],holes:[],cuts3d:[],
    objectGroups:[],nextId:1,terrainSeams:[manualSeam],terrainVertexOffsets:{},
-   zones:[{id:'plain1',name:'Llanura',isCliff:false,biomeId:'plains',points:plainsPoints},zone],
+   zones:[{id:'plain1',name:'Llanura',isCliff:false,biomeId:'plains',points:plainsPoints},zone,otherZone],
    settings:{heightMax:120,biomeTexturesVisible:true}};
   localStorage.setItem(key,JSON.stringify(project));
   const f=document.createElement('iframe');f.width=1400;f.height=900;f.src='../?safe=1';
@@ -98,8 +105,17 @@
   const range=a=>{let min=Infinity,max=-Infinity;for(const v of a){min=Math.min(min,v);max=Math.max(max,v)}return[min,max]};
   const bodyRange=range(bodyUV);
   assert(bodyRange[1]>1.01,'Body no utiliza la repetición 450 del editor: '+bodyRange[1]);
-  const inspector= w.__terrainMeshInspector;
+  const inspector=w.__terrainMeshInspector;
   assert(inspector&&typeof inspector.getState==='function','El inspector de malla no funciona');
+  const fallback=root.children.filter(m=>m.userData.cliffZoneId==='cliff-unassigned');
+  assert(fallback.length>0,'El acantilado sin material no recibió subdivisión');
+  assert(fallback.every(m=>m.userData.refinedTriangles>=m.userData.sourceTriangles*6),
+   'El acantilado sin bioma conserva triángulos demasiado grandes');
+  inspector.setActive(true);
+  const inspectorStats=inspector.getState();
+  assert(inspectorStats.cliffTriangles===root.children.reduce((n,m)=>n+m.userData.refinedTriangles,0),
+   'La vista de malla no enseña los triángulos subdivididos reales');
+  inspector.setActive(false);
   const cliffStats=painter.getCliffSubdivisionStats();
   assert(cliffStats.refinedTriangles>=cliffStats.sourceTriangles*6,
    'Los triángulos reales del acantilado no se multiplicaron 6x');
@@ -122,7 +138,7 @@
   d.head.append(script);
   const probe=await wait(()=>w.__plainsCollisionProbe,'raycast collisions');
   assert(!probe.error,'Colisión generada falló: '+probe.error);
-  assert(probe.count===parts.length,'La malla Body debe estar completa en colisiones: '+probe.count);
+  assert(probe.count===root.children.length,'Las zonas subdivididas deben participar en colisiones: '+probe.count);
   assert(probe.wall===true,'El relieve del cuerpo no detuvo al personaje');
   assert(probe.top!==null,'El borde superior no tiene superficie caminable');
   stage='persist-and-seams';
@@ -142,7 +158,7 @@
   assert(JSON.stringify(saved.terrainSeams)===JSON.stringify(before.terrainSeams),
    'Una costura protegida cambió de posición o desapareció');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · v0.9.104 Body Color/Height, escala 450 exacta, subdivisión 9x, colisiones y costuras';
+  document.getElementById('result').textContent='PASS · v0.9.104 Body Color/Height, escala 450, malla 9x en todos los acantilados, inspección y costuras';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>
