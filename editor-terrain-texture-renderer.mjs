@@ -214,10 +214,14 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     mesh.renderOrder=4;cliffLayer.add(mesh);hasCliffs=true;
     return mesh;
    }
-   const topColor=plains&&loaded.get(PLAINS_CLIFF_MAPS.topColor);
-   const bodyColor=plains&&loaded.get(PLAINS_CLIFF_MAPS.bodyColor);
-   const topHeight=plains&&heightPixels(PLAINS_CLIFF_MAPS.topHeight);
-   const bodyHeight=plains&&heightPixels(PLAINS_CLIFF_MAPS.bodyHeight);
+   const cliffMaps=live.biomeMaterials?.plains?.slots||{};
+   const selectedMap=kind=>cliffMaps[kind]?.image||PLAINS_CLIFF_MAPS[
+    {cliffTopColor:'topColor',cliffTopHeight:'topHeight',cliffBodyColor:'bodyColor',cliffBodyHeight:'bodyHeight'}[kind]
+   ];
+   const topColor=plains&&loaded.get(selectedMap('cliffTopColor'));
+   const bodyColor=plains&&loaded.get(selectedMap('cliffBodyColor'));
+   const topHeight=plains&&heightPixels(selectedMap('cliffTopHeight'));
+   const bodyHeight=plains&&heightPixels(selectedMap('cliffBodyHeight'));
    if(plains&&topColor&&bodyColor&&topHeight&&bodyHeight){
     const settings={...PLAINS_CLIFF_DEFAULTS,...live.cliffHeightmapPlains};
     const split=buildCliffTopBodyBuffers(geometry,{
@@ -262,8 +266,13 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    for(const key of ['ground','detail1','detail2','detail3','cliff'])
     if(slots?.[key]?.image)urls.add(slots[key].image);
   }
-  if(live.cliffHeightmapPlains?.enabled===true)
-   for(const url of Object.values(PLAINS_CLIFF_MAPS))urls.add(url);
+  if(live.cliffHeightmapPlains?.enabled===true){
+   const slots=live.biomeMaterials?.plains?.slots||{};
+   for(const [slot,key] of Object.entries({
+    cliffTopColor:'topColor',cliffTopHeight:'topHeight',
+    cliffBodyColor:'bodyColor',cliffBodyHeight:'bodyHeight'
+   }))urls.add(slots[slot]?.image||PLAINS_CLIFF_MAPS[key]);
+  }
   await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));
   if(ticket!==generation)return;
   // The old 768x768 baked terrain map turned 200 repeats into just 3.84
