@@ -1007,6 +1007,9 @@ terrainVertexEditor=createTerrainVertexEditor({scene,terrain,terrainGeo,camera,v
    return terrainVertexEditor?.getState().active===true;
   }});
 window.__terrainVertexEditor=terrainVertexEditor;
+const seamHelp=$('terrainSeamHelp'),seamHelpDialog=$('terrainSeamHelpDialog');
+seamHelp?.addEventListener('click',()=>seamHelpDialog?.showModal());
+
 objectMeshOverlays=createObjectMeshOverlays({
  getNodes:()=>live.nodes,getRoots:id=>renderedNodes.get(id)||[]
 });
