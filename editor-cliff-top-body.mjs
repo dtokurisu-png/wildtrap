@@ -66,7 +66,10 @@ function boundaryGrid(positions,paths,cell=5){
    const hit=grid.get([xyz[0]+x,xyz[1]+y,xyz[2]+z].join(':'));
    for(const q of hit||[])best=Math.min(best,dist(p,q));
   }
-  return Number.isFinite(best)?smooth(best/(cell*.85)):1;
+  // The refined visual mesh is intentionally offset 0.085 world units from
+  // source terrain. Include that epsilon and the 0.08 smoothing tolerance
+  // so an actual user seam is EXACTLY stationary, not only nearly stationary.
+  return Number.isFinite(best)?smooth((best-.30)/(cell*.85-.30)):1;
  };
 }
 function localVerticalBounds(positions,axis){
