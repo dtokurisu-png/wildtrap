@@ -12,7 +12,7 @@ import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.61';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
-import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.88';
+import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.89';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
@@ -556,7 +556,7 @@ function updateStatus(){
 function updateMeshInspection(){
  const editing=mode==='meshEdit'&&!testingScene&&live.nodes.some(n=>n.id===selectedId&&n.kind==='prefab');
  const editingTerrain=mode==='meshEdit'&&!testingScene&&!editing;
- const showTerrain=live.settings?.terrainMeshVisible===true&&!testingScene&&!editingTerrain;
+ const showTerrain=(live.settings?.terrainMeshVisible===true||editingTerrain)&&!testingScene;
  if(vertexEditor){
   if(vertexEditor.getState().active!==editing)vertexEditor.setActive(editing);
   else vertexEditor.updateInfo();
