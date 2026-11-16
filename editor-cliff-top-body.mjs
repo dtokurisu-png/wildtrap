@@ -70,10 +70,10 @@ function boundaryGrid(positions,paths,cell=5){
  };
 }
 function localVerticalBounds(positions,axis){
- const length=positions.length/3;
- let low=Infinity,high=-Infinity;
- const umin=Math.min(...Array.from({length},(_,i)=>positions[i*3+axis]));
- const umax=Math.max(...Array.from({length},(_,i)=>positions[i*3+axis]));
+ let low=Infinity,high=-Infinity,umin=Infinity,umax=-Infinity;
+ for(let i=0;i<positions.length;i+=3){
+  umin=Math.min(umin,positions[i+axis]);umax=Math.max(umax,positions[i+axis]);
+ }
  const span=Math.max(1e-5,umax-umin);
  const n=clamp(Math.ceil(span/6),8,64);
  const bottoms=Array(n).fill(Infinity),tops=Array(n).fill(-Infinity);
