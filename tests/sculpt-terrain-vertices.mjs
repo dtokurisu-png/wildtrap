@@ -14,6 +14,6 @@ assert.match(terrain,/intersectPlane\(e,g\.dragPlane\)/,'Mouse movement intersec
 assert.match(editor,/live\.terrainVertexOffsets\?\.\[i\]/,'Full XYZ vertex coordinates survive terrain rebuild');
 assert.match(terrain,/attr\.setXYZ\(i,x,h,z\)/,'Vertex moves update all three axes of terrain geometry');
 assert.match(terrain,/if\(!g\.snapshotted\)\{snapshot\(\)/,'History snapshot is taken before a deformation');
-assert.match(terrain,/if\(g\.moved\)\{refreshTerrain\(\);persist\(\);\}/,'Vertex changes synchronize the rest of terrain');
+assert.match(terrain,/if\(g\.moved\)\{[\s\S]*?refreshTerrain\(\);[\s\S]*?persist\(true\);/,'Vertex changes synchronize and immediately save the terrain');
 assert.match(editor,/terrainVertexOffsets=\{\}/,'Reset clears free vertex offsets');
 console.log('PASS: Sculpt selects and drags terrain vertices freely in XYZ with persistent XZ offsets and undo');
