@@ -21,8 +21,15 @@
   const zone={id:'cliff1',name:'Cliff sample',isCliff:true,cliffParentId:'plain1',
    points:cliffPoints,hidden:false,cliffAlignmentSignature:'rail-v1:'+
     JSON.stringify(cliffPoints.map(p=>[p.x,p.z]))};
+  // Preserve a manually edited upper rim on this same cliff zone.
+  const seamIds=Array.from({length:9},(_,j)=>60*n+60+j);
+  const seamAnchors=Object.fromEntries(seamIds.map(i=>[i,[
+   (i%n)*630/(n-1)-315,heights[i],Math.floor(i/n)*630/(n-1)-315
+  ]]));
+  const manualSeam={id:'seam-upper',name:'Costura superior',kind:'cliff',
+   vertices:seamIds,path:seamIds,anchors:seamAnchors};
   const project={version:3,size:630,resolution:n,heights,nodes:[],holes:[],cuts3d:[],
-   objectGroups:[],nextId:1,terrainSeams:[],terrainVertexOffsets:{},
+   objectGroups:[],nextId:1,terrainSeams:[manualSeam],terrainVertexOffsets:{},
    zones:[{id:'plain1',name:'Llanura',isCliff:false,biomeId:'plains',points:plainsPoints},zone],
    settings:{heightMax:120,biomeTexturesVisible:true}};
   localStorage.setItem(key,JSON.stringify(project));
@@ -83,6 +90,8 @@
    'La herramienta alteró el terreno original o los vértices editados');
   assert(JSON.stringify(saved.terrainVertexOffsets)===JSON.stringify(before.terrainVertexOffsets),
    'La geometría original se desplazó');
+  assert(JSON.stringify(saved.terrainSeams)===JSON.stringify(before.terrainSeams),
+   'Una costura protegida cambió de posición o desapareció');
   document.body.dataset.result='PASS';
   document.getElementById('result').textContent='PASS · 4 PNG reales, Top no repetido, Body repetible, relieve XYZ, colisión y malla original protegida';
  }catch(e){fail(stage,e)}
