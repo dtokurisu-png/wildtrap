@@ -91,9 +91,43 @@
   assert(editor.getState().protectedVertices>=7,'Deshacer perdió protección de la malla');
   d.getElementById('redo').click();
   assert(editor.getState().seams===0,'Rehacer no volvió a retirar la protección');
+  // A NON-protected, manually edited terrain vertex must survive a REAL
+  // browser reload, including the camera's separate delayed save channel.
+  const free=64*n+75,original=editor.debugVertexXYZ(free);
+  assert(original,'No se encontró vértice del terreno para guardado');
+  if(!editor.getState().active)d.getElementById('sculptSelectVertices').click();
+  assert(editor.getState().active,'No se activó selector de terreno para prueba de guardado');
+  const pt=editor.debugProjectVertex(free);
+  emit('pointerdown',pt.x,pt.y,45);
+  emit('pointermove',pt.x+28,pt.y-19,45);
+  emit('pointerup',pt.x+28,pt.y-19,45,false,0);
+  const moved=editor.debugVertexXYZ(free);
+  assert(moved&&moved.some((v,i)=>Math.abs(v-original[i])>.01),
+   'El movimiento manual no cambió la posición XYZ');
+  const savedMove=await wait(()=>{
+   const raw=localStorage.getItem(key),data=raw&&JSON.parse(raw);
+   return data&&Math.abs(data.heights[free]-original[1])>.01?data:null;
+  },'guardado inmediato XYZ');
+  assert(savedMove.terrainVertexOffsets&&typeof savedMove.terrainVertexOffsets==='object',
+   'Guardado XYZ no incluye offsets');
+  d.getElementById('angle').click();
+  await sleep(2200); // camera save used to overwrite world without save timestamp
+  const savedBeforeReload=JSON.parse(localStorage.getItem(key));
+  assert(Math.abs(savedBeforeReload.heights[free]-moved[1])<.005,
+   'Guardado de cámara revirtió la geometría');
+  frame.src='../?safe=1&reload-terrain=1';
+  const reloaded=await wait(()=>{
+   const next=frame.contentWindow?.__terrainVertexEditor;
+   return next&&next!==editor&&frame.contentDocument?.querySelector('#boot[hidden]')?next:null;
+  },'recarga real del editor');
+  const after=reloaded.debugVertexXYZ(free);
+  assert(after&&after.every((v,i)=>Math.abs(v-moved[i])<.015),
+   'Se perdieron vértices XYZ al recargar el editor: '+JSON.stringify({moved,after}));
+  const state=frame.contentDocument.getElementById('editorSaveState')?.textContent;
+  assert(state!=='Error al guardar','El editor informó fallo de guardado');
   document.body.dataset.result='PASS';
   d.getElementById('viewport').style.display='none';
-  document.getElementById('result').textContent='PASS · botón funcional desde primer clic, ayuda modal, Ctrl+clic, costura protegida, edición manual y Undo/Redo';
+  document.getElementById('result').textContent='PASS · costuras, guardado inmediato XYZ, guardado de cámara y recarga real sin pérdida de geometría';
  }catch(e){document.body.dataset.result='FAIL';document.getElementById('result').textContent='FAIL: '+e.message;}
 })();
 </script></body></html>
