@@ -31,8 +31,9 @@ export function straightenCliffSeams(triangles,{trimFraction=.065,minHeight=2}={
  if(!triangles?.length)return {triangles:[],seams:null};
  const valid=triangles.filter(t=>t.length===3&&t.every(safe));
  if(!valid.length)return {triangles:[],seams:null};
- const heights=valid.flatMap(t=>t.map(p=>p[1]));
- const minY=Math.min(...heights),maxY=Math.max(...heights),range=maxY-minY;
+ let minY=Infinity,maxY=-Infinity;
+ for(const tri of valid)for(const p of tri){minY=Math.min(minY,p[1]);maxY=Math.max(maxY,p[1]);}
+ const range=maxY-minY;
  if(range<minHeight)return {triangles:valid,seams:null};
  // A single top and foot Y for this WHOLE cliff region. Clipping at common
  // levels produces horizontal seams in both geometry and projected UV.
