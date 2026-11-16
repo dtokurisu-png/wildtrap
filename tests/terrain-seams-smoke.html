@@ -4,7 +4,7 @@
  const assert=(test,message)=>{if(!test)throw Error(message)};
  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
  const wait=async(check,label)=>{
-  for(let i=0;i<170;i++){const result=check();if(result)return result;await sleep(200);}
+  for(let i=0;i<90;i++){const result=check();if(result)return result;await sleep(120);}
   throw Error('Timeout '+label);
  };
  const n=129,k=64*n+62,finish=64*n+68,key='wildtrap-editor-draft-safe-v1';
