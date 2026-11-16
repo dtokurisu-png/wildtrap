@@ -12,7 +12,8 @@ import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.61';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
-import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.90';
+import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.95';
+import {restoreTerrainSeams,seamVertexIds} from './terrain-seams.mjs?v=0.9.94';
 import {straightenCliffZone} from './editor-cliff-alignment.mjs?v=0.9.92';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
@@ -245,6 +246,8 @@ function updateHistoryButtons(){
 }
 function snapshot(){undo.push(JSON.stringify(live));undoSerials.push(nextUndoSerial());redo.length=0;if(undo.length>20){undo.shift();undoSerials.shift()}persist();updateHistoryButtons()}
 function refreshTerrain(){
+// Central invariant: any automatic rebuild restores seam XYZ anchors first.
+restoreTerrainSeams(live,{size:SIZE,resolution:N});
 const p=terrainGeo.attributes.position;
 const rgb=new Float32Array(COUNT*3),color=new THREE.Color();
 for(let i=0;i<COUNT;i++){
@@ -717,6 +720,7 @@ function brush(x,z){
 const radius=Number($('brushRadius').value),strength=Number($('strength').value),cell=SIZE/(N-1);
 const cx=Math.round((x/SIZE+.5)*(N-1)),cz=Math.round((z/SIZE+.5)*(N-1));const r=Math.ceil(radius/cell);
 let source=(mode==='smooth'||mode==='trim')?live.heights.slice():null;
+const fixedSeamVertices=seamVertexIds(live,COUNT);
 let target=null;
 if(mode==='flatten'){
  // Capture maximum or minimum from the entire circular brush BEFORE any vertex moves.
@@ -731,6 +735,7 @@ if(mode==='flatten'){
 for(let j=Math.max(0,cz-r);j<=Math.min(N-1,cz+r);j++)for(let i=Math.max(0,cx-r);i<=Math.min(N-1,cx+r);i++){
 const px=(i/(N-1)-.5)*SIZE,pz=(j/(N-1)-.5)*SIZE,d=Math.hypot(px-x,pz-z);
 if(d>radius)continue;const falloff=(1-d/radius)**2,k=index(i,j),old=live.heights[k],delta=strength*.12*falloff;
+if(fixedSeamVertices.has(k))continue;
 if(mode==='raise')live.heights[k]=clamp(old+delta,0,Number($('maxHeight').value));
 if(mode==='lower')live.heights[k]=clamp(old-delta,0,Number($('maxHeight').value));
 if(mode==='flatten'&&target!==null)live.heights[k]=clamp(old+(target-old)*clamp(strength*.075*falloff,0,.95),0,Number($('maxHeight').value));
@@ -1631,13 +1636,15 @@ view.addEventListener('wheel',e=>{
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
 $('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
-$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.terrainVertexOffsets={};live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.terrainVertexOffsets={};live.terrainSeams=[];live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 function restoreHistoryState(data){
  // Restore the complete scene, including zones, textures and cuts.
  // Do not replace the live reference used by the other editor modules.
  const meshSelection=mode==='meshEdit'?[...selectedIds]:[];
  const v=JSON.parse(data);
  Object.assign(live,v);
+ live.terrainSeams=Array.isArray(v.terrainSeams)?v.terrainSeams:[];
+ live.terrainVertexOffsets=v.terrainVertexOffsets&&typeof v.terrainVertexOffsets==='object'?v.terrainVertexOffsets:{};
  if(!Array.isArray(live.holes))live.holes=[];
  if(!Array.isArray(live.zones))live.zones=[];
  if(!Array.isArray(v.cuts3d))live.cuts3d=[];
@@ -1792,7 +1799,7 @@ $('export').onclick=()=>{live.editorCamera=currentEditorCamera();download('wildt
 void import('./map-publisher.mjs?v=0.9.40').then(({createMapPublisher})=>{
  createMapPublisher({getScene:()=>({...live,editorCamera:currentEditorCamera()})});
 }).catch(error=>{const status=$('publishStatus');if(status)status.textContent='No se pudo iniciar el publicador: '+error.message;});
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.terrainSeams=Array.isArray(x.terrainSeams)?x.terrainSeams:[];live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
 updateMaxHeightControl();refreshTerrain();alignMarkedCliffZones();draw();
 if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
 persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
@@ -1837,6 +1844,8 @@ async function restoreSavedBase(confirmOverwrite=false){
   if(data.size!==SIZE||data.resolution!==N||data.heights?.length!==COUNT)throw Error('Terreno base incompatible');
   if(confirmOverwrite)snapshot();
   Object.assign(live,data);
+  live.terrainSeams=Array.isArray(data.terrainSeams)?data.terrainSeams:[];
+  live.terrainVertexOffsets=data.terrainVertexOffsets&&typeof data.terrainVertexOffsets==='object'?data.terrainVertexOffsets:{};
   live.holes=[];
   live.cuts3d=[];
   live.zones=[];zoneTool?.refreshAll();
@@ -1869,7 +1878,7 @@ try{
  if(saved){
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
-   Object.assign(live,d);live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
+   Object.assign(live,d);live.terrainSeams=Array.isArray(d.terrainSeams)?d.terrainSeams:[];live.terrainVertexOffsets=d.terrainVertexOffsets&&typeof d.terrainVertexOffsets==='object'?d.terrainVertexOffsets:{};live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
    live.settings={heightMax:120,...(d.settings&&typeof d.settings==='object'?d.settings:{})};
    recoveredDraft=true;
    playerSpawnPanel?.refresh();
@@ -1894,6 +1903,8 @@ async function loadPublishedWorld(){
   const world=await response.json();
   if(world.size!==SIZE||world.resolution!==N||world.heights?.length!==COUNT||!Array.isArray(world.nodes))throw Error('Escenario publicado incompatible');
   Object.assign(live,world);
+  live.terrainSeams=Array.isArray(world.terrainSeams)?world.terrainSeams:[];
+  live.terrainVertexOffsets=world.terrainVertexOffsets&&typeof world.terrainVertexOffsets==='object'?world.terrainVertexOffsets:{};
   live.holes=Array.isArray(world.holes)?world.holes:[];
   live.cuts3d=Array.isArray(world.cuts3d)?world.cuts3d:[];
   live.objectGroups=cleanObjectGroups(world.objectGroups);live.zones=Array.isArray(world.zones)?world.zones:[];zoneTool?.refreshAll();live.biomeMaterials=world.biomeMaterials&&typeof world.biomeMaterials==='object'?world.biomeMaterials:{};live.biomeGenerator=world.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
