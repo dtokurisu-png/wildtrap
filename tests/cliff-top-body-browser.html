@@ -1,0 +1,90 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Cliff Top Body heightmaps - Wildtrap</title></head>
+<body data-result="PENDING"><div id="result">Validando los cuatro PNG originales en el editor</div>
+<script>
+(async()=>{
+ const fail=(stage,e)=>{document.body.dataset.result='FAIL';document.getElementById('result').textContent='FAIL '+stage+': '+e.message;};
+ const assert=(v,m)=>{if(!v)throw Error(m)};
+ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+ const wait=async(fn,label)=>{
+  for(let i=0;i<100;i++){const v=fn();if(v)return v;await sleep(120)}
+  throw Error('Timeout '+label);
+ };
+ let stage='fixture';
+ try{
+  const n=129,key='wildtrap-editor-draft-safe-v1',heights=Array(n*n).fill(0);
+  for(let z=0;z<n;z++)for(let x=0;x<n;x++){
+   const h=z<=59?32:z>=67?0:32*(67-z)/8;
+   heights[z*n+x]=h;
+  }
+  const rect=(x,z,X,Z)=>[{x,z},{x:X,z},{x:X,z:Z},{x,z:Z}];
+  const cliffPoints=rect(-55,-43,55,24),plainsPoints=rect(-125,-115,125,115);
+  const zone={id:'cliff1',name:'Cliff sample',isCliff:true,cliffParentId:'plain1',
+   points:cliffPoints,hidden:false,cliffAlignmentSignature:'rail-v1:'+
+    JSON.stringify(cliffPoints.map(p=>[p.x,p.z]))};
+  const project={version:3,size:630,resolution:n,heights,nodes:[],holes:[],cuts3d:[],
+   objectGroups:[],nextId:1,terrainSeams:[],terrainVertexOffsets:{},
+   zones:[{id:'plain1',name:'Llanura',isCliff:false,biomeId:'plains',points:plainsPoints},zone],
+   settings:{heightMax:120,biomeTexturesVisible:true}};
+  localStorage.setItem(key,JSON.stringify(project));
+  const f=document.createElement('iframe');f.width=1400;f.height=900;f.src='../?safe=1';
+  document.body.append(f);
+  stage='startup';
+  const painter=await wait(()=>f.contentWindow?.__terrainTexturePainter?.getPlainsCliffStats&&
+   f.contentDocument?.querySelector('#boot[hidden]')&&f.contentWindow.__terrainTexturePainter,'renderer');
+  const w=f.contentWindow,d=f.contentDocument;
+  const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
+  assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
+  stage='help-modal';
+  const dialog=d.getElementById('plainsCliffHelpDialog');
+  d.getElementById('plainsCliffHelp').click();
+  assert(dialog.open,'La ayuda no abrió su modal');
+  dialog.close();
+  assert(!dialog.open,'La ayuda no cerró');
+  stage='assets';
+  const paths=[
+   'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png',
+   'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png',
+   'Textura de Acantilado llanura  CUERPO- COLOR.png',
+   'Textura de Acantilado llanura CUERPO-HEIGTH.png'];
+  for(const file of paths){
+   const response=await fetch('../assets/terrain/texturas/'+encodeURIComponent(file));
+   assert(response.ok,'Falta recurso '+file+' HTTP '+response.status);
+  }
+  stage='generate';
+  const before=JSON.parse(localStorage.getItem(key));
+  strength.value='2';strength.dispatchEvent(new Event('input',{bubbles:true}));
+  generate.click();
+  const stats=await wait(()=>painter.getPlainsCliffStats().zones>=1&&
+    painter.getPlainsCliffStats().moved>0?painter.getPlainsCliffStats():null,'heightmaps');
+  assert(stats.topTriangles>0&&stats.bodyTriangles>0,'Falta Top o Body');
+  assert(stats.maxOffset>0&&stats.maxOffset<=2.001,'Desplazamiento fuera del control de Relieve');
+  const root=painter.collisionRoot(),parts=root.children.filter(x=>x.userData.cliffZoneId==='cliff1');
+  assert(parts.length===2,'Deben generarse exactamente dos partes, Top y Body: '+parts.length);
+  assert(parts.some(m=>m.userData.cliffPart==='Top')&&parts.some(m=>m.userData.cliffPart==='Body'),
+   'No se distinguieron los materiales de Top y Body');
+  const top=parts.find(m=>m.userData.cliffPart==='Top'),body=parts.find(m=>m.userData.cliffPart==='Body');
+  assert(top.material.map.wrapS===w.THREE?.ClampToEdgeWrapping||top.material.map.wrapS===1001,
+   'La textura Top no debe repetirse');
+  assert(body.material.map.wrapT===w.THREE?.RepeatWrapping||body.material.map.wrapT===1000,
+   'Body debe repetir la textura verticalmente');
+  const topUV=top.geometry.attributes.uv.array,bodyUV=body.geometry.attributes.uv.array;
+  const range=a=>[Math.min(...a),Math.max(...a)];
+  const topRange=range(topUV),bodyRange=range(bodyUV);
+  assert(topRange[0]>=-.001&&topRange[1]<=1.001,'El Top salió de UV [0..1]');
+  assert(bodyRange[1]>1.01,'El Body no repite para la altura generada: '+bodyRange[1]);
+  assert(root.visible,'El grupo de acantilados no es visible');
+  stage='persist-and-seams';
+  const saved=await wait(()=>{
+   const r=JSON.parse(localStorage.getItem(key));
+   return r?.cliffHeightmapPlains?.enabled===true?r:null;
+  },'save');
+  assert(saved.cliffHeightmapPlains.strength===2,'No se guardó la intensidad');
+  assert(saved.heights.every((h,i)=>h===before.heights[i]),
+   'La herramienta alteró el terreno original o los vértices editados');
+  assert(JSON.stringify(saved.terrainVertexOffsets)===JSON.stringify(before.terrainVertexOffsets),
+   'La geometría original se desplazó');
+  document.body.dataset.result='PASS';
+  document.getElementById('result').textContent='PASS · 4 PNG reales, Top no repetido, Body repetible, relieve XYZ, colisión y malla original protegida';
+ }catch(e){fail(stage,e)}
+})();
+</script></body></html>
