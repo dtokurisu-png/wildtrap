@@ -60,7 +60,12 @@ function protectionField(position,seamPaths,radius=2.5){
     best=Math.min(best,pointDistance(p,a,b));
    }
   }
-  const value=Number.isFinite(best)?smooth(best/radius):1;
+  // Refined geometry includes a 0.085-unit anti-z-fighting offset and up
+  // to 0.08 units of relaxation. Exactly pin the whole neighborhood of
+  // each user seam instead of leaving a tiny displacement at that offset.
+  const protectedMargin=Math.min(.25,radius*.4);
+  const value=Number.isFinite(best)?
+   smooth(Math.max(0,best-protectedMargin)/Math.max(.01,radius-protectedMargin)):1;
   cache.set(pk,value);
   return value;
  };
