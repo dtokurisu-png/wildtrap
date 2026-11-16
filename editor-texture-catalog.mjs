@@ -175,6 +175,13 @@ export const REPO_TEXTURES=[
   "size": 2333667
  }
 ];
+export const PLAINS_CLIFF_TEXTURE_FILES=[
+ {id:'tx26',file:'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png',biome:'plains',kind:'cliff',role:'cliffTopColor',size:677607},
+ {id:'tx27',file:'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png',biome:'plains',kind:'heightmap',role:'cliffTopHeight',size:331065},
+ {id:'tx28',file:'Textura de Acantilado llanura  CUERPO- COLOR.png',biome:'plains',kind:'cliff',role:'cliffBodyColor',size:934326},
+ {id:'tx29',file:'Textura de Acantilado llanura CUERPO-HEIGTH.png',biome:'plains',kind:'heightmap',role:'cliffBodyHeight',size:457558}
+];
+REPO_TEXTURES.push(...PLAINS_CLIFF_TEXTURE_FILES);
 export const textureUrl=texture=>'./assets/terrain/texturas/'+encodeURIComponent(texture.file);
 // Existing repository PNGs: the TOP color is a single-use strip, the BODY
 // color repeats with height; their respective heightmaps drive real geometry.
@@ -185,4 +192,4 @@ export const PLAINS_CLIFF_MAPS={
  bodyColor:textureUrl({file:'Textura de Acantilado llanura  CUERPO- COLOR.png'}),
  bodyHeight:textureUrl({file:'Textura de Acantilado llanura CUERPO-HEIGTH.png'})
 };
-export const TEXTURE_KINDS=[{id:'ground',name:'Texturas base'},{id:'blend',name:'Complementarias'},{id:'cliff',name:'Acantilados'}];
+export const TEXTURE_KINDS=[{id:'ground',name:'Texturas base'},{id:'blend',name:'Complementarias'},{id:'cliff',name:'Acantilados'},{id:'heightmap',name:'Heightmaps'}];
