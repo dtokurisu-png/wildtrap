@@ -95,7 +95,10 @@ export function buildRefinedCliffGeometry(triangles,{repeat=8,maxEdge=3.0,maxTri
    const d=avg.map((v,k)=>(v-p[k])*.28);
    const normal=normals0[i];
    const projection=d[0]*normal.x+d[1]*normal.y+d[2]*normal.z;
-   for(let k=0;k<3;k++)d[k]-=projection*normal.getComponent(k);
+   // Retain a small fraction of normal-direction relaxation. Tangential-only
+   // smoothing changes tessellation but cannot round a triangulated ridge.
+   // Limit total displacement to protect the underlying collision surface.
+   for(let k=0;k<3;k++)d[k]-=.70*projection*normal.getComponent(k);
    const target=p.map((v,k)=>v+d[k]);
    const off=target.map((v,k)=>v-original[i][k]);
    const magnitude=Math.hypot(...off);
