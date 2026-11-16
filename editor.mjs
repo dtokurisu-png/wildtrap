@@ -211,7 +211,7 @@ sceneObjectManager=createSceneObjectManager({
  selectTerrain:()=>{
   selectedIds.clear();selectedId=null;
   terrainPropertiesSelected=true;
-  updateSelectionHighlights();updateStatus();
+  updateSelectionHighlights();updateStatus();updateMeshInspection();
   window.__workspaceLayout?.activateTab('object');
  }
 });
@@ -522,6 +522,7 @@ function updateStatus(){
  $('sculptSelectVertices').textContent=mode==='meshEdit'?'✓ Terminar selección de vértices':'✣ Seleccionar vértices';
  $('sculptSelectVertices').classList.toggle('active',mode==='meshEdit');
  $('sculptSelectVertices').setAttribute('aria-pressed',String(mode==='meshEdit'));
+ $('sculptSelectVertices').title='Sin modelo: editar vértices del escenario; con modelo: editar vértices GLB';
  if(editable){
   const locks=picked.rotationLocks||{};
   // The saved XYZ lock buttons apply to movement AND rotation.
@@ -543,7 +544,8 @@ function updateStatus(){
  }
  vertexEditor?.updateInfo();
  const modelSculptActive=sculptTools[mode]&&picked?.kind==='prefab';
- if($('sculptTargetHint'))$('sculptTargetHint').textContent=modelSculptActive?
+ if($('sculptTargetHint'))$('sculptTargetHint').textContent=mode==='meshEdit'&&!editable?
+  'Vértices del escenario: clic selecciona; arrastra para modificar altura Y; rectángulo selecciona varios; Ctrl añade selección.':modelSculptActive?
   'Esculpiendo '+(prefabById(picked.prefabId)?.name||picked.prefabId)+
    ': solo se modifica su malla. Los vértices bloqueados no se afectan.':
   'Sin un GLB seleccionado se esculpe el terreno. Selecciona un modelo en Objetos de escena para esculpir su malla.';
