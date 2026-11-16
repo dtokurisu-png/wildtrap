@@ -1,3 +1,4 @@
+import {buildRefinedCliffGeometry} from './editor-cliff-mesh.mjs?v=0.9.86';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
@@ -142,26 +143,21 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     [...new Set((zone.cliffs||[]).flatMap(c=>Array.isArray(c.faces)?c.faces:[])
      .filter(f=>Number.isInteger(f)&&f>=0&&f<faceCount))];
    if(!faces.length)continue;
-   const verts=[],uvs=[];
-   const scale=Math.max(.25,Number(slot.scale)||8);
+   // Refine the cliff overlay only. The original terrain mesh, cuts, holes,
+   // saved map and physics remain unchanged. Faces bordering holes are left
+   // out before the shared-vertex subdivision and gentle smoothing pass.
+   const triangles=[];
    for(const f of faces){
     const tri=getFace(f);
     const center=tri.reduce((a,p)=>[a[0]+p[0]/3,a[1]+p[1]/3,a[2]+p[2]/3],[0,0,0]);
     if(isHoleAt(center[0],center[1],center[2]))continue;
-    const a=new THREE.Vector3(...tri[0]),b=new THREE.Vector3(...tri[1]),c=new THREE.Vector3(...tri[2]);
-    const normal=b.clone().sub(a).cross(c.clone().sub(a)).normalize();
-    // Project walls along the dominant horizontal normal, never top-down.
-    const useX=Math.abs(normal.x)>Math.abs(normal.z);
-    for(const p of tri){
-     verts.push(p[0]+normal.x*.085,p[1]+normal.y*.085,p[2]+normal.z*.085);
-     uvs.push((useX?p[2]:p[0])*scale/SIZE,p[1]*scale/SIZE);
-    }
+    triangles.push(tri);
    }
-   if(!verts.length)continue;
-   const geometry=new THREE.BufferGeometry();
-   geometry.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
-   geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
-   geometry.computeVertexNormals();
+   if(!triangles.length)continue;
+   const geometry=buildRefinedCliffGeometry(triangles,{
+    repeat:Math.max(.25,Number(slot.scale)||8),maxEdge:3.0,maxTriangles:90000
+   });
+   if(!geometry)continue;
    const tex=new THREE.Texture(img);tex.needsUpdate=true;tex.colorSpace=THREE.SRGBColorSpace;
    tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.anisotropy=4;
    const mesh=new THREE.Mesh(geometry,new THREE.MeshLambertMaterial({
