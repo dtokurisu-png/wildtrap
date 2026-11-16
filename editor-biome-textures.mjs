@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES} from './editor-texture-catalog.mjs?v=0.9.102';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES} from './editor-texture-catalog.mjs?v=0.9.104';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -14,10 +14,8 @@ const SLOTS=[
  {id:'detail2',name:'Complementaria 2',type:'blend'},
  {id:'detail3',name:'Complementaria 3',type:'blend'},
  {id:'cliff',name:'Acantilado anterior',type:'cliff'},
- {id:'cliffTopColor',name:'Top · Color',type:'cliffMap'},
- {id:'cliffTopHeight',name:'Top · Heightmap',type:'cliffMap'},
- {id:'cliffBodyColor',name:'Body · Color',type:'cliffMap'},
- {id:'cliffBodyHeight',name:'Body · Heightmap',type:'cliffMap'}
+ {id:'cliffBodyColor',name:'Acantilado · Body Color',type:'cliffMap'},
+ {id:'cliffBodyHeight',name:'Acantilado · Body Height',type:'cliffMap'}
 ];
 const MAX_IMAGE=380*1024,MAX_TOTAL=2600*1024;
 const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -30,7 +28,7 @@ const defaults=()=>{
  // including in scenes saved before the heightmap generator existed.
  for(const file of PLAINS_CLIFF_TEXTURE_FILES){
   const target=data.plains.slots[file.role];
-  target.image=textureUrl(file);target.name=file.file;target.scale=1;target.opacity=1;
+  target.image=textureUrl(file);target.name=file.file;target.scale=8;target.opacity=1;
  }
  return data;
 };
@@ -68,6 +66,17 @@ export function normalizeBiomeMaterials(raw){
     /^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(imageSource)&&imageSource.length<=MAX_IMAGE*1.4?imageSource:'';
    target.scale=cl(Number(v.scale)||8,.25,1000);
    target.opacity=cl(Number.isFinite(Number(v.opacity))?Number(v.opacity):target.opacity,0,1);
+  }
+  // Older saved maps tuned the single cliff texture (often 400–450 repeats).
+  // Reuse that visible scale for Body Color once instead of resetting it to
+  // a hidden 20-unit tile or a default of 1. Keep explicit Body overrides.
+  if(biome.id==='plains'){
+   const bodyRaw=src.slots?.cliffBodyColor;
+   const cliffRaw=src.slots?.cliff;
+   const originalScale=Number(cliffRaw?.scale);
+   if(Number.isFinite(originalScale)&&originalScale>=.25&&
+      (!bodyRaw||Math.abs(Number(bodyRaw.scale)-1)<1e-9))
+    dest.slots.cliffBodyColor.scale=cl(originalScale,.25,1000);
   }
   dest.noise.scale=cl(Number(src.noise?.scale)||20,1,200);
   dest.noise.seed=cl(Math.round(Number(src.noise?.seed)||1),1,9999999);
@@ -172,8 +181,8 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
     const slot=element('select');slot.setAttribute('aria-label','Ranura de '+t.file);
     slot.style.cssText='width:80px;min-width:0;background:#1e4034;color:#fff;padding:6px';
     const validSlots=t.kind==='ground'?['ground']:
-     t.kind==='heightmap'?['cliffTopHeight','cliffBodyHeight']:
-     t.kind==='cliff'?['cliff','cliffTopColor','cliffBodyColor']:
+     t.kind==='heightmap'?['cliffBodyHeight']:
+     t.kind==='cliff'?['cliff','cliffBodyColor']:
      ['detail1','detail2','detail3'];
     for(const key of validSlots){const option=element('option','',SLOTS.find(s=>s.id===key).name);option.value=key;slot.append(option)}
     row.append(slot);
@@ -233,12 +242,35 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
      m.slots[def.id].name=t?.file||item.name||def.name;
     });
    };
-   card.append(choose);plainCards.push(card);
+   card.append(choose);
+   if(file.role==='cliffBodyColor'){
+    const label=element('label','','Repeticiones (630 unidades)');
+    const scale=element('input');scale.type='number';
+    scale.min='.25';scale.max='1000';scale.step='.25';
+    scale.value=String(item.scale);
+    scale.title='Repeticiones reales del Body Color y Body Height en todo el mapa';
+    scale.setAttribute('aria-label','Repeticiones acantilado Body');
+    scale.style.cssText='width:100%;background:#1e4034;color:#fff;border:1px solid #588c77;padding:6px';
+    scale.onchange=()=>{
+     const next=cl(Number(scale.value)||8,.25,1000);
+     mutate(m=>{m.slots.cliffBodyColor.scale=next;m.slots.cliffBodyHeight.scale=next});
+    };
+    label.append(scale);card.append(label);
+    const edit=element('button','','Editar escala');
+    edit.type='button';edit.title='Ajustar el Body junto al Explorador WT';
+    edit.onclick=()=>{
+     const chosen=REPO_TEXTURES.find(t=>textureUrl(t)===(item.image||textureUrl(file)));
+     if(chosen)void openEditor(chosen,'plains','cliffBodyColor');
+     else toast('Selecciona una imagen del repositorio para editar su escala');
+    };
+    card.append(edit);
+   }
+   plainCards.push(card);
   }
   if(biomeId==='plains'){
    const section=element('div');section.id='plainsCliffActiveMaps';
    section.style.cssText='margin:9px 0;padding:8px;border:1px solid #5b927a;border-radius:9px';
-   section.append(element('h3','','Acantilado · Top / Body'));
+   section.append(element('h3','','Acantilado · Body'));
    const grid=element('div');grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px';
    grid.append(...plainCards);section.append(grid);slots.append(section);
   }
