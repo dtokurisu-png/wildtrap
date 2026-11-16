@@ -1,0 +1,46 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>WILDTRAP cliff auto-alignment</title></head>
+<body data-result="PENDING"><div id="result">Validando autoalineación del borde</div><script>
+(()=>{
+ const fail=(step,e)=>{document.body.dataset.result='FAIL';document.getElementById('result').textContent='FAIL '+step+': '+e.message;};
+ const assert=(a,m)=>{if(!a)throw Error(m)};
+ try{
+  const n=129,step=630/(n-1),heights=Array(n*n).fill(0);
+  for(let z=0;z<n;z++)for(let x=0;x<n;x++){
+   const i=z*n+x;
+   heights[i]=z<=60?30:z===61?30+(x%2?4:-4):z===62?(x%2?2:-2):0;
+  }
+  const z=-315+61*step;
+  const draft={version:3,size:630,resolution:n,heights,nodes:[],objectGroups:[],holes:[],cuts3d:[],
+   zones:[{id:'zone-cliff-test',name:'Borde de prueba',isCliff:true,cliffParentId:'zone-land',
+    points:[{x:-45,z},{x:45,z},{x:45,z:20},{x:-45,z:20}],hidden:false}],
+   nextId:1,settings:{heightMax:120}};
+  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
+  const frame=document.createElement('iframe');frame.width=1400;frame.height=900;frame.src='../?safe=1';
+  document.body.append(frame);
+  const first=Date.now();const timer=setInterval(()=>{
+   try{
+    const w=frame.contentWindow,d=frame.contentDocument;
+    const json=localStorage.getItem('wildtrap-editor-draft-safe-v1');
+    const loaded=json&&JSON.parse(json);
+    if(!w?.__terrainVertexEditor||!loaded?.zones?.[0]?.cliffAlignmentSignature){
+     if(Date.now()-first>30000)throw Error('Editor no cargó o no procesó la zona de acantilado');
+     return;
+    }
+    clearInterval(timer);
+    const top=Array.from({length:13},(_,i)=>heights[61*n+58+i]);
+    const bottom=Array.from({length:13},(_,i)=>heights[62*n+58+i]);
+    const range=a=>Math.max(...a)-Math.min(...a);
+    const topAfter=Array.from({length:13},(_,i)=>loaded.heights[61*n+58+i]);
+    const bottomAfter=Array.from({length:13},(_,i)=>loaded.heights[62*n+58+i]);
+    assert(range(topAfter)<range(top),'Altura del borde superior siguió serruchada');
+    assert(range(bottomAfter)<range(bottom),'Altura del borde inferior siguió serruchada');
+    assert(loaded.heights[10*n+64]===heights[10*n+64],'Cambió terreno fuera de la zona');
+    assert(loaded.zones[0].cliffAlignmentSignature.startsWith('rail-v1:'),'No persistió el ajuste');
+    assert(d?.getElementById('viewport'),'Falta editor visible');
+    document.body.dataset.result='PASS';
+    document.getElementById('result').textContent='PASS · se alinearon los bordes superior e inferior al cargar una zona de acantilado existente';
+   }catch(e){clearInterval(timer);fail('integración',e)}
+  },250);
+ }catch(e){fail('preparación',e)}
+})();
+</script></body></html>
