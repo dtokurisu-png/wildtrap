@@ -3,6 +3,8 @@ import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.69';
+import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.99';
+import {buildCliffTopBodyBuffers,PLAINS_CLIFF_DEFAULTS} from './editor-cliff-top-body.mjs?v=0.9.99';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
 export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false,isHoleAt=()=>false}){
@@ -19,7 +21,31 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  const cliffLayer=new THREE.Group();cliffLayer.name='ProceduralCliffMaterials';scene.add(cliffLayer);
  // Cliff materials are gameplay visuals and must remain visible in Play mode.
  let enabled=true,timer=0,generation=0,hasSurface=false,hasCliffs=false;
- const imageCache=new Map(),loaded=new Map();
+ const imageCache=new Map(),loaded=new Map(),heightCache=new Map();
+ let plainsStats={zones:0,topTriangles:0,bodyTriangles:0,moved:0,maxOffset:0};
+ function heightPixels(url){
+  if(!url)return null;
+  if(heightCache.has(url))return heightCache.get(url);
+  const img=loaded.get(url);if(!img?.width||!img.height)return null;
+  try{
+   const w=Math.min(img.width,512),h=Math.min(img.height,512);
+   const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+   const ctx=canvas.getContext('2d',{willReadFrequently:true});
+   ctx.drawImage(img,0,0,w,h);
+   const data=ctx.getImageData(0,0,w,h);
+   heightCache.set(url,data);return data;
+  }catch(error){console.warn('Heightmap no accesible:',url,error);return null}
+ }
+ function cliffSeamPaths(){
+  const paths=[];
+  for(const seam of live.terrainSeams||[]){
+   if(seam?.kind!=='cliff')continue;
+   const path=(seam.path||seam.vertices||[]).map(id=>seam.anchors?.[id])
+    .filter(p=>Array.isArray(p)&&p.length===3&&p.every(Number.isFinite));
+   if(path.length>1)paths.push(path);
+  }
+  return paths;
+ }
  const worldToPixel=(x,z)=>[(x/SIZE+.5)*RES,(z/SIZE+.5)*RES];
  const pointIn=(poly,x,z)=>{
   let within=false;
@@ -47,6 +73,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    mesh.geometry?.dispose();mesh.material?.map?.dispose();mesh.material?.dispose();
   }
   hasCliffs=false;
+  plainsStats={zones:0,topTriangles:0,bodyTriangles:0,moved:0,maxOffset:0};
  }
  function polygon(ctx,points){
   if(!Array.isArray(points)||points.length<3)return false;
@@ -155,15 +182,62 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     triangles.push(tri);
    }
    if(!triangles.length)continue;
-   // Do not allow triangular fragments to terminate the top and foot.
-   // All cliff faces in this zone share two horizontal cut planes.
-   // Keep this change render-only, so holes, collision and saved terrain
-   // retain their exact geometry. Legacy face selections stay unchanged.
-   const aligned=zone.isCliff?straightenCliffSeams(triangles):{triangles,seams:null};
+   // The plains four-map prototype keeps the original user-edited rim
+   // instead of trimming it with horizontal cutoff planes.
+   const plains=zone.isCliff&&parentBiome(zone)==='plains'&&
+    live.cliffHeightmapPlains?.enabled===true;
+   const aligned=zone.isCliff&&!plains?
+    straightenCliffSeams(triangles):{triangles,seams:null};
    const geometry=buildRefinedCliffGeometry(aligned.triangles,{
     repeat:Math.max(.25,Number(slot.scale)||8),maxEdge:3.0,maxTriangles:90000
    });
    if(!geometry)continue;
+   function addMaterial(buffer,colorImage,part,repeat){
+    if(!buffer||!colorImage)return null;
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.Float32BufferAttribute(buffer.positions,3));
+    geo.setAttribute('normal',new THREE.Float32BufferAttribute(buffer.normals,3));
+    geo.setAttribute('uv',new THREE.Float32BufferAttribute(buffer.uvs,2));
+    geo.computeBoundingSphere();geo.computeBoundingBox();
+    const tex=new THREE.Texture(colorImage);
+    tex.needsUpdate=true;tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
+    tex.wrapS=tex.wrapT=repeat?THREE.RepeatWrapping:THREE.ClampToEdgeWrapping;
+    const mesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({
+     map:tex,side:THREE.DoubleSide,polygonOffset:true,
+     polygonOffsetFactor:-1,depthWrite:false,transparent:false
+    }));
+    mesh.name='PlainsCliff_'+part;
+    mesh.userData.cliffPart=part;
+    mesh.userData.cliffZoneId=zone.id;
+    mesh.userData.cliffSeams=aligned.seams;
+    mesh.renderOrder=4;cliffLayer.add(mesh);hasCliffs=true;
+    return mesh;
+   }
+   const topColor=plains&&loaded.get(PLAINS_CLIFF_MAPS.topColor);
+   const bodyColor=plains&&loaded.get(PLAINS_CLIFF_MAPS.bodyColor);
+   const topHeight=plains&&heightPixels(PLAINS_CLIFF_MAPS.topHeight);
+   const bodyHeight=plains&&heightPixels(PLAINS_CLIFF_MAPS.bodyHeight);
+   if(plains&&topColor&&bodyColor&&topHeight&&bodyHeight){
+    const settings={...PLAINS_CLIFF_DEFAULTS,...live.cliffHeightmapPlains};
+    const split=buildCliffTopBodyBuffers(geometry,{
+     topHeight,bodyHeight,strength:settings.strength,
+     topFraction:settings.topFraction,bodyTileWidth:settings.bodyTileWidth,
+     bodyTileHeight:settings.bodyTileHeight,seamPaths:cliffSeamPaths()
+    });
+    if(split.top&&split.body){
+     addMaterial(split.top,topColor,'Top',false);
+     addMaterial(split.body,bodyColor,'Body',true);
+     plainsStats.zones++;
+     plainsStats.topTriangles+=split.stats.topTriangles;
+     plainsStats.bodyTriangles+=split.stats.bodyTriangles;
+     plainsStats.moved+=split.stats.moved;
+     plainsStats.maxOffset=Math.max(plainsStats.maxOffset,split.stats.maxOffset);
+     geometry.dispose();
+     continue;
+    }
+   }
+   // Preserve existing single-material renderer for other biomes and
+   // for missing files, unsupported or flat cliff regions.
    const tex=new THREE.Texture(img);tex.needsUpdate=true;tex.colorSpace=THREE.SRGBColorSpace;
    tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.anisotropy=4;
    const mesh=new THREE.Mesh(geometry,new THREE.MeshLambertMaterial({
@@ -171,9 +245,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     depthWrite:false,transparent:true,opacity:1
    }));
    mesh.userData.cliffSeams=aligned.seams;
-   mesh.renderOrder=4; // Terrain cliff texture remains visible in Play.
-   cliffLayer.add(mesh);hasCliffs=true;
-   mesh.userData.disposeTexture=tex;
+   mesh.renderOrder=4;cliffLayer.add(mesh);hasCliffs=true;
   }
  }
  async function bake(){
@@ -188,6 +260,8 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    for(const key of ['ground','detail1','detail2','detail3','cliff'])
     if(slots?.[key]?.image)urls.add(slots[key].image);
   }
+  if(live.cliffHeightmapPlains?.enabled===true)
+   for(const url of Object.values(PLAINS_CLIFF_MAPS))urls.add(url);
   await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));
   if(ticket!==generation)return;
   // The old 768x768 baked terrain map turned 200 repeats into just 3.84
@@ -199,6 +273,11 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    'Suelos base intactos · capas complementarias independientes · '+gpuLayers.count()+' capas GPU.':
    'Sin texturas de terreno para las zonas asignadas.';
   buildCliffs();apply();
+  const output=document.getElementById('plainsCliffStatus');
+  if(output)output.textContent=live.cliffHeightmapPlains?.enabled?
+   (plainsStats.zones?plainsStats.zones+' zonas · '+plainsStats.moved+
+    ' vértices con relieve · '+plainsStats.maxOffset.toFixed(2)+' u máx.':
+    'Sin acantilados de llanura o imágenes disponibles'):'Desactivado';
  }
  function apply(){
   // Transparency is not used for terrain; only replace material when surface imagery exists.
@@ -212,5 +291,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  function setEnabled(next){enabled=Boolean(next);if(enabled)schedule();else{hasSurface=false;gpuLayers.clear();clearCliffs();apply()}}
  function refreshCliffs(){if(!enabled)return;buildCliffs();apply()}
  function dispose(){clearTimeout(timer);gpuLayers.clear();clearCliffs();surfaceMap.dispose();painted.dispose();paintedGhost.dispose();}
- return {schedule,apply,refreshCliffs,setEnabled,dispose};
+ return {schedule,apply,refreshCliffs,setEnabled,dispose,
+  collisionRoot:()=>cliffLayer,
+  getPlainsCliffStats:()=>({...plainsStats})};
 }
