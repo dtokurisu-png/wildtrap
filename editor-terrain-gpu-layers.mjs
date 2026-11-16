@@ -68,9 +68,9 @@ void main(){
  vec2 maskUV=vec2(vTerrainXZ.x/630.0+.5,.5-vTerrainXZ.y/630.0);
  float inside=texture2D(regionMask,maskUV).a;
  if(inside<.01)discard;
- // 200 repeats -> 50 potential appearances over the whole 630 x 630 map.
+ // Denser distribution: 200 repeats -> ~300 potential appearances on the whole map.
  // The approximate count is per complementary image, NOT 200 x 200 tiles.
- float target=clamp(floor(repeats*.25+.5),1.0,250.0);
+ float target=clamp(floor(repeats*1.5+.5),1.0,1200.0);
  float columns=ceil(sqrt(target));
  float probability=target/(columns*columns);
  vec2 unit=(vTerrainXZ+315.0)/630.0*columns;
@@ -78,21 +78,19 @@ void main(){
  if(cell.x<0.0||cell.y<0.0||cell.x>=columns||cell.y>=columns)discard;
  vec2 id=cell+vec2(variationSeed*.117+slotNumber*17.3,variationSeed*.071+slotNumber*31.9);
  if(rand2(id+43.0)>probability)discard;
- // Only one independently positioned and rotated patch per chosen cell.
+ // One randomly positioned patch per chosen cell, always axis-aligned.
  float cellSize=630.0/columns;
  float extent=min(630.0/max(repeats,.25),cellSize*.72);
  vec2 jitter=vec2(rand2(id+12.0),rand2(id+25.0));
  vec2 center=-315.0+(cell+.22+.56*jitter)*cellSize;
  vec2 local=(vTerrainXZ-center)/extent;
- float angle=6.28318530718*rand2(id+65.0);
- float c=cos(angle), sn=sin(angle);
- vec2 rotated=vec2(c*local.x-sn*local.y,sn*local.x+c*local.y);
+ vec2 rotated=local;
  float edge=max(abs(rotated.x),abs(rotated.y));
- // The interior keeps color, but the outer 46% softly fades to alpha=0.
- float feather=1.0-smoothstep(.27,.5,edge);
+ // Wide, squared feather: the perimeter fades to fully transparent.
+ float feather=pow(1.0-smoothstep(.12,.5,edge),2.0);
  if(feather<.002)discard;
  vec4 sampleColor=texture2D(detailTexture,rotated+.5);
- float patchOpacity=.5+.3*rand2(id+94.0);
+ float patchOpacity=.28+.22*rand2(id+94.0);
  float alpha=inside*sampleColor.a*feather*patchOpacity*intensity;
  if(alpha<.002)discard;
  gl_FragColor=vec4(sampleColor.rgb,alpha);
