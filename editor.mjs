@@ -1010,6 +1010,30 @@ window.__terrainVertexEditor=terrainVertexEditor;
 const seamHelp=$('terrainSeamHelp'),seamHelpDialog=$('terrainSeamHelpDialog');
 seamHelp?.addEventListener('click',()=>seamHelpDialog?.showModal());
 
+const plainsHelp=$('plainsCliffHelp'),plainsDialog=$('plainsCliffHelpDialog');
+plainsHelp?.addEventListener('click',()=>plainsDialog?.showModal());
+const plainsStrength=$('plainsCliffStrength'),plainsStrengthValue=$('plainsCliffStrengthValue');
+plainsStrength?.addEventListener('input',()=>{plainsStrengthValue.textContent=Number(plainsStrength.value).toFixed(2)});
+function syncPlainsCliffSettings(){
+ const v=Number(live.cliffHeightmapPlains?.strength);
+ const strength=Number.isFinite(v)&&v>=0&&v<=4?v:1.5;
+ if(plainsStrength)plainsStrength.value=String(strength);
+ if(plainsStrengthValue)plainsStrengthValue.textContent=strength.toFixed(2);
+}
+syncPlainsCliffSettings();
+$('plainsCliffGenerate')?.addEventListener('click',()=>{
+ const parents=new Map((live.zones||[]).filter(z=>!z.isCliff).map(z=>[z.id,z]));
+ const available=(live.zones||[]).some(z=>z.isCliff&&parents.get(z.cliffParentId)?.biomeId==='plains');
+ if(!available){toast('Primero asigna una zona de acantilado a una región de Llanura');return}
+ snapshot();
+ live.cliffHeightmapPlains={...(live.cliffHeightmapPlains||{}),
+  enabled:true,strength:Math.max(0,Math.min(4,Number(plainsStrength.value)||0)),
+  topFraction:.23,bodyTileWidth:20,bodyTileHeight:16};
+ const status=$('plainsCliffStatus');if(status){status.hidden=false;status.textContent='Generando…'}
+ terrainPainter?.schedule();
+ persist();
+});
+
 objectMeshOverlays=createObjectMeshOverlays({
  getNodes:()=>live.nodes,getRoots:id=>renderedNodes.get(id)||[]
 });
