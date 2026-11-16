@@ -147,6 +147,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   const parent=items().find(z=>z.id===$('zoneCliffParent').value&&!z.isCliff);
   if(!zone||!parent||zone.id===parent.id)return;
   snapshot();zone.isCliff=true;zone.cliffParentId=parent.id;
+  delete zone.cliffAlignmentSignature;
   commit();refreshAll();
  });
  function refreshAll(){renderPanel();refresh();}
