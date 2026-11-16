@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {buildTerrainVertexGraph,shortestTerrainVertexPath,addTerrainSeam,removeTerrainSeam,updateManualTerrainSeamAnchors,seamVertexIds} from './terrain-seams.mjs?v=0.9.94';
 
 // Terrain vertices are editable in all three dimensions. Displacements in X/Z
 // are stored independently of the heightmap so saves and geometry rebuilds keep them.
@@ -7,7 +8,9 @@ export function createTerrainVertexEditor({
 }){
  const count=terrainGeo.attributes.position.count;
  const maxSelected=40000;
- let active=false,gesture=null;
+ let active=false,gesture=null,lastAnchor=null,selectionRoute=[];
+ const graph=buildTerrainVertexGraph(terrainGeo);
+ const $=id=>document.getElementById(id);
  const selected=new Set(),positions=new Float32Array(count*3);
  const geo=new THREE.BufferGeometry();
  const colors=new Float32Array(count*3);
@@ -28,6 +31,87 @@ export function createTerrainVertexEditor({
  outlines.userData.editorOnly=true;outlines.renderOrder=79;
  outlines.visible=false;outlines.raycast=()=>{};scene.add(outlines);
  const projected=new Array(count);
+ const seamGeo=new THREE.BufferGeometry();
+ const seamLines=new THREE.LineSegments(seamGeo,new THREE.LineBasicMaterial({
+  color:0xffbe66,transparent:true,opacity:.92,depthTest:false,depthWrite:false
+ }));
+ seamLines.name='ProtectedCliffSeams';
+ seamLines.renderOrder=83;seamLines.frustumCulled=false;seamLines.userData.editorOnly=true;
+ seamLines.raycast=()=>{};scene.add(seamLines);
+ const seamDotsGeo=new THREE.BufferGeometry();
+ const seamDots=new THREE.Points(seamDotsGeo,new THREE.PointsMaterial({
+  color:0xffd36a,size:10,sizeAttenuation:false,depthTest:false,depthWrite:false
+ }));
+ seamDots.name='ProtectedCliffSeamVertices';
+ seamDots.renderOrder=84;seamDots.frustumCulled=false;seamDots.userData.editorOnly=true;
+ seamDots.raycast=()=>{};scene.add(seamDots);
+ function seams(){return Array.isArray(live.terrainSeams)?live.terrainSeams:[]}
+ function updateSeamVisuals(){
+  const attr=terrainGeo.attributes.position;
+  const locked=seamVertexIds(live,count);
+  const dots=[],lines=[];
+  for(const id of locked)dots.push(attr.getX(id),attr.getY(id),attr.getZ(id));
+  for(const seam of seams()){
+   const path=Array.isArray(seam.path)?seam.path:[];
+   for(let k=1;k<path.length;k++){
+    const a=path[k-1],b=path[k];
+    if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||a>=count||b<0||b>=count)continue;
+    if(!graph[a].includes(b))continue;
+    lines.push(attr.getX(a),attr.getY(a),attr.getZ(a),
+     attr.getX(b),attr.getY(b),attr.getZ(b));
+   }
+  }
+  seamGeo.setAttribute('position',new THREE.Float32BufferAttribute(lines,3));
+  seamDotsGeo.setAttribute('position',new THREE.Float32BufferAttribute(dots,3));
+  seamGeo.computeBoundingSphere();seamDotsGeo.computeBoundingSphere();
+  seamLines.visible=seamDots.visible=active;
+  const button=$('terrainCreateSeam'),clear=$('terrainClearVertexSelection');
+  if(button)button.disabled=!active||selected.size<2;
+  if(clear)clear.disabled=!active||selected.size===0;
+  if($('terrainSeamCount'))$('terrainSeamCount').textContent=
+   seams().length+' costura(s) · '+locked.size+' vértices protegidos · '+selected.size+' seleccionados';
+  const list=$('terrainSeamList');
+  if(list){
+   list.replaceChildren();
+   for(const seam of seams()){
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:5px;align-items:center;margin:5px 0';
+    const title=document.createElement('span');title.style.flex='1';
+    title.textContent=(seam.name||'Costura')+' · '+(seam.vertices?.length||0)+' vértices';
+    const remove=document.createElement('button');remove.type='button';
+    remove.textContent='Quitar';remove.title='Eliminar esta protección sin mover los vértices';
+    remove.onclick=()=>{
+     snapshot();
+     if(removeTerrainSeam(live,seam.id)){persist();refresh();updateSeamVisuals();}
+    };
+    row.append(title,remove);list.append(row);
+   }
+  }
+ }
+ function extendPath(target){
+  const from=lastAnchor;
+  if(from===null||!selected.has(from)){selected.add(target);selectionRoute=[target];lastAnchor=target;return false;}
+  const path=shortestTerrainVertexPath(terrainGeo,graph,from,target);
+  if(!path.length)return false;
+  for(const id of path)selected.add(id);
+  if(!selectionRoute.length)selectionRoute=[from];
+  selectionRoute.push(...path.slice(1));lastAnchor=target;
+  return true;
+ }
+ const createBtn=$('terrainCreateSeam'),clearBtn=$('terrainClearVertexSelection');
+ createBtn?.addEventListener('click',()=>{
+  if(!active||selected.size<2)return;
+  const attr=terrainGeo.attributes.position;
+  snapshot();
+  const seam=addTerrainSeam(live,[...selected],id=>[
+   attr.getX(id),attr.getY(id),attr.getZ(id)],selectionRoute);
+  if(!seam)return;
+  persist();refresh();updateSeamVisuals();
+ });
+ clearBtn?.addEventListener('click',()=>{
+  selected.clear();lastAnchor=null;selectionRoute=[];updateSelection();
+ });
+
  // Updates the actual cut terrain mesh during drag, not only the selection dots.
  const v=new THREE.Vector3();
  function updateCloud(){
@@ -53,13 +137,14 @@ export function createTerrainVertexEditor({
   geo.attributes.color.needsUpdate=true;
   outlineGeo.setAttribute('position',new THREE.Float32BufferAttribute(selectedPos,3));
   outlineGeo.computeBoundingSphere();
+  updateSeamVisuals();
  }
  function setActive(value){
   if(gesture)release();
   active=Boolean(value);
   dots.visible=active;outlines.visible=active;
   if(active){updateCloud();updateSelection();}
-  else{selected.clear();updateSelection();}
+  else{selected.clear();lastAnchor=null;selectionRoute=[];updateSelection();}
  }
  function refresh(){if(!active)return;updateCloud();updateSelection();}
  function pointInViewport(e){
@@ -88,11 +173,11 @@ export function createTerrainVertexEditor({
  }
  function toggleSelection(index,e){
   const extend=e.ctrlKey||e.metaKey||e.shiftKey;
-  if(!extend)selected.clear();
+  if(!extend){selected.clear();selectionRoute=[];}
   if(index!==-1){
-   if((e.ctrlKey||e.metaKey)&&selected.has(index))selected.delete(index);
-   else selected.add(index);
-  }
+   selected.add(index);lastAnchor=index;
+   if(!extend)selectionRoute=[index];
+  }else if(!extend)lastAnchor=null;
   updateSelection();
  }
  function release(){
@@ -117,8 +202,14 @@ export function createTerrainVertexEditor({
    gesture={pointerId:e.pointerId,kind:'marquee',x:e.clientX,y:e.clientY,
     additive:Boolean(e.ctrlKey||e.metaKey||e.shiftKey),dragging:false};
   }else{
-   // Clicking a selected vertex moves the entire current selection.
+   // Blender-style Ctrl+click follows actual triangle edges from the previous point.
+   if((e.ctrlKey||e.metaKey)&&lastAnchor!==null&&selected.has(lastAnchor)&&index!==lastAnchor){
+    extendPath(index);updateSelection();
+    gesture={pointerId:e.pointerId,kind:'select'};return true;
+   }
+   // Click selects a vertex. Drag can manually move even protected seam vertices.
    if(!wasSelected||e.ctrlKey||e.metaKey||e.shiftKey)toggleSelection(index,e);
+   else lastAnchor=index;
    // Drag along a plane facing the current camera. Mouse horizontal and
    // vertical motion therefore translate to matching screen-space X/Y, with
    // world X/Y/Z determined by the actual orbit/view angle.
@@ -140,6 +231,7 @@ export function createTerrainVertexEditor({
   if(!active||!gesture||gesture.pointerId!==e.pointerId)return false;
   e.preventDefault();e.stopImmediatePropagation();
   const g=gesture;
+  if(g.kind==='select')return true;
   if(g.kind==='marquee'){
    const dx=e.clientX-g.x,dy=e.clientY-g.y;
    g.dragging=Math.hypot(dx,dy)>4;
@@ -166,6 +258,7 @@ export function createTerrainVertexEditor({
   g.moved=true;
   const attr=terrainGeo.attributes.position;
   const offsets=live.terrainVertexOffsets||(live.terrainVertexOffsets={});
+  const movedSeamAnchors=new Map();
   const cell=630/128;
   for(const [i,original] of g.starts){
    const x=original[0]+localDelta.x,y=original[1]+localDelta.y,z=original[2]+localDelta.z;
@@ -179,7 +272,10 @@ export function createTerrainVertexEditor({
    else offsets[i]=[dx,dz];
    attr.setXYZ(i,x,h,z);
    positions[i*3]=x;positions[i*3+1]=h;positions[i*3+2]=z;
+   movedSeamAnchors.set(i,[x,h,z]);
   }
+  // Manual editing is the ONLY operation authorized to re-anchor seam locks.
+  updateManualTerrainSeamAnchors(live,movedSeamAnchors);
   attr.needsUpdate=true;
   geo.attributes.position.needsUpdate=true;
   geo.computeBoundingSphere();
@@ -201,8 +297,8 @@ export function createTerrainVertexEditor({
      const p=projected[i];
      if(p&&p.x>=l&&p.x<=r&&p.y>=t&&p.y<=b)selected.add(i);
     }
-    updateSelection();
-   }else if(!g.additive){selected.clear();updateSelection();}
+    lastAnchor=null;selectionRoute=[];updateSelection();
+   }else if(!g.additive){selected.clear();lastAnchor=null;selectionRoute=[];updateSelection();}
   }
   release();
   if(g.moved){refreshTerrain();persist();}
@@ -211,7 +307,16 @@ export function createTerrainVertexEditor({
  function dispose(){
   release();dots.parent?.remove(dots);outlines.parent?.remove(outlines);
   geo.dispose();outlineGeo.dispose();dots.material.dispose();outlines.material.dispose();
+  seamLines.parent?.remove(seamLines);seamDots.parent?.remove(seamDots);
+  seamGeo.dispose();seamDotsGeo.dispose();seamLines.material.dispose();seamDots.material.dispose();
  }
  return {setActive,refresh,dispose,pointerdown,pointermove,pointerup,
-  getState:()=>({active,selected:selected.size,vertices:count,dragging:Boolean(gesture)})};
+  getState:()=>({active,selected:selected.size,vertices:count,dragging:Boolean(gesture),
+   seams:seams().length,protectedVertices:seamVertexIds(live,count).size}),
+  debugSelectPath:(a,b)=>{
+   if(!active||a<0||b<0||a>=count||b>=count)return [];
+   selected.clear();selected.add(a);lastAnchor=a;selectionRoute=[a];
+   const path=shortestTerrainVertexPath(terrainGeo,graph,a,b);
+   extendPath(b);updateSelection();return path;
+  }};
 }
