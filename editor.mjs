@@ -19,6 +19,7 @@ import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
+import {createTextureRevisionWatcher,revisionedTextureUrl} from './editor-texture-live-refresh.mjs?v=0.9.107';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
@@ -55,6 +56,8 @@ const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
 const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],objectGroups:[],holes:[],cuts3d:[],zones:[],nextId:1,settings:{heightMax:120}};
 let holesEditor=null,vertexEditor=null,terrainVertexEditor=null,terrainInspector=null,objectMeshOverlays=null,zoneTool=null,textureTool=null,terrainPainter=null,biomeGeneratorTool=null,playerSpawnPanel=null,testingScene=false;
+let textureRevisionWatcher=null;
+const getTextureAssetUrl=url=>revisionedTextureUrl(url,textureRevisionWatcher?.getRevision()||'editor-0.9.107');
 // Modo seguro usa otro espacio local: nunca sobreescribe el proyecto habitual.
 const flags=new URLSearchParams(location.search);
 const safeMode=flags.has('safe'),recoveryMode=flags.has('recover');
@@ -2074,8 +2077,9 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.106');
-  textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,onChange:()=>terrainPainter?.schedule()});
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.107');
+  textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,
+    getTextureAssetUrl,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
  }catch(error){
   console.error('Error cargando Texturizado:',error);
@@ -2111,10 +2115,10 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.106');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.107');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
-   onCliffsGenerated:()=>terrainInspector?.refresh(true)});
+   onCliffsGenerated:()=>terrainInspector?.refresh(true),getTextureAssetUrl});
   window.__terrainTexturePainter=terrainPainter;
   const toggle=$('textureShow');
   toggle.checked=live.settings?.biomeTexturesVisible!==false;
@@ -2127,6 +2131,30 @@ async function initializeTerrainPainter(){
  }
 }
 void initializeTerrainPainter();
+// Poll updated repository PNGs. Only replace graphics: never reload or save
+// the scene, and never move the user's terrain, seams, GLBs or camera.
+const updateTextureStatus=message=>{
+ const el=$('textureUpdateStatus');
+ if(el){
+  el.title=message;
+  el.textContent=/Nuevas|recargadas/.test(message)?'Actualizadas':
+   /Sin conexión/.test(message)?'Sin conexión':'Al día';
+ }
+};
+textureRevisionWatcher=createTextureRevisionWatcher({
+ onRevision:()=>{
+  terrainPainter?.invalidateTextureImages();
+  textureTool?.refreshAssets?.();
+ },
+ onStatus:updateTextureStatus
+});
+window.__wildtrapTextureRevisionWatcher=textureRevisionWatcher;
+$('textureReloadImages')?.addEventListener('click',()=>{
+ textureRevisionWatcher.refreshNow();
+ toast('Recargando imágenes, materiales y heightmaps del repositorio');
+});
+textureRevisionWatcher.start();
+window.addEventListener('pagehide',()=>textureRevisionWatcher?.dispose());
 if(safeMode)toast('Modo seguro: el borrador habitual queda intacto. Tus cambios se guardan aparte.');
 if(recoveryMode){
  const warning=$('recoveryPanel');
