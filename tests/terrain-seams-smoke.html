@@ -76,9 +76,14 @@
    return saved?.terrainSeams?.length===0?saved:null;
   },'quitar protección');
   assert(unlocked.heights[k]===newSave.heights[k],'Quitar protección cambió forma');
+  d.getElementById('undo').click();
+  assert(editor.getState().seams===1,'Deshacer no restauró la costura');
+  assert(editor.getState().protectedVertices>=7,'Deshacer perdió protección de la malla');
+  d.getElementById('redo').click();
+  assert(editor.getState().seams===0,'Rehacer no volvió a retirar la protección');
   document.body.dataset.result='PASS';
   d.getElementById('viewport').style.display='none';
-  document.getElementById('result').textContent='PASS · Ctrl+clic, crear costura, pincel protegido, mover manualmente, persistencia y desbloqueo';
+  document.getElementById('result').textContent='PASS · Ctrl+clic, crear costura, pincel protegido, edición manual, persistencia, quitar y deshacer/rehacer';
  }catch(e){document.body.dataset.result='FAIL';document.getElementById('result').textContent='FAIL: '+e.message;}
 })();
 </script></body></html>
