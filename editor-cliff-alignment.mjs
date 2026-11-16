@@ -1,3 +1,4 @@
+import {seamVertexIds} from './terrain-seams.mjs?v=0.9.94';
 // WILDTRAP: straighten the upper/lower vertex rails along a marked cliff-zone
 // contour. Changes the REAL heightfield vertices, not a cosmetic overlay.
 // Work on a frozen snapshot so every candidate is repositioned once.
@@ -47,6 +48,7 @@ export function straightenCliffZone(live,zone,{size=630,resolution=129}={}){
   if(length>cell*.25)segments.push({index:i,x:a.x,z:a.z,dx,dz,length});
  }
  if(segments.length<3)return {changed:0,upper:0,lower:0};
+ const locked=seamVertexIds(live,count);
  const offsets=live.terrainVertexOffsets||{};
  const vertices=Array.from({length:count},(_,i)=>{
   const o=offsets[i];
@@ -80,6 +82,7 @@ export function straightenCliffZone(live,zone,{size=630,resolution=129}={}){
   group.sort((a,b)=>a.t-b.t);
   const window=cell*4.25;
   for(const item of group){
+   if(locked.has(item.i))continue; // Manual cliff seam anchors are immutable for auto-alignment.
    const samples=group.filter(p=>Math.abs(p.t-item.t)<=window);
    if(samples.length<3)continue;
    const targetDistance=median(samples.map(p=>p.d));
