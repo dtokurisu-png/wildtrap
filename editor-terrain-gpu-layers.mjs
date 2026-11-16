@@ -68,33 +68,47 @@ void main(){
  vec2 maskUV=vec2(vTerrainXZ.x/630.0+.5,.5-vTerrainXZ.y/630.0);
  float inside=texture2D(regionMask,maskUV).a;
  if(inside<.01)discard;
- // The saved repeat count defines the number of candidate tiles per axis.
- // Show 85% of those candidate patches, independently for each detail image.
- // At 200 repeats: 200*200*0.85 = ~34,000 appearances per detail.
+ // 60% of the candidates at the saved repetition scale.
+ // E.g. repeats=200 means ~24,000 appearances per detail across full map.
  float columns=max(1.0,floor(repeats+.5));
- float probability=0.85;
+ float probability=0.60;
  vec2 unit=(vTerrainXZ+315.0)/630.0*columns;
- vec2 cell=floor(unit);
- if(cell.x<0.0||cell.y<0.0||cell.x>=columns||cell.y>=columns)discard;
- vec2 id=cell+vec2(variationSeed*.117+slotNumber*17.3,variationSeed*.071+slotNumber*31.9);
- if(rand2(id+43.0)>probability)discard;
- // One randomly positioned patch per chosen cell, always axis-aligned.
+ vec2 origin=floor(unit);
  float cellSize=630.0/columns;
  float extent=630.0/max(repeats,.25);
- vec2 jitter=vec2(rand2(id+12.0),rand2(id+25.0));
- vec2 center=-315.0+(cell+.12+.76*jitter)*cellSize;
- vec2 local=(vTerrainXZ-center)/extent;
- vec2 rotated=local;
- float edge=max(abs(rotated.x),abs(rotated.y));
- // Keep the assigned opacity from the center to half the image radius;
- // then smoothly fade to fully transparent at the outer image border.
- float feather=1.0-smoothstep(.25,.5,edge);
- if(feather<.002)discard;
- vec4 sampleColor=texture2D(detailTexture,rotated+.5);
- float patchOpacity=.5+.3*rand2(id+94.0);
- float alpha=inside*sampleColor.a*feather*patchOpacity*intensity;
- if(alpha<.002)discard;
- gl_FragColor=vec4(sampleColor.rgb,alpha);
+ // Neighboring candidate cells must also be tested. Otherwise a randomly
+ // offset texture would get chopped off at its cell boundary, leaving
+ // visible square edges even with a correct alpha mask.
+ vec3 premultiplied=vec3(0.0);
+ float combinedAlpha=0.0;
+ for(int dy=-1;dy<=1;dy++){
+  for(int dx=-1;dx<=1;dx++){
+   vec2 cell=origin+vec2(float(dx),float(dy));
+   if(cell.x<0.0||cell.y<0.0||cell.x>=columns||cell.y>=columns)continue;
+   vec2 id=cell+vec2(variationSeed*.117+slotNumber*17.3,variationSeed*.071+slotNumber*31.9);
+   if(rand2(id+43.0)>probability)continue;
+   vec2 jitter=vec2(rand2(id+12.0),rand2(id+25.0));
+   vec2 center=-315.0+(cell+.12+.76*jitter)*cellSize;
+   // Texture UV is centered on its OWN image, never a cell corner.
+   vec2 uv=(vTerrainXZ-center)/extent+vec2(.5);
+   if(uv.x<=0.0||uv.y<=0.0||uv.x>=1.0||uv.y>=1.0)continue;
+   // Full central opacity from 0 to half the image radius (axis distance
+   // 0.0..0.5). Fade in BOTH axes between half-radius and outer image edge.
+   vec2 normalizedDistance=abs(uv-vec2(.5))*2.0;
+   vec2 fadeAxis=1.0-smoothstep(vec2(.5),vec2(1.0),normalizedDistance);
+   float feather=fadeAxis.x*fadeAxis.y;
+   if(feather<.002)continue;
+   vec4 sampleColor=texture2D(detailTexture,uv);
+   float patchOpacity=.5+.3*rand2(id+94.0);
+   float alpha=inside*sampleColor.a*feather*patchOpacity*intensity;
+   if(alpha<.002)continue;
+   // Composite overlapping patches WITHOUT truncating neighbors at tile edges.
+   premultiplied=sampleColor.rgb*alpha+premultiplied*(1.0-alpha);
+   combinedAlpha=alpha+combinedAlpha*(1.0-alpha);
+  }
+ }
+ if(combinedAlpha<.002)discard;
+ gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001),combinedAlpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`;
