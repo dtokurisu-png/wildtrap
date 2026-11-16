@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // Viewer for the ACTUAL triangulated arena, not the uncut base heightfield.
 // The visible geometry changes after each cut; all overlays are rebuilt only
 // when terrain.geometry changes. Nothing here changes the saved scenario.
-export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelected=()=>false}){
+export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelected=()=>false,getCliffOverlay=()=>null}){
  const overlay=new THREE.Group();
  overlay.name='WILDTRAP Terrain mesh X-ray inspection';
  overlay.userData.editorOnly=true;
@@ -35,7 +35,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
   for(const {object} of visuals){
    const kind=object.userData.terrainLayer;
    object.visible=kind==='faces'?$('terrainFaces').checked:
-    kind==='edges'?$('terrainEdges').checked:
+    (kind==='edges'||kind==='cliffEdges')?$('terrainEdges').checked:
     kind==='vertices'?$('terrainVertices').checked:true;
    const materials=Array.isArray(object.material)?object.material:[object.material];
    for(const material of materials)if(material){
@@ -92,14 +92,38 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
    depthTest:false,depthWrite:false});
   const points=own(new THREE.Points(dotGeometry,dotMaterial),dotGeometry,dotMaterial);
   points.userData.terrainLayer='vertices';points.renderOrder=11;points.frustumCulled=false;
+  // The user's original grid stays unchanged: the actual generated cliff
+  // subdivisions live in a SEPARATE mesh. Display those triangles alongside
+  // the original mesh, otherwise the inspector misleadingly looks unchanged.
+  const cliffRoot=getCliffOverlay();
+  let cliffFaces=0,cliffSource=0,cliffMeshes=0;
+  for(const mesh of cliffRoot?.children||[]){
+   if(!mesh.isMesh||!mesh.geometry?.getAttribute('position'))continue;
+   const tri=mesh.geometry.index?
+    mesh.geometry.index.count/3:mesh.geometry.getAttribute('position').count/3;
+   cliffFaces+=tri;
+   cliffSource+=Number(mesh.userData.sourceTriangles)||0;
+   cliffMeshes++;
+   const lines=new THREE.WireframeGeometry(mesh.geometry);
+   const mat=new THREE.LineBasicMaterial({
+    color:0xffba66,transparent:true,opacity:.75,depthTest:false,depthWrite:false
+   });
+   const viewLines=own(new THREE.LineSegments(lines,mat),lines,mat);
+   viewLines.userData.terrainLayer='cliffEdges';
+   viewLines.renderOrder=12;viewLines.frustumCulled=false;
+  }
   statistics={triangles:indices.length/3,vertices:position.count,activeVertices:total,
-   drawnVertices:dots.length/3};
+   drawnVertices:dots.length/3,cliffTriangles:cliffFaces,
+   cliffSourceTriangles:cliffSource,cliffMeshes};
+
   $('terrainMeshStats').textContent=
    statistics.triangles.toLocaleString('es')+' caras triangulares · '+
    total.toLocaleString('es')+' vértices activos · '+
    (dots.length/3).toLocaleString('es')+' dibujados · '+
-   Math.max(0,position.count-total).toLocaleString('es')+' vértices sin caras';
-  setInfo('Selecciona una cara de la pared: verás sus tres índices y las coordenadas exactas. La arena tiene una única superficie de triángulos (doble cara), no dos capas independientes.');
+   Math.max(0,position.count-total).toLocaleString('es')+' vértices sin caras'+
+   (cliffSource?' · ACANTILADOS '+cliffSource.toLocaleString('es')+' → '+
+    cliffFaces.toLocaleString('es')+' triángulos (x'+(cliffFaces/cliffSource).toFixed(1)+')':'');
+  setInfo('Malla del terreno en cian; triángulos subdivididos reales del acantilado en naranja. La malla base queda intacta.');
   display();
  }
  function highlightFace(hit){
