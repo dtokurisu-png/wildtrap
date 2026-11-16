@@ -4,14 +4,15 @@ const cliff=readFileSync(new URL('../editor-cliff-mesh.mjs',import.meta.url),'ut
 const renderer=readFileSync(new URL('../editor-terrain-texture-renderer.mjs',import.meta.url),'utf8');
 assert.match(cliff,/maxEdge=3\.0/,'Visual cliff faces should be subdivided to finer triangles');
 assert.match(cliff,/maxTriangles=90000/,'Protect against unbounded subdivision');
+assert.match(cliff,/clamp\(Math\.ceil\(longest\/maxEdge\),3,6\)/,'Every cliff is subdivided at least 9x');
 assert.match(cliff,/const lookup=new Map\(\)/,'Weld coincident vertices across triangle borders');
 assert.match(cliff,/const fixed=new Set\(\)/,'Keep outer boundaries from moving');
 assert.match(cliff,/count!==2/,'Keep cut and open edges fixed');
 assert.match(cliff,/iteration<3/,'Apply guarded smoothing');
 assert.match(cliff,/magnitude>\.08/,'Clamp vertex displacement to preserve terrain alignment');
 assert.match(cliff,/new THREE\.Float32BufferAttribute\(norm,3\)/,'Generate welded normals');
-assert.match(renderer,/buildRefinedCliffGeometry\(triangles/,'Renderer must use refined visual cliffs');
-assert.match(renderer,/isHoleAt\(center\[0\],center\[1\],center\[2\]\)/,'Preserve original holes');
-assert.match(renderer,/const slot=live\.biomeMaterials\?\.\[parentBiome\(zone\)\]\?\.slots\?\.cliff/,'Existing cliff material must be preserved');
+assert.match(renderer,/buildRefinedCliffGeometry\(batch/,'All cliff visual triangles must be subdivided in batches');
+assert.match(renderer,/isHoleAt\(c\[0\],c\[1\],c\[2\]\)/,'Preserve original cut and hole boundaries');
+assert.match(renderer,/slots\.cliff\?\.image/,'Other biomes keep their existing single cliff material');
 assert.doesNotMatch(cliff,/terrain\.geometry\s*=/,'Never rewrite the physical terrain');
 console.log('PASS: Refined cliff visual mesh retains original terrain, cut edges and material');
