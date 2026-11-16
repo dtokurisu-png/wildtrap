@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {prepareCutStamp,isTerrainCutAt,buildAdaptiveTerrain} from './adaptive-terrain-cuts.mjs?v=0.9.13';
+import {seamAnchors} from './terrain-seams.mjs?v=0.9.94';
 
 // The knife uses clicks, not a brush. Original surfaces remain raycastable
 // even after cutting, so a closed polygon can restore an older hole.
@@ -306,6 +307,27 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
   }
   return true;
  }
+ // Keep source seam vertices and adjacent seam edges out of polygon cuts.
+ // Refuse a destructive cut instead of pretending a recreated anchor repairs it.
+ function cutTouchesSeam(pending){
+  const stamps=pending.filter(s=>s.op==='cut').map(prepareCutStamp).filter(Boolean);
+  if(!stamps.length)return false;
+  const anchors=seamAnchors(live,terrainGeo.attributes.position.count);
+  if(!anchors.size)return false;
+  const overlaps=p=>isTerrainCutAt(p[0],p[1],p[2],new Set(),stamps,live.size,live.resolution);
+  for(const p of anchors.values())if(overlaps(p))return true;
+  for(const seam of live.terrainSeams||[]){
+   const path=Array.isArray(seam.path)?seam.path:[];
+   for(let i=1;i<path.length;i++){
+    const a=anchors.get(path[i-1]),b=anchors.get(path[i]);
+    if(!a||!b)continue;
+    for(const t of [.25,.5,.75]){
+     if(overlaps([0,1,2].map(k=>a[k]+(b[k]-a[k])*t)))return true;
+    }
+   }
+  }
+  return false;
+ }
  function apply(cut){
   if(!renderCuts){toast('Recortes suspendidos en recuperación: primero guarda una copia del escenario.');return}
   if(!closed||selected.length!==1){toast('Primero cierra el contorno del cuchillo');return}
@@ -323,6 +345,10 @@ export function createTerrainHoles({scene,terrainGeo,terrain,live,heightAt,refre
     const {modelNodeId,worldPreview,...data}=stamp;
     return {...data,op:cut?'cut':'restore'};
    });
+   if(cut&&cutTouchesSeam(pending)){
+    toast('Corte cancelado: atraviesa una costura protegida. Quita la protección antes de modificar ese borde.');
+    return;
+   }
    if(!validateTerrainChange(pending,cut))return;
   }
   if((live.cuts3d?.length||0)+terrainCount>700||
