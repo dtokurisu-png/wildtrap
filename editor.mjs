@@ -2033,7 +2033,7 @@ function animate(){
  if(now-lastMemoryUpdate>1800){lastMemoryUpdate=now;updateMemoryDisplay();}
 }
 animate();
-window.__editorReady?.();
+// The UI must not report ready before the recovered XYZ mesh has rendered.
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
 // A cliff zone is an editable contour. Apply one undoable correction per
 // contour revision, to the real terrain vertices (height + XZ offsets).
@@ -2141,6 +2141,8 @@ if(recoveryMode){
 setTimeout(()=>{
  try{
   updateMaxHeightControl();refreshTerrain();draw();setMode('raise');
+  window.__editorReady?.();
+  window.__terrainHydrated=true;
   if(!recoveredDraft)void loadPublishedWorld();
  }catch(error){
   console.error('Error al recuperar escenario WILDTRAP:',error);
