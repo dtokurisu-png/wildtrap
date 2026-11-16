@@ -7,7 +7,7 @@ import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.106';
 import {buildCliffBodyHeightmapBuffers} from './editor-cliff-body-heightmap.mjs?v=0.9.105';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
-export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false,isHoleAt=()=>false,onCliffsGenerated=()=>{}}){
+export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false,isHoleAt=()=>false,onCliffsGenerated=()=>{},getTextureAssetUrl=url=>url}){
  const SIZE=630, RES=768;
  const canvas=document.createElement('canvas');canvas.width=canvas.height=RES;
  const ctx=canvas.getContext('2d',{willReadFrequently:false});
@@ -62,7 +62,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    const img=new Image();
    img.onload=()=>resolve(img);
    img.onerror=()=>resolve(null);
-   img.src=url;
+   img.src=getTextureAssetUrl(url);
   });
   imageCache.set(url,promise);
   return promise;
@@ -341,8 +341,18 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  }
  function setEnabled(next){enabled=Boolean(next);if(enabled)schedule();else{hasSurface=false;gpuLayers.clear();clearCliffs();apply()}}
  function refreshCliffs(){if(!enabled)return;buildCliffs();apply()}
+ function invalidateTextureImages(){
+  // Stable filenames may now serve NEW PNG content. Discard decoded images,
+  // cached height pixels and old promises, but keep the current scene visible
+  // until freshly loaded textures can replace the GPU layers and cliff meshes.
+  ++generation;
+  imageCache.clear();
+  heightCache.clear();
+  loaded.clear();
+  if(enabled)schedule();
+ }
  function dispose(){clearTimeout(timer);gpuLayers.clear();clearCliffs();surfaceMap.dispose();painted.dispose();paintedGhost.dispose();}
- return {schedule,apply,refreshCliffs,setEnabled,dispose,
+ return {schedule,apply,refreshCliffs,invalidateTextureImages,setEnabled,dispose,
   collisionRoot:()=>cliffLayer,
   getCliffSubdivisionStats:()=>({...cliffLayer.userData}),
   getPlainsCliffStats:()=>({...plainsStats})};

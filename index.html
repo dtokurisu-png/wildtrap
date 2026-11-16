@@ -172,7 +172,11 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 
 <p class="hint">Biblioteca de texturas del repositorio. Filtra por bioma y ajusta el tamaño de cada textura con «Editar». La vista muestra una sola repetición junto al explorador.</p>
 <label>Bioma<select id="textureBiome" style="width:100%;padding:7px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px"></select></label>
-<label style="display:flex;align-items:center;gap:8px"><input id="textureShow" type="checkbox" checked> Mostrar texturas en el escenario</label>
+<div style="display:flex;align-items:center;gap:7px;margin:4px 0">
+ <label style="display:flex;align-items:center;gap:8px;flex:1"><input id="textureShow" type="checkbox" checked> Mostrar texturas</label>
+ <button id="textureReloadImages" type="button" title="Volver a cargar las imágenes del repositorio sin tocar el escenario" aria-label="Actualizar imágenes del repositorio" style="width:34px;height:30px;min-width:34px;padding:0;border-radius:7px">↻</button>
+ <span id="textureUpdateStatus" role="status" aria-live="polite" title="Estado de actualización de imágenes" style="font-size:10px;opacity:.78;max-width:95px"></span>
+</div>
 <div id="plainsCliffPanel" style="border:1px solid #568978;border-radius:9px;padding:8px;margin:9px 0">
  <div style="display:flex;gap:7px;align-items:center;justify-content:space-between">
   <strong>Acantilado · Llanura</strong>
@@ -392,7 +396,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
-<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.106
+<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.107
  <span id="editorSaveState" style="font-weight:400;display:block;opacity:.8">Guardado local</span></div>
 <div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
@@ -433,5 +437,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.106').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.107').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>

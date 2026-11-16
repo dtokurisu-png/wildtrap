@@ -5,7 +5,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 // The preview and the renderer use precisely the same world-size formula:
 // one repeat spans 630 / repeat terrain units. The explorer is 0.9 world units
 // high, matching the active WildTrap Play avatar, not a generic mannequin.
-export function createTextureScalePreview({onApply,toast}){
+export function createTextureScalePreview({onApply,toast,getTextureAssetUrl=url=>url}){
  const $=id=>document.getElementById(id);
  const dialog=$('textureScaleDialog'),canvas=$('textureScaleCanvas');
  const number=$('textureScaleNumber'),world=$('textureScaleWorld'),status=$('textureScalePreviewStatus');
@@ -93,7 +93,7 @@ export function createTextureScalePreview({onApply,toast}){
   };
   draw();
   const url=item.url;
-  const loadImage=new Promise((resolve,reject)=>new THREE.TextureLoader().load(url,resolve,undefined,reject));
+  const loadImage=new Promise((resolve,reject)=>new THREE.TextureLoader().load(getTextureAssetUrl(url),resolve,undefined,reject));
   const loadGLB=new GLTFLoader().loadAsync('./assets/explorador%201%20wt.glb');
   const settled=await Promise.allSettled([loadImage,loadGLB]);
   if(token!==openToken||!dialog.open){
@@ -156,6 +156,20 @@ export function createTextureScalePreview({onApply,toast}){
  };
  dialog.addEventListener('close',()=>{openToken++;dispose();active=null});
  return {
+  refreshTexture(){
+   if(!active||!dialog.open||!plane?.material)return;
+   const token=openToken;
+   new THREE.TextureLoader().load(getTextureAssetUrl(active.url),next=>{
+    if(!dialog.open||token!==openToken){next.dispose();return}
+    const old=texture;
+    next.colorSpace=THREE.SRGBColorSpace;
+    next.wrapS=next.wrapT=THREE.ClampToEdgeWrapping;next.anisotropy=4;
+    texture=next;plane.material.map=next;plane.material.needsUpdate=true;
+    old?.dispose();
+    status.textContent='Imagen actualizada · escala conservada';
+   },undefined,()=>{if(dialog.open&&token===openToken)
+    status.textContent='No se pudo actualizar la imagen'});
+  },
   open(item){
    if(dialog.open)dialog.close();
    active=item;request=item.url;
