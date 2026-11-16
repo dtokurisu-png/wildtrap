@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-// Terrain vertices are stored as a fixed XZ heightfield, so editing their Y
-// values preserves the existing grid, cuts, saved holes, and collision logic.
+// Terrain vertices are editable in all three dimensions. Displacements in X/Z
+// are stored independently of the heightmap so saves and geometry rebuilds keep them.
 export function createTerrainVertexEditor({
  scene,terrain,terrainGeo,camera,view,marquee,live,snapshot,refreshTerrain,persist
 }){
@@ -34,7 +34,7 @@ export function createTerrainVertexEditor({
   const attr=terrainGeo.attributes.position;
   for(let i=0;i<count;i++){
    positions[i*3]=attr.getX(i);
-   positions[i*3+1]=live.heights[i]??attr.getY(i);
+   positions[i*3+1]=attr.getY(i);
    positions[i*3+2]=attr.getZ(i);
   }
   geo.attributes.position.needsUpdate=true;
@@ -101,6 +101,13 @@ export function createTerrainVertexEditor({
   gesture=null;
   marquee.style.display='none';
  }
+ function intersectPlane(e,dragPlane){
+  const box=view.getBoundingClientRect();
+  const ndc=new THREE.Vector2((e.clientX-box.left)/box.width*2-1,
+   -(e.clientY-box.top)/box.height*2+1);
+  const raycaster=new THREE.Raycaster();raycaster.setFromCamera(ndc,camera);
+  return raycaster.ray.intersectPlane(dragPlane,new THREE.Vector3());
+ }
  function pointerdown(e){
   if(!active||e.button!==0||!pointInViewport(e))return false;
   e.preventDefault();e.stopImmediatePropagation();
@@ -112,19 +119,19 @@ export function createTerrainVertexEditor({
   }else{
    // Clicking a selected vertex moves the entire current selection.
    if(!wasSelected||e.ctrlKey||e.metaKey||e.shiftKey)toggleSelection(index,e);
-   const startHeights=new Map();
-   for(const i of selected)startHeights.set(i,Number(live.heights[i])||0);
-   // Actual projection of a +1 world-Y displacement determines how much
-   // mouse movement corresponds to one height unit in this camera view.
-   const box=view.getBoundingClientRect();
-   const base=new THREE.Vector3(positions[index*3],positions[index*3+1],positions[index*3+2])
+   // Drag along a plane facing the current camera. Mouse horizontal and
+   // vertical motion therefore translate to matching screen-space X/Y, with
+   // world X/Y/Z determined by the actual orbit/view angle.
+   camera.updateMatrixWorld(true);terrain.updateMatrixWorld(true);
+   const origin=new THREE.Vector3(positions[index*3],positions[index*3+1],positions[index*3+2])
     .applyMatrix4(terrain.matrixWorld);
-   const p0=base.clone().project(camera),p1=base.clone().add(new THREE.Vector3(0,1,0)).project(camera);
-   const pixelsPerUnit=(p0.y-p1.y)*box.height*.5;
+   const normal=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize();
+   const dragPlane=new THREE.Plane().setFromNormalAndCoplanarPoint(normal,origin);
+   const startPoint=intersectPlane(e,dragPlane);
+   const starts=new Map();
+   for(const i of selected)starts.set(i,[positions[i*3],positions[i*3+1],positions[i*3+2]]);
    gesture={pointerId:e.pointerId,kind:'move',x:e.clientX,y:e.clientY,
-    moved:false,snapshotted:false,startHeights,
-    // Positive screen-up means positive height, regardless of camera direction.
-    pixelsPerUnit:Math.abs(pixelsPerUnit)>.001?pixelsPerUnit:Math.max(1,box.height/100)};
+    moved:false,snapshotted:false,starts,dragPlane,startPoint};
   }
   try{view.setPointerCapture(e.pointerId)}catch(_){}
   return true;
@@ -146,23 +153,37 @@ export function createTerrainVertexEditor({
    return true;
   }
   if(Math.hypot(e.clientX-g.x,e.clientY-g.y)<3&&!g.moved)return true;
-  const delta=(g.y-e.clientY)/g.pixelsPerUnit;
-  if(!Number.isFinite(delta))return true;
+  const at=intersectPlane(e,g.dragPlane);
+  if(!at||!g.startPoint)return true;
+  const worldDelta=at.sub(g.startPoint);
+  const inverse=new THREE.Matrix4().copy(terrain.matrixWorld).invert();
+  // Apply inverse world transform to both points for correct local translation.
+  const localStart=g.startPoint.clone().applyMatrix4(inverse);
+  const localEnd=g.startPoint.clone().add(worldDelta).applyMatrix4(inverse);
+  const localDelta=localEnd.sub(localStart);
+  if(![localDelta.x,localDelta.y,localDelta.z].every(Number.isFinite))return true;
   if(!g.snapshotted){snapshot();g.snapshotted=true;}
   g.moved=true;
   const attr=terrainGeo.attributes.position;
-  for(const [i,original] of g.startHeights){
-   const h=Math.max(-500,Math.min(500,original+delta));
+  const offsets=live.terrainVertexOffsets||(live.terrainVertexOffsets={});
+  const cell=630/128;
+  for(const [i,original] of g.starts){
+   const x=original[0]+localDelta.x,y=original[1]+localDelta.y,z=original[2]+localDelta.z;
+   const h=Math.max(-500,Math.min(500,y));
+   // The heightmap remains the authoritative Y storage for sculpting.
    live.heights[i]=h;
-   attr.setY(i,h);
-   positions[i*3+1]=h;
+   const baseX=(i%129)*cell-315;
+   const baseZ=Math.floor(i/129)*cell-315;
+   const dx=x-baseX,dz=z-baseZ;
+   if(Math.abs(dx)<.000001&&Math.abs(dz)<.000001)delete offsets[i];
+   else offsets[i]=[dx,dz];
+   attr.setXYZ(i,x,h,z);
+   positions[i*3]=x;positions[i*3+1]=h;positions[i*3+2]=z;
   }
   attr.needsUpdate=true;
   geo.attributes.position.needsUpdate=true;
   geo.computeBoundingSphere();
-  terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();
-  // Rebuild the visible (possibly cut) terrain on EVERY pointer move.
-  // Previously only the vertex markers moved; the real mesh caught up on release.
+  // Refresh the actual terrain mesh and the cut topology while the mouse moves.
   refreshTerrain();
   updateSelection();
   return true;
