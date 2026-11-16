@@ -975,7 +975,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.100').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.101').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,terrainPainter?.collisionRoot()].filter(Boolean),
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
@@ -2078,7 +2078,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.100');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.101');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false});
   window.__terrainTexturePainter=terrainPainter;
