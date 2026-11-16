@@ -1,0 +1,57 @@
+name: Validar costuras protegidas del escenario
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terrain-seams.mjs'
+      - 'terrain-vertex-editor.mjs'
+      - 'terrain-holes.mjs'
+      - 'editor-cliff-alignment.mjs'
+      - 'editor.mjs'
+      - 'index.html'
+      - 'tests/terrain-seams.test.mjs'
+      - 'tests/terrain-seams-smoke.html'
+      - 'tests/browser-terrain-seams.mjs'
+      - '.github/workflows/terrain-seams-tests.yml'
+  pull_request:
+    paths:
+      - 'terrain-seams.mjs'
+      - 'terrain-vertex-editor.mjs'
+      - 'terrain-holes.mjs'
+      - 'editor-cliff-alignment.mjs'
+      - 'editor.mjs'
+      - 'index.html'
+      - 'tests/terrain-seams.test.mjs'
+      - 'tests/terrain-seams-smoke.html'
+      - 'tests/browser-terrain-seams.mjs'
+      - '.github/workflows/terrain-seams-tests.yml'
+jobs:
+  seam-protection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax
+        run: |
+          node --check terrain-seams.mjs
+          node --check terrain-vertex-editor.mjs
+          node --check terrain-holes.mjs
+          node --check editor-cliff-alignment.mjs
+          node --check editor.mjs
+          node --check tests/terrain-seams.test.mjs
+      - name: Geometry and seam persistence
+        run: |
+          node tests/terrain-seams.test.mjs
+          node tests/sculpt-terrain-vertices.mjs
+          node tests/cliff-zone-alignment.test.mjs
+      - name: Start browser server
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-seams-http.log 2>&1 &
+          sleep 2
+      - name: Interactive Sculpt seams in Chromium
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-terrain-seams.mjs
