@@ -61,7 +61,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
 <aside id="side">
-<h1>WILDTRAP · EDITOR</h1><small>Editor de escenarios v0.9.41 · 630 × 630 unidades · modelos GLB · guardado local</small>
+<h1>WILDTRAP · EDITOR</h1><small>630 × 630 unidades · modelos GLB · guardado local</small>
 <section>
 <h2>Vista y proyecto</h2><section id="testPanel">
 <h2>▶ Modo de prueba 3D</h2>
@@ -185,7 +185,10 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <label>Relieve <output id="plainsCliffStrengthValue">1.5</output>
   <input id="plainsCliffStrength" type="range" min="0" max="4" step=".25" value="1.5">
  </label>
- <button id="plainsCliffGenerate" type="button" style="width:100%">Generar</button>
+ <div class="grid2" style="margin-top:6px">
+ <button id="plainsCliffViewMaps" type="button">Ver 4 mapas</button>
+ <button id="plainsCliffGenerate" type="button">Generar</button>
+ </div>
  <output id="plainsCliffStatus" class="hint" hidden></output>
 </div>
 <dialog id="plainsCliffHelpDialog" aria-labelledby="plainsCliffHelpTitle" style="background:#18372c;color:#e5fff0;border:1px solid #55977c;border-radius:12px;max-width:min(420px,92vw);padding:16px">
@@ -392,6 +395,8 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
+<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.102
+ <span id="editorSaveState" style="font-weight:400;display:block;opacity:.8">Guardado local</span></div>
 <div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
 <div id="toast"></div>
@@ -431,5 +436,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.101').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.102').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
