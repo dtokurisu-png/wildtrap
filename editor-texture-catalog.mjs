@@ -175,9 +175,10 @@ export const REPO_TEXTURES=[
   "size": 2333667
  }
 ];
+// Llanura has ONE cliff material and its corresponding displacement map.
+// Historical Top images remain in the repository (not deleted) but are no
+// longer offered or applied in the new single-body generator.
 export const PLAINS_CLIFF_TEXTURE_FILES=[
- {id:'tx26',file:'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png',biome:'plains',kind:'cliff',role:'cliffTopColor',size:677607},
- {id:'tx27',file:'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png',biome:'plains',kind:'heightmap',role:'cliffTopHeight',size:331065},
  {id:'tx28',file:'Textura de Acantilado llanura  CUERPO- COLOR.png',biome:'plains',kind:'cliff',role:'cliffBodyColor',size:934326},
  {id:'tx29',file:'Textura de Acantilado llanura CUERPO-HEIGTH.png',biome:'plains',kind:'heightmap',role:'cliffBodyHeight',size:457558}
 ];
