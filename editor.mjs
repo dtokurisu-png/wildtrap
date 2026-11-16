@@ -552,7 +552,7 @@ function updateStatus(){
  vertexEditor?.updateInfo();
  const modelSculptActive=sculptTools[mode]&&picked?.kind==='prefab';
  if($('sculptTargetHint'))$('sculptTargetHint').textContent=mode==='meshEdit'&&!editable?
-  'Vértices del escenario: clic selecciona; arrastra libremente en X/Y/Z según la vista; rectángulo selecciona varios; Ctrl añade selección.':modelSculptActive?
+  'Vértices del escenario: clic selecciona; Ctrl + clic elige una ruta completa por las aristas; arrastra en X/Y/Z; «Crear costura» protege la selección.':modelSculptActive?
   'Esculpiendo '+(prefabById(picked.prefabId)?.name||picked.prefabId)+
    ': solo se modifica su malla. Los vértices bloqueados no se afectan.':
   'Sin un GLB seleccionado se esculpe el terreno. Selecciona un modelo en Objetos de escena para esculpir su malla.';
