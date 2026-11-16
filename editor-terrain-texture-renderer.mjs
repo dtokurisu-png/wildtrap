@@ -3,7 +3,7 @@ import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.105';
-import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.104';
+import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.106';
 import {buildCliffBodyHeightmapBuffers} from './editor-cliff-body-heightmap.mjs?v=0.9.105';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
@@ -169,19 +169,21 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    if(!zone.isCliff&&!BIOMES.some(b=>b.id===biome))continue;
    const plains=biome==='plains'&&zone.isCliff===true;
    const slots=live.biomeMaterials?.[biome]?.slots||{};
-   // The visible Body Color slot is the only color material for a plains
-   // cliff. All other biomes keep the old single-cliff material pipeline.
-   const colorURL=plains?
-    (slots.cliffBodyColor?.image||PLAINS_CLIFF_MAPS.bodyColor):slots.cliff?.image;
+   // The original single-material cliff uses CUERPO.png. Only when the
+   // procedural relief is enabled is that material replaced by the dedicated
+   // CUERPO- COLOR.png + CUERPO-HEIGTH.png pair.
+   const generated=plains&&live.cliffHeightmapPlains?.enabled===true;
+   const colorURL=generated?
+    (slots.cliffBodyColor?.image||PLAINS_CLIFF_MAPS.bodyColor):
+    (plains?(slots.cliff?.image||PLAINS_CLIFF_MAPS.base):slots.cliff?.image);
    const image=loaded.get(colorURL)||null;
-   const heightURL=plains?
+   const heightURL=generated?
     (slots.cliffBodyHeight?.image||PLAINS_CLIFF_MAPS.bodyHeight):null;
-   const requestedHeight=plains&&live.cliffHeightmapPlains?.enabled===true;
-   const heightmap=requestedHeight?heightPixels(heightURL):null;
-   // Exactly the scale indicated in 'Editar escala' and the Body Color slot:
-   // N repeats across the 630-unit world, in X/Z AND in Y.
+   const heightmap=heightURL?heightPixels(heightURL):null;
+   // Scale belongs to the ACTUAL chosen material. Do not silently apply the
+   // Body Color repetition when the original cliff slot is being displayed.
    const visibleScale=Math.max(.25,Math.min(1000,Number(
-    plains?slots.cliffBodyColor?.scale:slots.cliff?.scale)||8));
+    generated?slots.cliffBodyColor?.scale:slots.cliff?.scale)||8));
    const legacyFaces=Array.isArray(zone.cliffs)?[...new Set(zone.cliffs.flatMap(c=>
     (Array.isArray(c.faces)?c.faces:[]).filter(f=>Number.isInteger(f)&&f>=0&&f<faceCount)))]:[];
    const triangles=[];
@@ -258,7 +260,8 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     const mesh=new THREE.Mesh(finalGeometry,mat);
     mesh.name=(plains?'PlainsCliff_Body':'CliffMaterial')+'_'+zone.id+'_'+zoneMeshes;
     mesh.userData.cliffZoneId=zone.id;
-    mesh.userData.cliffPart=plains?'Body':'Cliff';
+    mesh.userData.cliffPart=generated?'Body':(plains?'Base':'Cliff');
+    mesh.userData.cliffImage=colorURL;
     mesh.userData.sourceTriangles=batch.length;
     mesh.userData.refinedTriangles=before;
     mesh.userData.repetition=visibleScale;
