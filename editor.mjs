@@ -19,7 +19,8 @@ import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
-import {createTextureRevisionWatcher,revisionedTextureUrl} from './editor-texture-live-refresh.mjs?v=0.9.107';
+import {createTextureRevisionWatcher,revisionedTextureUrl} from './editor-texture-live-refresh.mjs?v=0.9.109';
+import {syncPublishedTextureCatalog} from './editor-texture-catalog.mjs?v=0.9.109';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
@@ -2077,7 +2078,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.107');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.109');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,
     getTextureAssetUrl,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
@@ -2133,6 +2134,21 @@ async function initializeTerrainPainter(){
 void initializeTerrainPainter();
 // Poll updated repository PNGs. Only replace graphics: never reload or save
 // the scene, and never move the user's terrain, seams, GLBs or camera.
+async function reloadPublishedTextureCatalog(){
+ try{
+  const result=await syncPublishedTextureCatalog();
+  textureTool?.refreshAssets?.();
+  if(result.added||result.removed){
+   const el=$('textureUpdateStatus');
+   if(el)el.title='Catálogo GitHub: '+result.added+' nuevas · '+
+    result.removed+' retiradas. Las referencias guardadas no se modificaron.';
+  }
+ }catch(error){
+  // Asset loading remains usable offline. The manual refresh still bypasses
+  // browser caches even if GitHub's public catalog API is inaccessible.
+  console.warn('No se pudo comprobar catálogo de imágenes:',error.message);
+ }
+}
 const updateTextureStatus=message=>{
  const el=$('textureUpdateStatus');
  if(el){
@@ -2145,12 +2161,14 @@ textureRevisionWatcher=createTextureRevisionWatcher({
  onRevision:()=>{
   terrainPainter?.invalidateTextureImages();
   textureTool?.refreshAssets?.();
+  void reloadPublishedTextureCatalog();
  },
  onStatus:updateTextureStatus
 });
 window.__wildtrapTextureRevisionWatcher=textureRevisionWatcher;
 $('textureReloadImages')?.addEventListener('click',()=>{
  textureRevisionWatcher.refreshNow();
+ void reloadPublishedTextureCatalog();
  toast('Recargando imágenes, materiales y heightmaps del repositorio');
 });
 textureRevisionWatcher.start();
