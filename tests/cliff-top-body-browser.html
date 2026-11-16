@@ -13,7 +13,7 @@
  try{
   const n=129,key='wildtrap-editor-draft-safe-v1',heights=Array(n*n).fill(0);
   for(let z=0;z<n;z++)for(let x=0;x<n;x++){
-   const h=z<=59?32:z>=67?0:32*(67-z)/8;
+   const h=z<=61?32:z>=65?0:32*(65-z)/4;
    heights[z*n+x]=h;
   }
   const rect=(x,z,X,Z)=>[{x,z},{x:X,z},{x:X,z:Z},{x,z:Z}];
@@ -80,6 +80,27 @@
   assert(topRange[0]>=-.001&&topRange[1]<=1.001,'El Top salió de UV [0..1]');
   assert(bodyRange[1]>1.01,'El Body no repite para la altura generada: '+bodyRange[1]);
   assert(root.visible,'El grupo de acantilados no es visible');
+  stage='collision';
+  const script=d.createElement('script');script.type='module';
+  script.textContent=`
+   import * as THREE from 'three';
+   import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.100';
+   try{
+    const cliff=window.__terrainTexturePainter.collisionRoot();
+    const collider=createPlaytestCollider({THREE,terrain:cliff,roots:()=>[]});
+    const count=collider.refresh();
+    const wall=collider.blocked(0,15,-29,0,33,{radius:.2,height:1.7});
+    const top=collider.floorAt(0,-30,32,{stepUp:5,searchDepth:8});
+    window.__plainsCollisionProbe={count,wall,top:top?.y??null};
+    collider.restore();
+   }catch(error){window.__plainsCollisionProbe={error:error.message}}
+  `;
+  d.head.append(script);
+  const probe=await wait(()=>w.__plainsCollisionProbe,'raycast collisions');
+  assert(!probe.error,'Colisión generada falló: '+probe.error);
+  assert(probe.count===2,'Los dos materiales deben estar en el sistema de colisiones: '+probe.count);
+  assert(probe.wall===true,'El relieve del cuerpo no detuvo al personaje');
+  assert(probe.top!==null,'El borde superior no tiene superficie caminable');
   stage='persist-and-seams';
   const saved=await wait(()=>{
    const r=JSON.parse(localStorage.getItem(key));
