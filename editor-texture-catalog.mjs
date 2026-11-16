@@ -192,4 +192,62 @@ export const PLAINS_CLIFF_MAPS={
  bodyColor:textureUrl({file:'Textura de Acantilado llanura  CUERPO- COLOR.png'}),
  bodyHeight:textureUrl({file:'Textura de Acantilado llanura CUERPO-HEIGTH.png'})
 };
+// GitHub assets may be replaced, removed or added without a JS commit.
+// Keep the running catalog in sync with the repository tree. This catalogue
+// only lists images; it NEVER changes the current world's saved selections.
+let publishedFiles=null;
+const classifyTexture=file=>{
+ const name=file.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+ const kind=/height|heigth|desplazamiento/.test(name)?'heightmap':
+  /acantilado|muro|pared|roca labrada/.test(name)?'cliff':
+  /suelo base|piso base/.test(name)?'ground':'blend';
+ const biome=/llanura|pradera/.test(name)?'plains':
+  /desiert|arena/.test(name)?'desert':
+  /pantan/.test(name)?'swamp':
+  /bosco|bosqu|forest|jungla/.test(name)?'forest':
+  /montan|monta[nñ]|rocoso/.test(name)?'mountain':'';
+ return {kind,biome};
+};
+export function syncPublishedTextureFiles(entries){
+ if(!Array.isArray(entries))return {added:0,removed:0,total:REPO_TEXTURES.length};
+ const valid=entries.filter(x=>typeof x.file==='string'&&
+  /\\.(png|jpe?g|webp)$/i.test(x.file)&&x.file.length<=240);
+ const old=new Map(REPO_TEXTURES.map(x=>[x.file,x]));
+ const list=[],seen=new Set();
+ let added=0;
+ for(const entry of valid){
+  if(seen.has(entry.file))continue;
+  seen.add(entry.file);
+  const previous=old.get(entry.file);
+  if(previous)list.push({...previous,size:Number(entry.size)||previous.size||0});
+  else{
+   const tags=classifyTexture(entry.file);
+   list.push({id:'repo-'+encodeURIComponent(entry.file),file:entry.file,
+    biome:tags.biome,kind:tags.kind,size:Number(entry.size)||0});
+   added++;
+  }
+ }
+ const removed=[...old.keys()].filter(name=>!seen.has(name));
+ REPO_TEXTURES.splice(0,REPO_TEXTURES.length,...list);
+ publishedFiles=seen;
+ return {added,removed:removed.length,removedNames:removed,total:list.length};
+}
+export function isPublishedTextureUrl(url){
+ if(publishedFiles===null||typeof url!=='string'||!url.startsWith('./assets/terrain/texturas/'))
+  return true;
+ const filename=url.slice('./assets/terrain/texturas/'.length).split(/[?#]/)[0];
+ try{return publishedFiles.has(decodeURIComponent(filename))}
+ catch(_){return false}
+}
+export const TEXTURE_TREE_API=
+ 'https://api.github.com/repos/dtokurisu-png/wildtrap/git/trees/main?recursive=1';
+export async function syncPublishedTextureCatalog(request=fetch){
+ const response=await request(TEXTURE_TREE_API,{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});
+ if(!response.ok)throw Error('HTTP '+response.status);
+ const data=await response.json();
+ if(!Array.isArray(data?.tree)||data.truncated)throw Error('Catálogo incompleto');
+ const prefix='assets/terrain/texturas/';
+ return syncPublishedTextureFiles(data.tree.filter(t=>t.type==='blob'&&t.path.startsWith(prefix))
+  .map(t=>({file:t.path.slice(prefix.length),size:t.size})));
+}
 export const TEXTURE_KINDS=[{id:'ground',name:'Texturas base'},{id:'blend',name:'Complementarias'},{id:'cliff',name:'Acantilados'},{id:'heightmap',name:'Heightmaps'}];
