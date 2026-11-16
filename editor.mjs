@@ -1678,6 +1678,7 @@ function restoreHistoryState(data){
  const v=JSON.parse(data);
  Object.assign(live,v);
  live.terrainSeams=Array.isArray(v.terrainSeams)?v.terrainSeams:[];
+ syncPlainsCliffSettings();
  live.terrainVertexOffsets=v.terrainVertexOffsets&&typeof v.terrainVertexOffsets==='object'?v.terrainVertexOffsets:{};
  if(!Array.isArray(live.holes))live.holes=[];
  if(!Array.isArray(live.zones))live.zones=[];
@@ -1833,7 +1834,7 @@ $('export').onclick=()=>{live.editorCamera=currentEditorCamera();download('wildt
 void import('./map-publisher.mjs?v=0.9.40').then(({createMapPublisher})=>{
  createMapPublisher({getScene:()=>({...live,editorCamera:currentEditorCamera()})});
 }).catch(error=>{const status=$('publishStatus');if(status)status.textContent='No se pudo iniciar el publicador: '+error.message;});
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.terrainSeams=Array.isArray(x.terrainSeams)?x.terrainSeams:[];live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);syncPlainsCliffSettings();live.terrainSeams=Array.isArray(x.terrainSeams)?x.terrainSeams:[];live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
 updateMaxHeightControl();refreshTerrain();alignMarkedCliffZones();draw();
 if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
 persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
@@ -1879,6 +1880,7 @@ async function restoreSavedBase(confirmOverwrite=false){
   if(confirmOverwrite)snapshot();
   Object.assign(live,data);
   live.terrainSeams=Array.isArray(data.terrainSeams)?data.terrainSeams:[];
+  syncPlainsCliffSettings();
   live.terrainVertexOffsets=data.terrainVertexOffsets&&typeof data.terrainVertexOffsets==='object'?data.terrainVertexOffsets:{};
   live.holes=[];
   live.cuts3d=[];
@@ -1912,7 +1914,7 @@ try{
  if(saved){
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
-   Object.assign(live,d);live.terrainSeams=Array.isArray(d.terrainSeams)?d.terrainSeams:[];live.terrainVertexOffsets=d.terrainVertexOffsets&&typeof d.terrainVertexOffsets==='object'?d.terrainVertexOffsets:{};live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
+   Object.assign(live,d);syncPlainsCliffSettings();live.terrainSeams=Array.isArray(d.terrainSeams)?d.terrainSeams:[];live.terrainVertexOffsets=d.terrainVertexOffsets&&typeof d.terrainVertexOffsets==='object'?d.terrainVertexOffsets:{};live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
    live.settings={heightMax:120,...(d.settings&&typeof d.settings==='object'?d.settings:{})};
    recoveredDraft=true;
    playerSpawnPanel?.refresh();
@@ -1938,6 +1940,7 @@ async function loadPublishedWorld(){
   if(world.size!==SIZE||world.resolution!==N||world.heights?.length!==COUNT||!Array.isArray(world.nodes))throw Error('Escenario publicado incompatible');
   Object.assign(live,world);
   live.terrainSeams=Array.isArray(world.terrainSeams)?world.terrainSeams:[];
+  syncPlainsCliffSettings();
   live.terrainVertexOffsets=world.terrainVertexOffsets&&typeof world.terrainVertexOffsets==='object'?world.terrainVertexOffsets:{};
   live.holes=Array.isArray(world.holes)?world.holes:[];
   live.cuts3d=Array.isArray(world.cuts3d)?world.cuts3d:[];
