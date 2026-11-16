@@ -165,15 +165,15 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   let allSource=0,allGenerated=0,zoneCount=0;
   for(const zone of live.zones||[]){
    const biome=parentBiome(zone);
-   if(!biome||!BIOMES.some(b=>b.id===biome))continue;
+   // A marked cliff must be subdivided even when its parent has no biome or texture.
+   if(!zone.isCliff&&!BIOMES.some(b=>b.id===biome))continue;
    const plains=biome==='plains'&&zone.isCliff===true;
    const slots=live.biomeMaterials?.[biome]?.slots||{};
    // The visible Body Color slot is the only color material for a plains
    // cliff. All other biomes keep the old single-cliff material pipeline.
    const colorURL=plains?
     (slots.cliffBodyColor?.image||PLAINS_CLIFF_MAPS.bodyColor):slots.cliff?.image;
-   const image=loaded.get(colorURL);
-   if(!image)continue;
+   const image=loaded.get(colorURL)||null;
    const heightURL=plains?
     (slots.cliffBodyHeight?.image||PLAINS_CLIFF_MAPS.bodyHeight):null;
    const requestedHeight=plains&&live.cliffHeightmapPlains?.enabled===true;
@@ -214,11 +214,14 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     straightenCliffSeams(triangles):{triangles,seams:null};
    const source=aligned.triangles;
    if(!source.length)continue;
-   const tex=new THREE.Texture(image);
-   tex.needsUpdate=true;tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
-   tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+   const tex=image?new THREE.Texture(image):null;
+   if(tex){
+    tex.needsUpdate=true;tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
+    tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+   }
    const mat=new THREE.MeshLambertMaterial({
-    map:tex,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,
+    map:tex,color:tex?0xffffff:0x8a8575,
+    side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,
     depthWrite:false,transparent:false
    });
    let zoneGenerated=0,zoneMoved=0,zoneMax=0,zoneMeshes=0;
