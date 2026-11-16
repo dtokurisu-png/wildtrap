@@ -327,7 +327,13 @@ export function createTerrainVertexEditor({
    }else if(!g.additive){selected.clear();lastAnchor=null;selectionRoute=[];updateSelection();}
   }
   release();
-  if(g.moved){refreshTerrain();persist();}
+  if(g.moved){
+   refreshTerrain();
+   // Geometric edits are high-value and can be many vertices at once.
+   // Commit them immediately instead of waiting 700 ms for a timer that
+   // is lost when the editor is reloaded or the browser tab is closed.
+   void persist(true);
+  }
   return true;
  }
  function dispose(){
