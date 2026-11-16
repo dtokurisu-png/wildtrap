@@ -20,7 +20,7 @@ export function createTextureRevisionWatcher({
  page=typeof document!=='undefined'?document:null,
  intervalMs=90000
 }={}){
- let revision='editor-0.9.107',latestSha=null,disposed=false,inFlight=null;
+ let revision='editor-0.9.109',latestSha=null,disposed=false,inFlight=null;
  let pollId=null,retries=[],lastCheck=0;
  const interval=Math.max(90000,Number(intervalMs)||90000);
  const notify=label=>{if(!disposed)onStatus(label)};
