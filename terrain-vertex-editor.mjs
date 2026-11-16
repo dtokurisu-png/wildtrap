@@ -313,6 +313,11 @@ export function createTerrainVertexEditor({
  return {setActive,refresh,dispose,pointerdown,pointermove,pointerup,
   getState:()=>({active,selected:selected.size,vertices:count,dragging:Boolean(gesture),
    seams:seams().length,protectedVertices:seamVertexIds(live,count).size}),
+  getSelectedIndices:()=>[...selected],
+  debugProjectVertex:id=>{
+   if(!active||!Number.isInteger(id)||id<0||id>=count)return null;
+   projectAll();return projected[id]?{...projected[id]}:null;
+  },
   debugSelectPath:(a,b)=>{
    if(!active||a<0||b<0||a>=count||b>=count)return [];
    selected.clear();selected.add(a);lastAnchor=a;selectionRoute=[a];
