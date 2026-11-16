@@ -68,9 +68,13 @@ const nextUndoSerial=()=>++actionSerial;
 // Save large maps primarily in IndexedDB; retain localStorage as a compatible
 // secondary copy. Browser quota failures never turn off autosave.
 const localStampKey=draftKey+'-last-save-time-v1';
+function showSaveState(label){
+ const el=$('editorSaveState');if(el)el.textContent=label;
+}
 let saveTimer=null,saveQueue=Promise.resolve();
 function saveProject(manual=false){
  clearTimeout(saveTimer);saveTimer=null;
+ showSaveState('Guardando…');
  let json;
  try{json=JSON.stringify(live)}catch(error){
   if(manual)toast('No se pudo preparar el guardado: '+error.message);
@@ -87,16 +91,19 @@ function saveProject(manual=false){
   }catch(_){/* QuotaExceededError is expected for large cave projects. */}
   try{await putDraft(draftKey,json);dbOK=true}catch(_){}
   if(localOK||dbOK){
+   showSaveState('Guardado ✓');
    if(manual)toast('Proyecto guardado correctamente'+(!localOK?' (almacenamiento ampliado)':''));
    return true;
   }
   const message='No se pudo guardar en este navegador; comprueba el espacio disponible';
+  showSaveState('Error al guardar');
   $('toast').textContent=message;
   return false;
  });
  return saveQueue;
 }
 function persist(immediate=false){
+ showSaveState('Cambios pendientes');
  clearTimeout(saveTimer);
  if(immediate)return saveProject();
  saveTimer=setTimeout(()=>{void saveProject()},700);
@@ -1037,6 +1044,15 @@ function loadSavedPlainsCliffSettings(source){
  syncPlainsCliffSettings();
 }
 syncPlainsCliffSettings();
+$('plainsCliffViewMaps')?.addEventListener('click',()=>{
+ const selector=$('textureBiome');
+ if(!selector){toast('La biblioteca de texturas no está preparada');return}
+ selector.value='plains';
+ selector.dispatchEvent(new Event('change',{bubbles:true}));
+ const target=$('plainsCliffActiveMaps');
+ if(target)target.scrollIntoView({behavior:'smooth',block:'nearest'});
+ else toast('Preparando ranuras del bioma Llanura…');
+});
 $('plainsCliffGenerate')?.addEventListener('click',()=>{
  const parents=new Map((live.zones||[]).filter(z=>!z.isCliff).map(z=>[z.id,z]));
  const available=(live.zones||[]).some(z=>z.isCliff&&parents.get(z.cliffParentId)?.biomeId==='plains');
@@ -1157,7 +1173,9 @@ function flushCameraSave({saveDraft=true}={}){
    cameraDraftTimer=null;
    try{
     if(localStorage.getItem(draftKey)!==expectedWorldDraft)return;
-    localStorage.setItem(draftKey,JSON.stringify(live));
+    // Previous local-only camera writes had no save timestamp. Reload could
+    // prefer an OLDER IndexedDB world, losing recent geometry edits.
+    void saveProject();
    }catch(_){/* The camera key above is already safe. */}
   },680);
  }
@@ -2041,7 +2059,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.77');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.102');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
  }catch(error){
@@ -2078,7 +2096,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.101');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.102');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false});
   window.__terrainTexturePainter=terrainPainter;
