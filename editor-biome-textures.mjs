@@ -123,6 +123,10 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
      const current=ensure()[next.biome]?.slots?.[next.slot];
      if(!current)return;
      current.name=next.name;current.image=next.url;current.scale=next.scale;
+     // Body Color defines the ONE actual UV scale for color AND displacement.
+     // Keep saved Body Height metadata synchronized with the visual scale.
+     if(next.biome==='plains'&&next.slot==='cliffBodyColor')
+      ensure().plains.slots.cliffBodyHeight.scale=next.scale;
      // Store the chosen repeat count for this exact repository texture.
      if(!live.textureCatalogScale||typeof live.textureCatalogScale!=='object')live.textureCatalogScale={};
      live.textureCatalogScale[next.id]=next.scale;
