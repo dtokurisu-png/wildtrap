@@ -11,10 +11,13 @@ assert.match(gpu,/records\.push\(\{mesh,mask,texture,material:shader\}\)/,'Groun
 // Complementary passes are independent; never pass a sampler into a function.
 assert.match(gpu,/const DETAIL_FRAGMENT=/,'Detail material has separate fragment shader');
 assert.doesNotMatch(gpu,/\w+\s*\(\s*sampler2D\s+\w+/,'Shader must not pass samplers to functions');
-assert.match(gpu,/texture2D\(detailTexture,rotated\+\.5\)/,'Details sample original image');
+assert.match(gpu,/texture2D\(detailTexture,uv\)/,'Details sample source image at centered UV');
 assert.match(gpu,/float columns=max\(1\.0,floor\(repeats\+\.5\)\)/,'Saved repeats define candidate columns');
-assert.match(gpu,/float probability=0\.85/,'85% of all candidate tiles receive complementary patches');
-assert.match(gpu,/float feather=1\.0-smoothstep\(\.25,\.5,edge\)/,'Center holds opacity to half the radius, then fades to zero at image edge');
+assert.match(gpu,/float probability=0\.60/,'60% of all candidate tiles receive complementary patches');
+assert.match(gpu,/vec2 fadeAxis=1\.0-smoothstep\(vec2\(\.5\),vec2\(1\.0\),normalizedDistance\)/,'Center holds opacity to half radius and fades to zero at each edge');
+assert.match(gpu,/float feather=fadeAxis\.x\*fadeAxis\.y/,'All four edges and corners must become transparent');
+assert.match(gpu,/vec2 uv=\(vTerrainXZ-center\)\/extent\+vec2\(\.5\)/,'UV must be centered at the image center');
+assert.match(gpu,/for\(int dy=-1;dy<=1;dy\+\+\)/,'Neighbor cells must contribute to avoid square clipping');
 assert.match(gpu,/patchOpacity=\.5\+\.3\*/,'Patch opacity varies between 50% and 80%');
 assert.match(gpu,/variationSeed/,'Distribution is deterministic per seed');
 assert.match(gpu,/detailMesh\.renderOrder=3\+i\*\.01/,'Details render over base');
@@ -25,6 +28,6 @@ assert.match(renderer,/\['ground','detail1','detail2','detail3','cliff'\]/,'Load
 assert.match(renderer,/buildCliffs\(\);apply\(\)/,'Cliff generator remains active');
 assert.doesNotMatch(renderer,/surfaceMap\.needsUpdate=true/,'Do not reintroduce the downsampled baked base texture');
 assert.doesNotMatch(gpu,/float angle=|float c=cos\(angle\)/,'Complementary patches must not rotate');
-assert.match(gpu,/vec2 rotated=local/,'Complementary patch orientation stays aligned');
-assert.equal(200*200*.85,34000,'Example density: 200 repeats -> 34,000 expected patches per complement');
+assert.doesNotMatch(gpu,/float angle=|mat2\(cos/,'Complementary patch orientation stays aligned');
+assert.equal(200*200*.60,24000,'Example density: 200 repeats -> 24,000 expected patches per complement');
 console.log('PASS: Independent randomized soft-edge complement layers preserve working base and cliffs');
