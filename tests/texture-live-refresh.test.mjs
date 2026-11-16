@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {revisionedTextureUrl,createTextureRevisionWatcher,TEXTURE_COMMITS_API}
  from '../editor-texture-live-refresh.mjs';
+import {syncPublishedTextureCatalog,syncPublishedTextureFiles,isPublishedTextureUrl,
+ REPO_TEXTURES,textureUrl,TEXTURE_TREE_API} from '../editor-texture-catalog.mjs';
 
 const source='./assets/terrain/texturas/Textura%20de%20Acantilado%20llanura%20%20CUERPO.png';
 assert.equal(revisionedTextureUrl(source,'git-a1'),source+'?wt_texture_revision=git-a1');
@@ -43,6 +45,34 @@ online=false;
 assert.equal(await watcher.check(true),false,'Offline checks fail nonfatally');
 assert.equal(updates.length,3,'Offline failure must preserve last working texture');
 watcher.dispose();
+
+// Replacing files in GitHub can also ADD or DELETE names, not just bytes.
+// Never keep deleted images in the live picker or hide newly uploaded art.
+const original=REPO_TEXTURES.map(x=>({file:x.file,size:x.size}));
+const gone='Textura de Acantilado llanura  CUERPO- COLOR.png';
+const fresh='Acantilado de piedra y tierra labrada.png';
+const listing=original.filter(x=>x.file!==gone).concat([{file:fresh,size:2965478}]);
+const changes=syncPublishedTextureFiles(listing);
+assert.equal(changes.added,1);
+assert.ok(changes.removedNames.includes(gone));
+assert.ok(REPO_TEXTURES.some(x=>x.file===fresh&&x.kind==='cliff'),
+ 'The new rock cliff should appear automatically in the repository catalog');
+assert.equal(isPublishedTextureUrl(textureUrl({file:gone})),false,
+ 'A removed image must be flagged missing, not served from a stale cache');
+assert.equal(isPublishedTextureUrl(textureUrl({file:fresh})),true);
+assert.equal(isPublishedTextureUrl('data:image/png;base64,AA=='),true,
+ 'User-owned data URLs must never be invalidated');
+const treeResult=await syncPublishedTextureCatalog(async(url,options)=>{
+ assert.equal(url,TEXTURE_TREE_API);
+ assert.equal(options.cache,'no-store');
+ return {ok:true,json:async()=>({truncated:false,tree:[
+  {type:'blob',path:'assets/terrain/texturas/'+fresh,size:2965478},
+  {type:'blob',path:'src/not-an-image.txt',size:300}
+ ]})};
+});
+assert.equal(treeResult.total,1);
+assert.equal(REPO_TEXTURES[0].file,fresh);
+assert.ok(!REPO_TEXTURES.some(x=>x.file===gone));
 
 const renderer=(await import('node:fs')).readFileSync(new URL('../editor-terrain-texture-renderer.mjs',import.meta.url),'utf8');
 assert.match(renderer,/img\.src=getTextureAssetUrl\(url\)/);
