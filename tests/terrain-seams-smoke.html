@@ -118,7 +118,8 @@
   frame.src='../?safe=1&reload-terrain=1';
   const reloaded=await wait(()=>{
    const next=frame.contentWindow?.__terrainVertexEditor;
-   return next&&next!==editor&&frame.contentDocument?.querySelector('#boot[hidden]')?next:null;
+   return next&&next!==editor&&frame.contentWindow?.__terrainHydrated===true&&
+    frame.contentDocument?.querySelector('#boot[hidden]')?next:null;
   },'recarga real del editor');
   const after=reloaded.debugVertexXYZ(free);
   assert(after&&after.every((v,i)=>Math.abs(v-moved[i])<.015),
