@@ -346,6 +346,8 @@ export function createTerrainVertexEditor({
   getState:()=>({active,selected:selected.size,vertices:count,dragging:Boolean(gesture),
    seams:seams().length,protectedVertices:seamVertexIds(live,count).size}),
   getSelectedIndices:()=>[...selected],
+  debugVertexXYZ:id=>Number.isInteger(id)&&id>=0&&id<count?
+   [terrainGeo.attributes.position.getX(id),terrainGeo.attributes.position.getY(id),terrainGeo.attributes.position.getZ(id)]:null,
   debugProjectVertex:id=>{
    if(!active||!Number.isInteger(id)||id<0||id>=count)return null;
    projectAll();return projected[id]?{...projected[id]}:null;
