@@ -6,7 +6,7 @@ import {putDraft,getDraft} from './editor-draft-storage.mjs?v=0.9.59';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
 // Playtest is loaded on demand. Broken external GLB/FBX cannot prevent the editor boot.
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.96';
-import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.104';
+import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.111';
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.50';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
@@ -2120,7 +2120,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.110');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.111');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    onCliffsGenerated:()=>terrainInspector?.refresh(true),getTextureAssetUrl});
