@@ -30,6 +30,7 @@ uniform sampler2D cliffTexture;
 uniform sampler2D cliffMask;
 uniform float cliffRepeats;
 uniform float intensity;
+uniform float heightmapAligned;
 varying vec3 worldPosition;
 varying vec3 worldNormal;
 void main(){
@@ -38,7 +39,7 @@ void main(){
  vec2 maskUV=vec2(worldPosition.x/630.0+.5,.5-worldPosition.z/630.0);
  float inside=texture2D(cliffMask,maskUV).a;
  if(inside<.01)discard;
- float tangent=abs(n.x)>=abs(n.z)?worldPosition.z:worldPosition.x;
+ float tangent=heightmapAligned>.5?worldPosition.z:(abs(n.x)>=abs(n.z)?worldPosition.z:worldPosition.x);
  vec2 colorUV=vec2(tangent,worldPosition.y)*(cliffRepeats/630.0);
  vec4 color=texture2D(cliffTexture,colorUV);
  float alpha=inside*color.a*intensity;
@@ -94,7 +95,8 @@ export function createCliffColorRenderer({scene,terrain,live,getTextureAssetUrl=
    const material=new THREE.ShaderMaterial({
     uniforms:{cliffTexture:{value:texture},cliffMask:{value:mask},
      cliffRepeats:{value:cliffRepeatCount(live,biome)},
-     intensity:{value:CLAMP(Number.isFinite(Number(settings.intensity))?Number(settings.intensity):1,0,1)}},
+     intensity:{value:CLAMP(Number.isFinite(Number(settings.intensity))?Number(settings.intensity):1,0,1)},
+     heightmapAligned:{value:CLIFF_ASSETS.some(a=>a.biome===biome&&a.height)?1:0}},
     vertexShader,fragmentShader,side:THREE.DoubleSide,
     transparent:true,depthWrite:false,depthTest:true,
     polygonOffset:true,polygonOffsetFactor:-9,polygonOffsetUnits:-9
