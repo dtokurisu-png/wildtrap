@@ -65,7 +65,7 @@ export function addTerrainSeam(live,indices,getPosition,orderedPath=[]){
  let path=[...orderedPath].filter(id=>same.has(id));
  if(path.length<2)path=ids;
  const seam={id:'seam-'+number,name:'Costura '+String(number).padStart(2,'0'),
-  kind:'cliff',vertices:ids,anchors,path};
+  kind:'terrain',vertices:ids,anchors,path};
  live.terrainSeams.push(seam);
  return seam;
 }

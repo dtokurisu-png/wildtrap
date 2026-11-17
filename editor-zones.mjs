@@ -176,7 +176,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   if(!valid(pending)){toast('Zona inválida: revisa cruces, vértices repetidos o superficie demasiado pequeña');return;}
   snapshot();
   const ids=new Set(items().map(z=>z.id));let i=1;while(ids.has('zone-'+i))i++;
-  const zone={id:'zone-'+i,name:'Zona '+String(i).padStart(2,'0'),points:pending.map(norm),hidden:false,cliffs:[]};
+  const zone={id:'zone-'+i,name:'Zona '+String(i).padStart(2,'0'),points:pending.map(norm),hidden:false};
   items().push(zone);selected=zone.id;pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;editVertices=false;addingVertex=false;
   commit();refreshAll();toast(zone.name+' creada y guardada');
  }

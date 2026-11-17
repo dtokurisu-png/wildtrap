@@ -13,8 +13,6 @@ export function createTextureScalePreview({onApply,toast,getTextureAssetUrl=url=
  let renderer=null,scene=null,camera=null,orbit=null,plane=null,texture=null,model=null;
  let raf=0,openToken=0,drag=null,request=null,active=null;
  const bounds=(v,min,max)=>Math.max(min,Math.min(max,v));
- // Base CUERPO, dedicated Body Color and Body Height are all vertical cliff maps.
- const isCliffSlot=slot=>slot==='cliff'||slot==='cliffBodyColor'||slot==='cliffBodyHeight';
  const value=()=>bounds(Number(number.value)||8,.25,1000);
  const label=()=>{
   const v=value(),tile=630/v;
@@ -79,7 +77,7 @@ export function createTextureScalePreview({onApply,toast,getTextureAssetUrl=url=
    camera.lookAt(0,0,0);
   }
   orbit=new OrbitControls(camera,canvas);orbit.enableDamping=true;
-  orbit.target.set(0,isCliffSlot(item.slot)?.5:0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
+  orbit.target.set(0,0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
   update();
   const draw=()=>{
    if(token!==openToken||!dialog.open)return;
@@ -173,7 +171,7 @@ export function createTextureScalePreview({onApply,toast,getTextureAssetUrl=url=
   open(item){
    if(dialog.open)dialog.close();
    active=item;request=item.url;
-   $('textureScaleTitle').textContent=(isCliffSlot(item.slot)?'Editar acantilado · ':'Editar suelo · ')+item.name;
+   $('textureScaleTitle').textContent='Editar suelo · '+item.name;
    number.value=String(bounds(item.scale,.25,1000));
    status.textContent='Cargando textura y Explorador 1 WT…';
    dialog.showModal();

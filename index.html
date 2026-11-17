@@ -195,7 +195,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <p class="hint">Las etiquetas, rutas y parámetros de materiales se guardan con el escenario. Las imágenes originales permanecen en el repositorio. Los biomas pueden asignarse manualmente o generarse desde las zonas definidas.</p>
 <div id="biomeGeneratorPanel" style="border-top:1px solid #497967;margin-top:12px;padding-top:10px">
 <h2>Generador procedural de biomas</h2>
-<p class="hint">Reparte los cinco biomas entre las zonas existentes sin modificar alturas, acantilados, recortes ni objetos. Repetir una semilla y reglas idénticas devuelve la misma distribución.</p>
+<p class="hint">Reparte los cinco biomas entre las zonas existentes sin modificar alturas, recortes ni objetos. Repetir una semilla y reglas idénticas devuelve la misma distribución.</p>
 <label>Semilla de distribución<input id="biomeGeneratorSeed" type="number" min="1" max="2147483646" step="1" value="1" style="width:100%;padding:7px;background:#1e4034;color:#fff;border:1px solid #598071;border-radius:6px"></label>
 <h2>Biomas activos y pesos</h2>
 <p class="hint">Peso 0: no aparece en nuevas asignaciones. Los biomas bloqueados previamente se conservan.</p>
@@ -245,7 +245,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <p class="hint">Activa las mallas desde <b>Objetos de escena → ◫</b>, incluso mientras dibujas el recorte. Los controles de caras, aristas, vértices y Rayos X están en las propiedades de cada objeto y del terreno.</p>
 <div class="hint"><span id="holeSelectionCount">0 vértices · clic para iniciar el contorno</span> · <span id="holeCounter">0 celdas antiguas · 0 cortes 3D · 0 restauraciones</span></div>
 <div class="hint" id="holeMeshStats">Malla base sin recortes adicionales</div>
-<p class="hint"><b>Atajos:</b> Retroceso elimina el último punto; Escape cancela el contorno; Ctrl+Z deshace el corte aplicado. Puedes marcar puntos sobre un acantilado o un GLB, pero cada contorno debe pertenecer a la misma malla. Los agujeros y restauraciones se guardan en el proyecto; la topología original de los modelos se conserva para reconstruir y deshacer.</p>
+<p class="hint"><b>Atajos:</b> Retroceso elimina el último punto; Escape cancela el contorno; Ctrl+Z deshace el corte aplicado. Puedes marcar puntos sobre el terreno o un GLB, pero cada contorno debe pertenecer a la misma malla. Los agujeros y restauraciones se guardan en el proyecto; la topología original de los modelos se conserva para reconstruir y deshacer.</p>
 </section>
 <section>
 <h2>3. Anclajes, caminos y estructuras</h2>

@@ -994,7 +994,7 @@ holesEditor=createTerrainHoles({
  renderCuts:!recoveryMode,nextUndoSerial
 });
 terrainInspector=createTerrainMeshInspector({scene,camera,view,terrain,$,
- isSelected:()=>terrainPropertiesSelected,getCliffOverlay:()=>null});
+ isSelected:()=>terrainPropertiesSelected});
 window.__terrainMeshInspector=terrainInspector;
 // No network, FBX parser or animation adapter is required to open the editor.
 let preview={

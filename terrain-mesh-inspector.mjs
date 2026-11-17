@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // Viewer for the ACTUAL triangulated arena, not the uncut base heightfield.
 // The visible geometry changes after each cut; all overlays are rebuilt only
 // when terrain.geometry changes. Nothing here changes the saved scenario.
-export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelected=()=>false,getCliffOverlay=()=>null}){
+export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelected=()=>false}){
  const overlay=new THREE.Group();
  overlay.name='WILDTRAP Terrain mesh X-ray inspection';
  overlay.userData.editorOnly=true;
@@ -113,8 +113,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
    viewLines.renderOrder=12;viewLines.frustumCulled=false;
   }
   statistics={triangles:indices.length/3,vertices:position.count,activeVertices:total,
-   drawnVertices:dots.length/3,cliffTriangles:cliffFaces,
-   cliffSourceTriangles:cliffSource,cliffMeshes};
+   drawnVertices:dots.length/3};
 
   $('terrainMeshStats').textContent=
    statistics.triangles.toLocaleString('es')+' caras triangulares · '+
@@ -123,12 +122,12 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
    Math.max(0,position.count-total).toLocaleString('es')+' vértices sin caras'+
    (cliffSource?' · ACANTILADOS '+cliffSource.toLocaleString('es')+' → '+
     cliffFaces.toLocaleString('es')+' triángulos (x'+(cliffFaces/cliffSource).toFixed(1)+')':'');
-  setInfo('Cian: terreno conservado; naranja: acantilados subdivididos que sustituyen la superficie original y reciben heightmap.');
+  setInfo('Vista de la geometría original del terreno.');
   display();
  }
  function highlightFace(hit){
   release(faceVisuals);
-  const generated=hit.object!==terrain;
+  
   const geo=hit.object.geometry,pos=geo.getAttribute('position'),indices=geo.index?.array;
   const offset=hit.faceIndex*3;
   if(offset<0||offset+2>=(indices?.length||pos.count))return;
@@ -152,11 +151,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
   const lines=own(new THREE.LineSegments(linesGeo,linesMat),linesGeo,linesMat,faceVisuals);
   lines.renderOrder=16;
   const p=hit.point;
-  setInfo((generated?'ACANTILADO REFINADO · ':'Malla de terreno · ')+
-   'cara #'+hit.faceIndex+' · triángulo XYZ '+ids.join(', ')+
-   ' · X '+p.x.toFixed(2)+' / Y '+p.y.toFixed(2)+' / Z '+p.z.toFixed(2)+
-   (generated?' · geometría realmente desplazada por el heightmap':
-    ' · geometría no sustituida'));
+  setInfo('Malla de terreno · cara #'+hit.faceIndex+' · triángulo XYZ '+ids.join(', ')+' · X '+p.x.toFixed(2)+' / Y '+p.y.toFixed(2)+' / Z '+p.z.toFixed(2));
  }
  function inspect(event){
   if(!active||!terrain.visible||event.button!==0)return false;
@@ -165,11 +160,11 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
    -(event.clientY-bounds.top)/bounds.height*2+1);
   raycaster.setFromCamera(ndc,camera);
   terrain.updateMatrixWorld(true);
-  const hit=raycaster.intersectObjects([terrain,...(getCliffOverlay()?.children||[])],false)[0];
+  const hit=raycaster.intersectObject(terrain,false)[0];
   if(hit)highlightFace(hit);
   else{
    release(faceVisuals);
-   setInfo('No hay caras de terreno o acantilado aquí. Gira la cámara para inspeccionar la superficie.');
+   setInfo('No hay caras de terreno aquí. Gira la cámara para inspeccionar la superficie.');
   }
   return true;
  }
