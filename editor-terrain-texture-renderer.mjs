@@ -2,8 +2,8 @@ import {buildRefinedCliffGeometry} from './editor-cliff-mesh.mjs?v=0.9.104';
 import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
-import {BIOMES} from './editor-biome-textures.mjs?v=0.9.105';
-import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.106';
+import {BIOMES} from './editor-biome-textures.mjs?v=0.9.110';
+import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.110';
 import {buildCliffBodyHeightmapBuffers} from './editor-cliff-body-heightmap.mjs?v=0.9.105';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
@@ -22,7 +22,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  // Cliff materials are gameplay visuals and must remain visible in Play mode.
  let enabled=true,timer=0,generation=0,hasSurface=false,hasCliffs=false;
  const imageCache=new Map(),loaded=new Map(),heightCache=new Map();
- let plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,meshes:0,subdivisionRatio:0};
+ let plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0};
  function heightPixels(url){
   if(!url)return null;
   if(heightCache.has(url))return heightCache.get(url);
@@ -78,7 +78,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    }
   }
   hasCliffs=false;
-  plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,meshes:0,subdivisionRatio:0};
+  plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0};
  }
  function polygon(ctx,points){
   if(!Array.isArray(points)||points.length<3)return false;
@@ -169,9 +169,9 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    if(!zone.isCliff&&!BIOMES.some(b=>b.id===biome))continue;
    const plains=biome==='plains'&&zone.isCliff===true;
    const slots=live.biomeMaterials?.[biome]?.slots||{};
-   // The original single-material cliff uses CUERPO.png. Only when the
-   // procedural relief is enabled is that material replaced by the dedicated
-   // CUERPO- COLOR.png + CUERPO-HEIGTH.png pair.
+   // Both base and generated color resolve to the SAME currently existing
+   // Llanura CUERPO.png. The generated mesh additionally samples HEIGTH.png.
+   // Color and height share a single set of UVs and the saved Body scale.
    const generated=plains&&live.cliffHeightmapPlains?.enabled===true;
    const colorURL=generated?
     (slots.cliffBodyColor?.image||PLAINS_CLIFF_MAPS.bodyColor):
@@ -271,11 +271,12 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     zoneGenerated+=before;zoneMoved+=modified;zoneMax=Math.max(zoneMax,offset);
     zoneMeshes++;
    }
-   if(!zoneMeshes){mat.map.dispose();mat.dispose();continue}
+   if(!zoneMeshes){mat.map?.dispose();mat.dispose();continue}
    hasCliffs=true;zoneCount++;
    allSource+=source.length;allGenerated+=zoneGenerated;
    if(plains){
     plainsStats.zones++;
+    if(heightmap)plainsStats.heightmapZones++;
     plainsStats.sourceTriangles+=source.length;
     plainsStats.subdividedTriangles+=zoneGenerated;
     plainsStats.bodyTriangles+=zoneGenerated;
@@ -304,11 +305,13 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    for(const key of ['ground','detail1','detail2','detail3','cliff'])
     if(slots?.[key]?.image)urls.add(slots[key].image);
   }
-  // Plains always displays Body Color. Body Height is loaded when its
-  // generator is enabled. Never request a Top asset.
+  // The base and Body Color both point to CUERPO.png on current GitHub.
+  // Load the canonical color as a safe fallback for older saved references.
+  // Do not depend on a separate -COLOR.png file (it does not exist).
   if(zones.some(z=>z.isCliff&&parentBiome(z)==='plains')){
    const slots=live.biomeMaterials?.plains?.slots||{};
-   urls.add(slots.cliffBodyColor?.image||PLAINS_CLIFF_MAPS.bodyColor);
+   urls.add(PLAINS_CLIFF_MAPS.base);
+   if(slots.cliffBodyColor?.image)urls.add(slots.cliffBodyColor.image);
    if(live.cliffHeightmapPlains?.enabled===true)
     urls.add(slots.cliffBodyHeight?.image||PLAINS_CLIFF_MAPS.bodyHeight);
   }
@@ -327,8 +330,12 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   if(output)output.textContent=plainsStats.zones?
    (plainsStats.zones+' zonas · '+plainsStats.sourceTriangles+' → '+
     plainsStats.subdividedTriangles+' triángulos (x'+
-    plainsStats.subdivisionRatio.toFixed(1)+') · '+plainsStats.moved+
-    ' vértices desplazados'):'No hay zonas de acantilado de Llanura';
+    plainsStats.subdivisionRatio.toFixed(1)+') · '+
+    (live.cliffHeightmapPlains?.enabled?
+     (plainsStats.heightmapZones?
+      plainsStats.moved+' vértices desplazados · heightmap aplicado':
+      '⚠ Heightmap no cargado'):'Relieve no generado')):
+   'No hay zonas de acantilado de Llanura';
  }
  function apply(){
   // Transparency is not used for terrain; only replace material when surface imagery exists.
