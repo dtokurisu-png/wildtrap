@@ -1,10 +1,10 @@
-import {buildRefinedCliffGeometry} from './editor-cliff-mesh.mjs?v=0.9.104';
+import {buildRefinedCliffGeometry,buildOriginalCliffMaterialGeometry} from './editor-cliff-mesh.mjs?v=0.9.112';
 import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
 import {BIOMES,normalizePlainsCliffImage} from './editor-biome-textures.mjs?v=0.9.110';
 import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.110';
-import {buildCliffBodyHeightmapBuffers} from './editor-cliff-body-heightmap.mjs?v=0.9.105';
+import {buildCliffBodyHeightmapBuffers,cliffWallProjection} from './editor-cliff-body-heightmap.mjs?v=0.9.112';
 import {maskTerrainCliffFaces} from './editor-cliff-surface-replacement.mjs?v=0.9.111';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
@@ -33,7 +33,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   }
  }
  const imageCache=new Map(),loaded=new Map(),heightCache=new Map();
- let plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0};
+ let plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,minOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0,rejectedZones:0,unrefinedFaces:0,shapeRange:0};
  function heightPixels(url){
   if(!url)return null;
   if(heightCache.has(url))return heightCache.get(url);
@@ -90,7 +90,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    }
   }
   hasCliffs=false;
-  plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0};
+  plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,minOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0,rejectedZones:0,unrefinedFaces:0,shapeRange:0};
  }
  function polygon(ctx,points){
   if(!Array.isArray(points)||points.length<3)return false;
@@ -249,41 +249,58 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     // Real depth writing is needed so protruding ridges affect visibility.
     depthTest:true,depthWrite:true,transparent:false
    });
-   let zoneGenerated=0,zoneMoved=0,zoneMax=0,zoneMeshes=0;
-   // Each source triangle is split at least 3x3 -> 9 triangles.
-   // Chunk a large cliff for memory safety WITHOUT lowering resolution.
-   const CHUNK=2400;
+   let zoneGenerated=0,zoneMoved=0,zoneMax=0,zoneMin=0,zoneRange=0,
+    zoneMeshes=0,zoneRefined=0,zoneUnrefined=0;
+   const wall=generated&&heightmap?cliffWallProjection(source):null;
+   const strength=Math.max(0,Math.min(4,Number(live.cliffHeightmapPlains?.strength)||0));
+   const canDisplace=Boolean(generated&&heightmap&&wall&&strength>0);
+   // Heightmap projection: 1 grayscale image across each vertical cliff wall.
+   // Color repeats (100/450) do not control geometry sampling.
+   const CHUNK=canDisplace?160:2400;
    for(let start=0;start<source.length;start+=CHUNK){
     const batch=source.slice(start,start+CHUNK);
-    const geometry=buildRefinedCliffGeometry(batch,{
-     repeat:visibleScale,maxEdge:3,maxTriangles:90000
-    });
-    if(!geometry)continue;
-    const before=geometry.userData.generatedTriangles||geometry.attributes.position.count/3;
-    if(before<batch.length*6){
-     geometry.dispose();throw Error('Subdivisión insuficiente para acantilado '+zone.id);
-    }
-    let finalGeometry=geometry,modified=0,offset=0;
-    if(heightmap){
-     const displaced=buildCliffBodyHeightmapBuffers(geometry,{
-      heightmap,strength:live.cliffHeightmapPlains.strength??1.5,
-      seamPaths:zoneSeams,protectRadius:2.5
+    let finalGeometry=null,realRelief=false,before=batch.length,modified=0,offset=0;
+    if(canDisplace){
+     const refined=buildRefinedCliffGeometry(batch,{
+      repeat:visibleScale,maxEdge:1.05,maxTriangles:70000,
+      minDivisions:3,maxDivisions:16
      });
-     if(displaced){
-      finalGeometry=new THREE.BufferGeometry();
-      finalGeometry.setAttribute('position',new THREE.Float32BufferAttribute(displaced.positions,3));
-      finalGeometry.setAttribute('normal',new THREE.Float32BufferAttribute(displaced.normals,3));
-      finalGeometry.setAttribute('uv',new THREE.Float32BufferAttribute(displaced.uvs,2));
-      finalGeometry.computeBoundingBox();finalGeometry.computeBoundingSphere();
-      finalGeometry.userData={...geometry.userData};
-      modified=displaced.stats.moved;offset=displaced.stats.maxOffset;
-      geometry.dispose();
+     if(refined){
+      const displaced=buildCliffBodyHeightmapBuffers(refined,{
+       heightmap,strength,wallProjection:wall,seamPaths:zoneSeams,
+       protectRadius:1.5
+      });
+      if(displaced?.stats?.applied&&displaced.positions){
+       finalGeometry=new THREE.BufferGeometry();
+       finalGeometry.setAttribute('position',new THREE.Float32BufferAttribute(displaced.positions,3));
+       finalGeometry.setAttribute('normal',new THREE.Float32BufferAttribute(displaced.normals,3));
+       finalGeometry.setAttribute('uv',new THREE.Float32BufferAttribute(displaced.uvs,2));
+       finalGeometry.computeBoundingBox();finalGeometry.computeBoundingSphere();
+       finalGeometry.userData={...refined.userData,actualHeightmapRelief:true};
+       before=refined.userData.generatedTriangles||refined.attributes.position.count/3;
+       modified=displaced.stats.moved;offset=displaced.stats.maxOffset;
+       zoneMin=Math.min(zoneMin,displaced.stats.minOffset);
+       zoneRange=Math.max(zoneRange,displaced.stats.range);
+       realRelief=true;
+       // Mask the source terrain only for verified displaced chunks.
+       for(const face of sourceFaceIds.slice(start,start+batch.length))
+        removedSourceFaces.add(face);
+      }
+      refined.dispose();
      }
     }
+    // If no visible grayscale shape was produced, draw original triangles.
+    if(!realRelief){
+     finalGeometry=buildOriginalCliffMaterialGeometry(batch,{repeat:visibleScale});
+     if(!finalGeometry)continue;
+     before=batch.length;
+     zoneUnrefined+=batch.length;
+    }else zoneRefined++;
     const mesh=new THREE.Mesh(finalGeometry,mat);
-    mesh.name=(plains?'PlainsCliff_Body':'CliffMaterial')+'_'+zone.id+'_'+zoneMeshes;
+    mesh.name=(realRelief?'PlainsCliff_Heightmap':'CliffMaterial')+'_'+zone.id+'_'+zoneMeshes;
     mesh.userData.cliffZoneId=zone.id;
-    mesh.userData.cliffPart=generated?'Body':(plains?'Base':'Cliff');
+    mesh.userData.cliffPart=realRelief?'Body':(plains?'Base':'Cliff');
+    mesh.userData.heightmapApplied=realRelief;
     mesh.userData.cliffImage=colorURL;
     mesh.userData.sourceTriangles=batch.length;
     mesh.userData.refinedTriangles=before;
@@ -295,17 +312,21 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     zoneMeshes++;
    }
    if(!zoneMeshes){mat.map?.dispose();mat.dispose();continue}
-   if(zone.isCliff)for(const face of sourceFaceIds)removedSourceFaces.add(face);
+   // Source faces are masked only for accepted heightmap chunks.
    hasCliffs=true;zoneCount++;
    allSource+=source.length;allGenerated+=zoneGenerated;
    if(plains){
     plainsStats.zones++;
-    if(heightmap)plainsStats.heightmapZones++;
+    if(zoneRefined>0)plainsStats.heightmapZones++;
+    else if(generated)plainsStats.rejectedZones++;
     plainsStats.sourceTriangles+=source.length;
     plainsStats.subdividedTriangles+=zoneGenerated;
     plainsStats.bodyTriangles+=zoneGenerated;
     plainsStats.moved+=zoneMoved;
     plainsStats.maxOffset=Math.max(plainsStats.maxOffset,zoneMax);
+    plainsStats.minOffset=Math.min(plainsStats.minOffset,zoneMin);
+    plainsStats.shapeRange=Math.max(plainsStats.shapeRange,zoneRange);
+    plainsStats.unrefinedFaces+=zoneUnrefined;
     plainsStats.meshes+=zoneMeshes;
    }
   }
@@ -363,15 +384,15 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   buildCliffs();apply();
   const output=document.getElementById('plainsCliffStatus');
   if(output)output.textContent=plainsStats.zones?
-   (plainsStats.zones+' zonas · '+plainsStats.sourceTriangles+' → '+
-    plainsStats.subdividedTriangles+' triángulos (x'+
-    plainsStats.subdivisionRatio.toFixed(1)+') · '+
+   (plainsStats.zones+' zonas · '+
     (live.cliffHeightmapPlains?.enabled?
      (plainsStats.heightmapZones?
-      (plainsStats.moved?
-       plainsStats.moved+' vértices desplazados · heightmap aplicado':
-       '⚠ Heightmap cargado, sin desplazamiento'):
-      '⚠ Heightmap no cargado'):'Relieve no generado')):
+      plainsStats.moved+' vértices desplazados · '+plainsStats.sourceTriangles+
+       ' → '+plainsStats.subdividedTriangles+' triángulos · relieve real '+
+       plainsStats.shapeRange.toFixed(2)+' u · heightmap aplicado':
+      '⚠ Sin relieve geométrico verificable. Malla original conservada ('+
+       plainsStats.unrefinedFaces+' caras sin subdividir)'):
+     'Malla original conservada · sin subdivisión por heightmap')):
    'No hay zonas de acantilado de Llanura';
  }
  function apply(){
