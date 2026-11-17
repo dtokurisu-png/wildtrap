@@ -2082,7 +2082,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.110');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.113');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,
     getTextureAssetUrl,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
@@ -2120,7 +2120,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.112');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.113');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    onCliffsGenerated:()=>terrainInspector?.refresh(true),getTextureAssetUrl});
