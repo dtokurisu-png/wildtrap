@@ -190,7 +190,12 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <button id="plainsCliffViewMaps" type="button">Ver materiales</button>
  <button id="plainsCliffGenerate" type="button">Generar</button>
  </div>
- <output id="plainsCliffStatus" class="hint" hidden></output>
+ <output id="plainsCliffStatus" class="hint" style="display:block;white-space:normal;overflow-wrap:anywhere;margin:7px 0" hidden></output>
+ <div style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
+  <img id="plainsCliffHeightProof" alt="Imagen real utilizada para desplazar la malla de acantilado" hidden
+    style="width:86px;height:86px;object-fit:contain;background:#26352e;border:1px solid #577e70;border-radius:5px" />
+  <span class="hint">Comprobación: esta miniatura muestra el PNG que el generador ha cargado realmente como mapa de alturas. El resultado indicará si el relieve se aplicó o fue rechazado.</span>
+ </div>
 </div>
 <dialog id="plainsCliffHelpDialog" aria-labelledby="plainsCliffHelpTitle" style="background:#18372c;color:#e5fff0;border:1px solid #55977c;border-radius:12px;max-width:min(420px,92vw);padding:16px">
  <h3 id="plainsCliffHelpTitle" style="margin:0 0 9px">Acantilado de llanura</h3>
@@ -396,7 +401,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
-<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.112
+<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.113
  <span id="editorSaveState" style="font-weight:400;display:block;opacity:.8">Guardado local</span></div>
 <div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
@@ -437,5 +442,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.112').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.113').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
