@@ -1080,7 +1080,17 @@ $('plainsCliffViewMaps')?.addEventListener('click',()=>{
 $('plainsCliffGenerate')?.addEventListener('click',()=>{
  const parents=new Map((live.zones||[]).filter(z=>!z.isCliff).map(z=>[z.id,z]));
  const available=(live.zones||[]).some(z=>z.isCliff&&parents.get(z.cliffParentId)?.biomeId==='plains');
- if(!available){toast('Primero asigna una zona de acantilado a una región de Llanura');return}
+ if(!available){
+  const message='Heightmap no aplicado: no hay acantilados ⛰ asociados a una región principal de Llanura. Revisa Zonas → ⛰ → Región principal.';
+  const output=$('plainsCliffStatus');
+  if(output){output.hidden=false;output.textContent=message;}
+  toast(message);return;
+ }
+ if(!terrainPainter){
+  const output=$('plainsCliffStatus');
+  if(output){output.hidden=false;output.textContent='El renderizador del terreno no está preparado; no se ha generado el relieve.';}
+  toast('El renderizador del terreno no está preparado');return;
+ }
  snapshot();
  live.cliffHeightmapPlains={...(live.cliffHeightmapPlains||{}),
   enabled:true,strength:Math.max(0,Math.min(4,Number(plainsStrength.value)||0))};
