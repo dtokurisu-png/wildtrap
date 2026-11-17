@@ -164,9 +164,11 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
      live.textureCatalogScale[next.id]=next.scale;
      // The same texture can already be in another active slot:
      // update its footprint without changing the image assignment.
-     for(const config of Object.values(ensure())){
-      for(const entry of Object.values(config.slots||{}))
-       if(entry!==current&&entry.image===next.url)entry.scale=next.scale;
+     if(!(next.biome==='plains'&&(next.slot==='cliff'||next.slot==='cliffBodyColor'))){
+      for(const config of Object.values(ensure())){
+       for(const entry of Object.values(config.slots||{}))
+        if(entry!==current&&entry.image===next.url)entry.scale=next.scale;
+      }
      }
      persist();render();onChange();
      toast('Escala aplicada: '+next.scale+' repeticiones en el mapa');
@@ -174,8 +176,10 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
    }
    const url=textureUrl(t);
    const prev=Number(live.textureCatalogScale?.[t.id]);
-   const known=Number.isFinite(prev)&&prev>=.25&&prev<=1000?prev:
-    record.image===url?record.scale:8;
+   // A single CUERPO.png serves two Llanura material slots. Respect
+   // each slot's own saved repeat count (100 versus 450, for example).
+   const known=record.image===url&&Number.isFinite(Number(record.scale))?
+    record.scale:Number.isFinite(prev)&&prev>=.25&&prev<=1000?prev:8;
    previewController.open({id:t.id,name:t.file,url,biome,slot,scale:known});
   }catch(error){toast('No se pudo abrir editor de textura: '+error.message)}
  }
