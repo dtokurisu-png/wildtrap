@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {buildCliffHeightmapGeometry} from '../cliff-heightmap-geometry.mjs';
+import {buildCliffHeightmapGeometry,detectDominantCliff} from '../cliff-heightmap-geometry.mjs';
 const wall={positions:Float32Array.from([
  -12,0,0, 12,0,0, -12,20,0, 12,20,0
 ]),indices:Uint16Array.from([0,1,2,1,3,2]),colors:new Float32Array(12).fill(.7),
@@ -25,4 +25,7 @@ const far=buildCliffHeightmapGeometry(wall,{...options,point:{x:280,z:280}});
 assert.equal(far,null,'An unselected remote wall must not change');
 const zero=buildCliffHeightmapGeometry(wall,{...options,sample:()=>.5});
 assert.equal(zero,null,'A flat heightmap must not cause unnecessary subdivision');
+const detected=detectDominantCliff(wall,{minFaces:1});
+assert.ok(detected&&Math.hypot(...detected.normalXZ)>.99,'Auto-detection finds the true steep wall');
+assert.equal(detectDominantCliff(plain),null,'Auto-detection skips the flat terrain');
 console.log('PASS physical heightmap: localized wall-only mesh displacement, selective tessellation, seam boundaries, flat/no-map guards');

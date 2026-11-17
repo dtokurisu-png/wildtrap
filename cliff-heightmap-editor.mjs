@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.117';
+import {buildCliffHeightmapGeometry,detectDominantCliff} from './cliff-heightmap-geometry.mjs?v=0.9.118';
 
 // New heightmaps can be registered here without changing the geometry engine.
 // Images are geometry inputs ONLY; cliff color materials are intentionally absent.
@@ -14,17 +14,17 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
   radius=$('cliffHeightRadius'),strength=$('cliffHeightStrength'),period=$('cliffHeightPeriod'),
   steps=$('cliffHeightSteps'),remove=$('cliffHeightRemove');
  if(!btn||!status||!enabled||!radius||!strength||!period||!steps||!remove)throw Error('Panel del mapa de altura incompleto');
- let selecting=false,timer=0,ticket=0,derived=[],source=null,imageCache=new Map(),disposed=false;
+ let selecting=false,timer=0,ticket=0,derived=[],source=null,automatic=null,imageCache=new Map(),disposed=false;
  const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
  const configs=()=>Array.isArray(live.cliffHeightmaps)?live.cliffHeightmaps:[];
- const active=()=>configs().find(c=>c.id==='plains-body');
+ const active=()=>configs().find(c=>c.id==='plains-body')||automatic;
  function parameters(){
   const c=active();
   enabled.checked=c?.enabled!==false;
   radius.value=c?.radius??32;strength.value=c?.strength??2.5;period.value=c?.period??24;steps.value=c?.steps??2;
   remove.disabled=!c;btn.classList.toggle('active',selecting);
   status.textContent=selecting?'Haz clic directamente sobre la pared empinada del acantilado':
-   c?.point?'Pared seleccionada · X '+c.point.x.toFixed(1)+' / Z '+c.point.z.toFixed(1)+'. Esperando geometría…':
+   c?.point?(configs().some(x=>x.id==='plains-body')?'Pared seleccionada':'Pared detectada automáticamente')+' · X '+c.point.x.toFixed(1)+' / Z '+c.point.z.toFixed(1)+'. Preparando relieve…':
    'Aún no hay pared seleccionada. Pulsa «Seleccionar pared» y luego haz clic en el acantilado.';
  }
  function disposeDerived(){
@@ -77,9 +77,12 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
   const current=terrain.geometry;
   if(!derived.includes(current))source=current;
   const base=source||current;
+  automatic=configs().length?null:detectDominantCliff(geometryData(base));
+  if(automatic)automatic={...automatic,id:'plains-body',strength:7,period:24,steps:2,enabled:true};
   const maps=configs().filter(c=>c?.point&&c.enabled!==false&&CLIFF_HEIGHTMAPS.some(m=>m.id===c.id));
+  if(automatic)maps.push(automatic);
   if(!maps.length){
-   disposeDerived();status.textContent='Sin desplazamiento activo; terreno original conservado.';
+   disposeDerived();status.textContent=configs().length?'Relieve desactivado. Geometría original conservada.':'No hay paredes empinadas detectadas. Selecciona una pared manualmente.';
    onGeometryChanged();return;
   }
   try{
@@ -103,7 +106,7 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
    derived=newGeometries;
    onGeometryChanged();
    status.textContent=results.length?
-    'Malla real: '+results.reduce((n,x)=>n+x.moved,0)+' vértices desplazados · '+
+    (automatic?'Detección automática · ':'Selección manual · ')+'Malla real: '+results.reduce((n,x)=>n+x.moved,0)+' vértices desplazados · '+
     results.reduce((n,x)=>n+x.subdivided,0)+' caras refinadas · sin capa visual adicional.':
     'No se encontró una pared con relieve significativo en esta selección. Selecciona otra cara o ajusta escala.';
   }catch(error){
@@ -131,7 +134,7 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
   const n=hit.face.normal,side=Math.hypot(n.x,n.z);
   if(side<.65){toast('Selecciona una pared inclinada, no el suelo horizontal');parameters();return}
   snapshot();
-  const previous=active()||{};
+  const previous=active()||{};automatic=null;
   live.cliffHeightmaps=[...configs().filter(c=>c.id!=='plains-body'),{
    id:'plains-body',point:{x:hit.point.x,z:hit.point.z},
    normalXZ:[n.x/side,n.z/side],radius:previous.radius??32,
@@ -142,8 +145,11 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
  }
  view.addEventListener('pointerdown',choose,true);
  btn.onclick=()=>{selecting=!selecting;parameters()};
- remove.onclick=()=>{if(!active())return;snapshot();live.cliffHeightmaps=configs().filter(c=>c.id!=='plains-body');persist();parameters();schedule()};
- function change(field,value){const c=active();if(!c)return;snapshot();c[field]=value;persist();schedule()}
+ remove.onclick=()=>{if(!active())return;snapshot();automatic=null;live.cliffHeightmaps=[...configs().filter(c=>c.id!=='plains-body'),{id:'plains-body',enabled:false}];persist();parameters();schedule()};
+ function change(field,value){const c=active();if(!c)return;snapshot();
+  if(!configs().some(x=>x.id==='plains-body')){live.cliffHeightmaps=[...configs(),{...c,id:'plains-body'}];automatic=null}
+  live.cliffHeightmaps.find(x=>x.id==='plains-body')[field]=value;persist();parameters();schedule()}
+
  radius.onchange=()=>change('radius',clamp(Number(radius.value)||32,4,150));
  strength.onchange=()=>change('strength',clamp(Number(strength.value)||2.5,0,12));
  period.onchange=()=>change('period',clamp(Number(period.value)||24,2,180));

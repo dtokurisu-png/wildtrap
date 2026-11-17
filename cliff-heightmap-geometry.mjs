@@ -95,3 +95,43 @@ export function buildCliffHeightmapGeometry(source,{point,normalXZ,radius=32,str
   colors:colors?Float32Array.from(colors.flat()):null,uvs:uv?Float32Array.from(uv.flat()):null,
   stats:{originalVertices:originalCount,vertices:vertices.length,triangles:triangles.length,subdivided,moved}};
 }
+
+/** Pick one coherent steep wall patch if the world has no explicit cliff assignment.
+ * Does not persist or modify the terrain: the user can replace it by clicking a wall. */
+export function detectDominantCliff(source,{cellSize=24,minFaces=3}={}){
+ const p=source?.positions,idx=source?.indices;
+ if(!p||p.length<9)return null;
+ const entries=new Map(),triangleCount=idx?Math.floor(idx.length/3):Math.floor(p.length/9);
+ for(let t=0;t<triangleCount;t++){
+  const ids=idx?[idx[t*3],idx[t*3+1],idx[t*3+2]]:[t*3,t*3+1,t*3+2];
+  const a=Array.from(p.slice(ids[0]*3,ids[0]*3+3));
+  const b=Array.from(p.slice(ids[1]*3,ids[1]*3+3));
+  const c=Array.from(p.slice(ids[2]*3,ids[2]*3+3));
+  const n=normal(a,b,c);
+  if(Math.abs(n[1])>.72)continue;
+  const x=(a[0]+b[0]+c[0])/3,z=(a[2]+b[2]+c[2])/3;
+  const weight=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))+
+   Math.abs((b[2]-a[2])*(c[1]-a[1])-(b[1]-a[1])*(c[2]-a[2]));
+  const gx=Math.floor(x/cellSize),gz=Math.floor(z/cellSize),key=gx+':'+gz;
+  if(!entries.has(key))entries.set(key,{gx,gz,count:0,weight:0,x:0,z:0,nx:0,nz:0});
+  const group=entries.get(key),w=Math.max(.1,weight);
+  group.count++;group.weight+=w;group.x+=x*w;group.z+=z*w;group.nx+=n[0]*w;group.nz+=n[2]*w;
+ }
+ let best=null,bestScore=0;
+ for(const group of entries.values()){
+  let count=0,weight=0,x=0,z=0,nx=0,nz=0;
+  for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++){
+   const neighbor=entries.get((group.gx+dx)+':'+(group.gz+dz));
+   if(!neighbor)continue;
+   count+=neighbor.count;weight+=neighbor.weight;
+   x+=neighbor.x;z+=neighbor.z;nx+=neighbor.nx;nz+=neighbor.nz;
+  }
+  if(count<minFaces||weight<1)continue;
+  const point={x:x/weight,z:z/weight},centerDistance=Math.hypot(point.x,point.z);
+  const score=weight/(1+centerDistance*.001);
+  if(score>bestScore){const length=Math.hypot(nx,nz);if(length<.0001)continue;
+   best={point,normalXZ:[nx/length,nz/length],radius:Math.max(32,cellSize*2),
+    detectedFaces:count};bestScore=score}
+ }
+ return best;
+}

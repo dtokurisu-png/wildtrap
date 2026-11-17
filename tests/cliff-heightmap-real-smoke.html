@@ -6,7 +6,7 @@ try{
  const n=129,h=Array(n*n).fill(0);
  for(let z=0;z<n;z++)for(let x=0;x<n;x++)h[z*n+x]=x<64?45:0;
  const draft={version:3,size:630,resolution:n,heights:h,nodes:[],objectGroups:[],holes:[],cuts3d:[],zones:[],
-  cliffHeightmaps:[{id:'plains-body',point:{x:0,z:0},normalXZ:[1,0],radius:72,strength:7,period:24,steps:2,enabled:true}],
+  cliffHeightmaps:[],
   nextId:1,settings:{heightMax:120,biomeTexturesVisible:false}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
  const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=1000;frame.height=650;document.body.append(frame);
@@ -17,7 +17,7 @@ try{
   const label=d.querySelector('#cliffHeightStatus')?.textContent||'';
   if(label.includes('Malla real:')){
    const count=Number(label.match(/Malla real: (\d+)/)?.[1]||0);
-   clearInterval(interval);document.body.dataset.result=count>0?'PASS':'FAIL';
+   clearInterval(interval);document.body.dataset.result=count>0&&label.includes('Detección automática')?'PASS':'FAIL';
    document.querySelector('#result').textContent=label;return;
   }
   if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}
