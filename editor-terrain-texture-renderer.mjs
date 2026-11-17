@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {BIOMES,normalizePlainsCliffImage} from './editor-biome-textures.mjs?v=0.9.110';
 import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.110';
 import {buildCliffBodyHeightmapBuffers} from './editor-cliff-body-heightmap.mjs?v=0.9.105';
+import {maskTerrainCliffFaces} from './editor-cliff-surface-replacement.mjs?v=0.9.111';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
 export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial,live,toast,isTesting=()=>false,isHoleAt=()=>false,onCliffsGenerated=()=>{},getTextureAssetUrl=url=>url}){
@@ -19,8 +20,18 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  const painted=material.clone();painted.vertexColors=false;painted.color.set(0xffffff);painted.map=surfaceMap;painted.needsUpdate=true;
  const paintedGhost=painted.clone();paintedGhost.transparent=true;paintedGhost.opacity=.24;paintedGhost.depthWrite=false;
  const cliffLayer=new THREE.Group();cliffLayer.name='ProceduralCliffMaterials';scene.add(cliffLayer);
- // Cliff materials are gameplay visuals and must remain visible in Play mode.
+ // Cliff materials are part of the actual RENDERED/collision surface. The
+ // editable heightfield and its original XYZ indices are preserved.
  let enabled=true,timer=0,generation=0,hasSurface=false,hasCliffs=false;
+ let sourceCutGeometry=null,maskedCliffGeometry=null;
+ function restoreSourceSurface(){
+  if(maskedCliffGeometry){
+   if(terrain.geometry===maskedCliffGeometry)
+    terrain.geometry=sourceCutGeometry||terrainGeo;
+   maskedCliffGeometry.dispose();
+   maskedCliffGeometry=null;sourceCutGeometry=null;
+  }
+ }
  const imageCache=new Map(),loaded=new Map(),heightCache=new Map();
  let plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0};
  function heightPixels(url){
@@ -68,6 +79,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   return promise;
  };
  function clearCliffs(){
+  restoreSourceSurface();
   const disposed=new Set();
   while(cliffLayer.children.length){
    const mesh=cliffLayer.children[0];cliffLayer.remove(mesh);
@@ -154,8 +166,12 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  }
  function buildCliffs(){
   clearCliffs();
-  const attr=terrainGeo.attributes.position,idx=terrainGeo.index;
+  // Terrain.geometry includes any real 3D polygon cuts. Build the physical
+  // replacement FROM that geometry, not the uncut 129x129 source grid.
+  const originalSurface=terrain.geometry;
+  const attr=originalSurface.attributes.position,idx=originalSurface.index;
   const faceCount=Math.floor((idx?.count||attr.count)/3);
+  const removedSourceFaces=new Set();
   const getFace=f=>{
    const a=idx?idx.getX(f*3):f*3,b=idx?idx.getX(f*3+1):f*3+1,c=idx?idx.getX(f*3+2):f*3+2;
    return [[attr.getX(a),attr.getY(a),attr.getZ(a)],
@@ -191,7 +207,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     generated?slots.cliffBodyColor?.scale:slots.cliff?.scale)||8));
    const legacyFaces=Array.isArray(zone.cliffs)?[...new Set(zone.cliffs.flatMap(c=>
     (Array.isArray(c.faces)?c.faces:[]).filter(f=>Number.isInteger(f)&&f>=0&&f<faceCount)))]:[];
-   const triangles=[];
+   const triangles=[],sourceFaceIds=[];
    if(zone.isCliff){
     // Only take real grid faces inside this marked cliff polygon.
     for(let f=0;f<faceCount;f++){
@@ -202,7 +218,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
      const c=[(tri[0][0]+tri[1][0]+tri[2][0])/3,
       (tri[0][1]+tri[1][1]+tri[2][1])/3,
       (tri[0][2]+tri[1][2]+tri[2][2])/3];
-     if(!isHoleAt(c[0],c[1],c[2]))triangles.push(tri);
+     if(!isHoleAt(c[0],c[1],c[2])){triangles.push(tri);sourceFaceIds.push(f)}
     }
    }else{
     // Existing face-based cliffs remain compatible, including older worlds.
@@ -228,8 +244,10 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    }
    const mat=new THREE.MeshLambertMaterial({
     map:tex,color:tex?0xffffff:0x8a8575,
-    side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,
-    depthWrite:false,transparent:false
+    side:THREE.DoubleSide,
+    // The old geometry is masked out behind this actual cliff surface.
+    // Real depth writing is needed so protruding ridges affect visibility.
+    depthTest:true,depthWrite:true,transparent:false
    });
    let zoneGenerated=0,zoneMoved=0,zoneMax=0,zoneMeshes=0;
    // Each source triangle is split at least 3x3 -> 9 triangles.
@@ -277,6 +295,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     zoneMeshes++;
    }
    if(!zoneMeshes){mat.map?.dispose();mat.dispose();continue}
+   if(zone.isCliff)for(const face of sourceFaceIds)removedSourceFaces.add(face);
    hasCliffs=true;zoneCount++;
    allSource+=source.length;allGenerated+=zoneGenerated;
    if(plains){
@@ -296,6 +315,17 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   cliffLayer.userData.refinedTriangles=allGenerated;
   cliffLayer.userData.subdivisionRatio=allSource?allGenerated/allSource:0;
   cliffLayer.userData.zones=zoneCount;
+  // Replace original faces in the displayed terrain with subdivided and
+  // height-displaced triangles. No permanent vertex, seam, save or cut edits.
+  // This avoids the original cliff wall hiding the new shape underneath.
+  const replaced=maskTerrainCliffFaces(originalSurface,removedSourceFaces);
+  if(replaced){
+   sourceCutGeometry=originalSurface;
+   maskedCliffGeometry=replaced;
+   terrain.geometry=replaced;
+  }
+  cliffLayer.userData.replacedSourceFaces=removedSourceFaces.size;
+  cliffLayer.userData.isPhysicalReplacement=Boolean(replaced);
   onCliffsGenerated();
  }
  async function bake(){
@@ -369,5 +399,15 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
  return {schedule,apply,refreshCliffs,invalidateTextureImages,setEnabled,dispose,
   collisionRoot:()=>cliffLayer,
   getCliffSubdivisionStats:()=>({...cliffLayer.userData}),
+  getPhysicalSurfaceStats:()=>({
+   replacedFaces:cliffLayer.userData.replacedSourceFaces||0,
+   originalFaces:sourceCutGeometry?
+    Math.floor((sourceCutGeometry.index?.count||
+      sourceCutGeometry.attributes.position.count)/3):0,
+   remainingFaces:terrain.geometry.userData.wildtrapRemainingFaces??0,
+   activeFaces:cliffLayer.children.reduce((n,m)=>n+
+     Math.floor((m.geometry.index?.count||m.geometry.attributes.position.count)/3),0),
+   sourceUnchanged:sourceCutGeometry!==null&&terrainGeo!==terrain.geometry
+  }),
   getPlainsCliffStats:()=>({...plainsStats})};
 }
