@@ -6,14 +6,18 @@ try{
  const n=129,h=Array(n*n).fill(0);
  for(let z=0;z<n;z++)for(let x=0;x<n;x++)h[z*n+x]=x<64?45:0;
  const draft={version:3,size:630,resolution:n,heights:h,nodes:[],objectGroups:[],holes:[],cuts3d:[],
-  zones:[{id:'zone-main',name:'Llanura',biomeId:'plains',points:[{x:-160,z:-160},{x:160,z:-160},{x:160,z:160},{x:-160,z:160}]},\n   {id:'zone-cliff',name:'Acantilado',isCliff:true,cliffParentId:'zone-main',points:[{x:-9,z:-60},{x:9,z:-60},{x:9,z:60},{x:-9,z:60}]}],
+  zones:[{id:'zone-main',name:'Llanura',biomeId:'plains',points:[{x:-160,z:-160},{x:160,z:-160},{x:160,z:160},{x:-160,z:160}]},
+   {id:'zone-cliff',name:'Acantilado',isCliff:true,cliffParentId:'zone-main',points:[{x:-9,z:-60},{x:9,z:-60},{x:9,z:60},{x:-9,z:60}]}],
   nextId:1,settings:{heightMax:120,biomeTexturesVisible:false}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
  const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=1000;frame.height=650;document.body.append(frame);
  const start=Date.now();let counted=0;
  const interval=setInterval(()=>{
   const d=frame.contentDocument,w=frame.contentWindow;
-  if(!d?.querySelector('#boot[hidden]')||!w.__cliffHeightmapEditor)return;
+  if(!d?.querySelector('#boot[hidden]')||!w.__cliffHeightmapEditor){
+   if(Date.now()-start>25000){clearInterval(interval);fail('El editor no inició: '+(d?.getElementById('bootMsg')?.textContent||'sin estado'))}
+   return;
+  }
   const label=d.querySelector('#cliffHeightStatus')?.textContent||'';
   if(label.includes('vértices desplazados')){
    const count=Number(label.match(/(\d+) vértices desplazados/)?.[1]||0);
