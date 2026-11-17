@@ -187,8 +187,10 @@ assert.match(renderer,/slots\.cliff\?\.image\|\|PLAINS_CLIFF_MAPS\.base/,
  'Ordinary cliff must read its original cliff slot');
 assert.match(renderer,/slots\.cliffBodyColor\?\.image\|\|PLAINS_CLIFF_MAPS\.bodyColor/,
  'Procedural cliff reads the Body Color slot, now normalized to CUERPO.png');
-assert.match(renderer,/slots\.cliffBodyHeight\?\.image\|\|PLAINS_CLIFF_MAPS\.bodyHeight/,
- 'Procedural cliff must read dedicated Body Height slot');
+assert.match(renderer,/normalizePlainsCliffImage\(slots\.cliffBodyHeight\?\.image\|\|/,
+ 'The renderer MUST normalize stored legacy HEIGHT paths before decoding');
+assert.match(renderer,/PLAINS_CLIFF_MAPS\.bodyHeight,'cliffBodyHeight'\)/,
+ 'The PNG decoder must use the same corrected actual file as the displacement processor');
 
 assert.match(renderer,/getCliffSubdivisionStats/);
 assert.doesNotMatch(biome, /\{id:'cliffTopColor'/,'Top Color must be removed from active slots');
