@@ -40,13 +40,14 @@ const FRAGMENT=`
 uniform sampler2D baseTexture;
 uniform sampler2D regionMask;
 uniform float repeats;
+uniform float intensity;
 varying vec2 vTerrainXZ;
 void main(){
  vec2 maskUV=vec2(vTerrainXZ.x/630.0+.5,.5-vTerrainXZ.y/630.0);
  float alpha=texture2D(regionMask,maskUV).a;
  if(alpha<.01)discard;
  vec2 sourceUV=vTerrainXZ/630.0*repeats;
- gl_FragColor=vec4(texture2D(baseTexture,sourceUV).rgb,alpha);
+ gl_FragColor=vec4(texture2D(baseTexture,sourceUV).rgb,alpha*intensity);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`;
@@ -165,7 +166,8 @@ export function createTerrainGPULayers({scene,terrain}){
     uniforms:{
      baseTexture:{value:texture},
      regionMask:{value:mask},
-     repeats:{value:limit(Number(slot.scale)||8,.25,1000)}
+     repeats:{value:limit(Number(slot.scale)||8,.25,1000)},
+      intensity:{value:limit(Number.isFinite(Number(slot.opacity))?Number(slot.opacity):1,0,1)}
     },
     vertexShader:VERTEX,fragmentShader:FRAGMENT,
     side:THREE.DoubleSide,
@@ -187,7 +189,7 @@ export function createTerrainGPULayers({scene,terrain}){
     const detailSlot=materials[biome].slots['detail'+i];
     const detailImage=loaded.get(detailSlot?.image);
     if(!detailImage)continue;
-    const opacity=limit(Number(detailSlot?.opacity??.5)*2,0,1);
+    const opacity=limit(Number(detailSlot?.opacity??.5),0,1);
     if(opacity<=0)continue;
     const detailTexture=new THREE.Texture(fullResolutionSource(detailImage));
     detailTexture.wrapS=detailTexture.wrapT=THREE.ClampToEdgeWrapping;

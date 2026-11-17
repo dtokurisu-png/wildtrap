@@ -17,7 +17,7 @@ function insideCliffPolygon(x,z,points){
  }
  return inside;
 }
-export function buildCliffHeightmapGeometry(source,{point,normalXZ,zonePoints=null,radius=32,strength=2.5,period=24,steps=2,sample,maxTriangles=150000}={}){
+export function buildCliffHeightmapGeometry(source,{point,normalXZ,zonePoints=null,radius=32,strength=2.5,period=24,steps=2,sample,smoothing=0,peakFlatten=0,maxTriangles=150000}={}){
  if(!source||!point||typeof sample!=='function')return null;
  const [nx,nz]=normalXZ||[0,1],nl=Math.hypot(nx,nz)||1,axis=[nx/nl,nz/nl];
  const originalCount=source.positions.length/3;
@@ -95,16 +95,57 @@ export function buildCliffHeightmapGeometry(source,{point,normalXZ,zonePoints=nu
   const a=vertices[tri[0]],b=vertices[tri[1]],c=vertices[tri[2]],n=normal(a,b,c);
   for(const id of tri){allVotes[id]++;if(qualifiesWall){wallVotes[id]++;horizontal[id][0]+=n[0];horizontal[id][1]+=n[2]}}
  }
- let moved=0;
+ // Sample the complete subdivided surface FIRST; only then resolve the relief.
+ // Smooth displacement magnitudes, not vertex positions, preserving seams and topology.
+ const candidate=new Float64Array(total),moveable=new Uint8Array(total),fadeByVertex=new Float64Array(total);
  for(let i=originalCount;i<total;i++){
   if(!wallVotes[i]||wallVotes[i]!==allVotes[i])continue;
-  const p=vertices[i],v=sampleAt(p),delta=(v-.5)*2*strength;
-  if(Math.abs(delta)<.001)continue;
+  const p=vertices[i];
   const fade=zonePoints?1:clamp((maxR-Math.hypot(p[0]-point.x,p[2]-point.z))/3,0,1);
-  const n=horizontal[i],length=Math.hypot(n[0],n[1])||1;
-  p[0]+=n[0]/length*delta*fade;
-  p[2]+=n[1]/length*delta*fade;
-  if(fade>0)moved++;
+  if(!fade)continue;
+  moveable[i]=1;fadeByVertex[i]=fade;
+  candidate[i]=(sampleAt(p)-.5)*2*strength*fade;
+ }
+ const neighbors=Array.from({length:total},()=>new Set());
+ for(const [a,b,c] of triangles){
+  neighbors[a].add(b);neighbors[a].add(c);
+  neighbors[b].add(a);neighbors[b].add(c);
+  neighbors[c].add(a);neighbors[c].add(b);
+ }
+ const smoothingAmount=clamp(Number(smoothing)||0,0,1),flattenAmount=clamp(Number(peakFlatten)||0,0,1);
+ let relief=candidate;
+ if(smoothingAmount>0){
+  const passes=Math.max(1,Math.round(2+3*smoothingAmount));
+  for(let pass=0;pass<passes;pass++){
+   const next=new Float64Array(relief);
+   for(let i=originalCount;i<total;i++)if(moveable[i]){
+    let sum=0,count=0;
+    for(const k of neighbors[i]){sum+=relief[k];count++}
+    if(count)next[i]+=smoothingAmount*.65*(sum/count-relief[i]);
+   }
+   relief=next;
+  }
+ }
+ if(flattenAmount>0){
+  const old=relief,next=new Float64Array(old);
+  for(let i=originalCount;i<total;i++)if(moveable[i]){
+   let sum=0,count=0;
+   for(const k of neighbors[i]){sum+=old[k];count++}
+   if(!count)continue;
+   const average=sum/count;
+   // Flatten isolated maxima without erasing broad high rock plateaus.
+   if(old[i]>average)next[i]-=(old[i]-average)*flattenAmount*.9;
+  }
+  relief=next;
+ }
+ let moved=0;
+ for(let i=originalCount;i<total;i++)if(moveable[i]){
+  const delta=relief[i];
+  if(Math.abs(delta)<.001)continue;
+  const p=vertices[i],n=horizontal[i],length=Math.hypot(n[0],n[1])||1;
+  p[0]+=n[0]/length*delta;
+  p[2]+=n[1]/length*delta;
+  moved++;
  }
  return {positions:Float32Array.from(vertices.flat()),indices:Uint32Array.from(triangles.flat()),
   colors:colors?Float32Array.from(colors.flat()):null,uvs:uv?Float32Array.from(uv.flat()):null,

@@ -1,93 +1,81 @@
 import * as THREE from 'three';
-import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.120';
-import {registeredCliffZones,CLIFF_ASSETS,cliffRepeatCount} from './cliff-zone-bindings.mjs?v=0.9.122';
+import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.123';
+import {registeredCliffZones,CLIFF_ASSETS,cliffRepeatCount} from './cliff-zone-bindings.mjs?v=0.9.123';
+import {createCliffColorRenderer} from './cliff-color-renderer.mjs?v=0.9.123';
 const texturePath=file=>'./assets/terrain/texturas/'+encodeURIComponent(file);
-const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl=url=>url,onGeometryChanged=()=>{}}){
  const $=id=>document.getElementById(id);
- const status=$('cliffHeightStatus'),enabled=$('cliffHeightEnabled'),radius=$('cliffHeightRadius'),
-  strength=$('cliffHeightStrength'),period=$('cliffHeightPeriod'),repeats=$('cliffHeightRepeats'),steps=$('cliffHeightSteps'),
-  pick=$('cliffHeightPick'),remove=$('cliffHeightRemove');
- if(!status||!enabled||!strength||!period||!steps)throw Error('Falta panel geométrico de heightmap');
- if(radius)radius.closest('label').hidden=true;
- if(pick)pick.hidden=true;
- if(remove)remove.hidden=true;
- if(repeats)repeats.closest('label').hidden=true;
- if(period)period.closest('label').hidden=true;
- const cards=$('cliffBiomeCards');
+ const status=$('cliffHeightStatus'),enabled=$('cliffHeightEnabled'),
+  strength=$('cliffHeightStrength'),steps=$('cliffHeightSteps'),
+  smoothing=$('cliffHeightSmoothing'),flatten=$('cliffHeightFlatten'),
+  cards=$('cliffBiomeCards'),target=$('textureTarget'),
+  geometryControls=$('cliffGeometryControls');
+ if(!status||!enabled||!strength||!steps||!smoothing||!flatten||!cards||!target)
+  throw Error('Faltan controles de acantilado o propiedades procedurales');
  let timer=0,ticket=0,derived=[],source=null,disposed=false;
  const imageCache=new Map();
- const settings=()=>{
+ const renderer=createCliffColorRenderer({scene,terrain,live,getTextureAssetUrl});
+ renderer.setVisible(live.settings?.biomeTexturesVisible!==false);
+ function settings(){
   if(!live.cliffHeightSettings||typeof live.cliffHeightSettings!=='object')live.cliffHeightSettings={};
   return live.cliffHeightSettings;
- };
- function parameters(){
-  renderBiomeCards();
-  const c=settings();enabled.checked=c.enabled!==false;
-  strength.value=c.strength??3;period.value=c.period??24;
-  if(repeats)repeats.value=String(Math.round((630/(Number(c.period)||24))*100)/100);
-  steps.value=c.steps??2;
-  const marked=registeredCliffZones(live),ready=marked.filter(x=>x.map);
-  const pending=marked.filter(x=>!x.parent).length,missing=marked.filter(x=>x.parent&&!x.map).length;
-  status.textContent=marked.length?
-   marked.length+' zonas marcadas como acantilado · '+ready.length+' con heightmap disponible'+
-   (pending?' · '+pending+' sin región principal':'')+
-   (missing?' · '+missing+' pendientes de mapa de alturas':'')+
-   ' · escalas por bioma disponibles en los controles de imágenes':
-   'No hay zonas marcadas como acantilado. Usa el botón ⛰ del Creador de zonas y asóciala a su región principal.';
  }
- function renderBiomeCards(){
-  if(!cards)return;
+ function biomeSettings(biome){
+  const config=settings();
+  if(!config.biomes||typeof config.biomes!=='object')config.biomes={};
+  if(!config.biomes[biome]||typeof config.biomes[biome]!=='object')config.biomes[biome]={};
+  return config.biomes[biome];
+ }
+ function activeBiome(){
+  const chosen=target.value||'';
+  return chosen.startsWith('cliff:')?chosen.slice(6):null;
+ }
+ function parameters(){
+  const c=settings(),biome=activeBiome(),b=biome?biomeSettings(biome):{};
+  enabled.checked=c.enabled!==false;
+  if(geometryControls)geometryControls.hidden=!biome;
+  strength.value=b.strength??c.strength??3;
+  steps.value=b.steps??c.steps??2;
+  smoothing.value=Math.round((b.smoothing??c.smoothing??.55)*100);
+  flatten.value=Math.round((b.peakFlatten??c.peakFlatten??.4)*100);
+  renderCards();
+  const zones=registeredCliffZones(live);
+  const ready=zones.filter(x=>x.map);
+  const missing=zones.filter(x=>x.parent&&!x.map).length;
+  status.textContent=zones.length?
+   zones.length+' zonas ⛰ · '+ready.length+' con heightmap'+
+    (missing?' · '+missing+' pendientes de heightmap':''):
+   'Sin zonas ⛰ asignadas.';
+ }
+ function renderCards(){
   cards.replaceChildren();
   const zones=registeredCliffZones(live);
   for(const asset of CLIFF_ASSETS){
-   const count=zones.filter(z=>z.biome===asset.biome).length;
-   const reps=cliffRepeatCount(live,asset.biome);
-   const card=document.createElement('section');
-   card.style.cssText='border:1px solid #487666;border-radius:8px;padding:9px;margin:8px 0;background:#19392d';
-   const header=document.createElement('strong');header.textContent=asset.label+' · '+count+' zonas de acantilado';
-   card.append(header);
-   const gallery=document.createElement('div');
-   gallery.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0';
-   function image(file,label){
+   const card=document.createElement('div');
+   card.style.cssText='padding:8px;margin-top:7px;border:1px solid #497967;border-radius:9px';
+   const bar=document.createElement('div');bar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:7px';
+   const name=document.createElement('strong');name.textContent=asset.label+' · '+zones.filter(z=>z.biome===asset.biome).length+' zonas ⛰';
+   const select=document.createElement('button');select.type='button';select.textContent='Editar';select.title='Seleccionar controles para '+asset.label;
+   select.onclick=()=>{target.value='cliff:'+asset.biome;target.dispatchEvent(new Event('change',{bubbles:true}))};
+   bar.append(name,select);card.append(bar);
+   const gallery=document.createElement('div');gallery.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px';
+   for(const [filename,label] of [[asset.color,'Color'],[asset.height,'Heightmap']]){
     const figure=document.createElement('figure');figure.style.margin='0';
-    if(file){
-     const img=document.createElement('img');img.src=getTextureAssetUrl(texturePath(file));img.alt=label+' · '+asset.label;
-     img.loading='lazy';img.style.cssText='width:100%;height:105px;object-fit:contain;background:#0f261d;border-radius:6px';figure.append(img);
+    if(filename){
+     const img=document.createElement('img');img.src=getTextureAssetUrl(texturePath(filename));
+     img.alt=label+' '+asset.label;img.loading='lazy';
+     img.style.cssText='width:100%;height:95px;object-fit:contain;background:#142820;border-radius:7px';
+     figure.append(img);
     }else{
-     const placeholder=document.createElement('div');
-     placeholder.style.cssText='height:105px;display:flex;align-items:center;justify-content:center;text-align:center;padding:7px;font-size:11px;border:1px dashed #688b7e;border-radius:6px';
-     placeholder.textContent='Heightmap pendiente';figure.append(placeholder);
+     const blank=document.createElement('div');blank.textContent='Pendiente';
+     blank.style.cssText='height:95px;display:grid;place-items:center;border:1px dashed #497967;font-size:11px;border-radius:7px';
+     figure.append(blank);
     }
-    const caption=document.createElement('figcaption');
-    caption.style.cssText='font-size:11px;opacity:.85';caption.textContent=label;figure.append(caption);gallery.append(figure);
+    const caption=document.createElement('figcaption');caption.textContent=label;
+    caption.style.cssText='font-size:11px;opacity:.8';figure.append(caption);gallery.append(figure);
    }
-   image(asset.color,'Color · referencia sin aplicar');
-   image(asset.height,asset.height?'Heightmap · relieve activo':'Heightmap · todavía no disponible');
-   card.append(gallery);
-   const label=document.createElement('label');
-   label.style.cssText='font-size:12px;display:block';
-   label.textContent='Repeticiones compartidas de color y heightmap (mapa de 630 unidades)';
-   const input=document.createElement('input');
-   input.type='number';input.min='3.5';input.max='315';input.step='.25';input.value=String(Math.round(reps*100)/100);
-   input.dataset.cliffBiome=asset.biome;
-   input.style.cssText='width:100%';
-   input.onchange=()=>{
-    const value=clamp(Number(input.value)||reps,3.5,315);
-    snapshot();
-    const config=settings();
-    if(!config.biomes||typeof config.biomes!=='object')config.biomes={};
-    config.biomes[asset.biome]={...config.biomes[asset.biome],repeats:value};
-    // Store a single shared value for the color texture reference too.
-    if(!live.textureCatalogScale||typeof live.textureCatalogScale!=='object')live.textureCatalogScale={};
-    live.textureCatalogScale['cliff-'+asset.biome+'-color']=value;
-    persist();schedule();renderBiomeCards();
-   };
-   label.append(input);card.append(label);
-   const measurement=document.createElement('small');
-   measurement.textContent=(630/reps).toFixed(2)+' unidades por repetición · '+(asset.height?'Color y relieve sincronizados':'Solo vista/escala de color; no hay relieve todavía');
-   card.append(measurement);
-   cards.append(card);
+   card.append(gallery);cards.append(card);
   }
  }
  function disposeDerived(){
@@ -136,6 +124,7 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
   return g;
  }
 
+
  async function bake(){
   const id=++ticket;if(disposed)return;
   const current=terrain.geometry;
@@ -143,51 +132,58 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
   const base=source||current,c=settings();
   const associations=c.enabled===false?[]:registeredCliffZones(live).filter(x=>x.map);
   if(!associations.length){
-   disposeDerived();parameters();onGeometryChanged();return;
+   disposeDerived();parameters();onGeometryChanged();
+   renderer.sync();void renderer.rebuild();return;
   }
   try{
-   const inputs=await Promise.all(associations.map(async entry=>({
-    ...entry,sample:await decodeImage(entry.map.file)
-   })));
+   const inputs=await Promise.all(associations.map(async entry=>({...entry,
+    sample:await decodeImage(entry.map.file)})));
    if(disposed||id!==ticket||terrain.geometry!==current)return;
    let working=base;const newGeometries=[],results=[];
    for(const {zone,map,sample} of inputs){
     const xs=zone.points.map(p=>p.x),zs=zone.points.map(p=>p.z);
     const point={x:(Math.min(...xs)+Math.max(...xs))/2,z:(Math.min(...zs)+Math.max(...zs))/2};
-    const radius=Math.max(3,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...zs)-Math.min(...zs)));
+    const b=biomeSettings(map.biome);
     const output=buildCliffHeightmapGeometry(geometryData(working),{
-     point,normalXZ:[1,0],zonePoints:zone.points,radius,
-     strength:clamp(Number(c.strength??3),0,12),period:630/cliffRepeatCount(live,map.biome),
-     steps:clamp(Number(c.steps??2),1,3),sample
+     point,normalXZ:[1,0],zonePoints:zone.points,
+     radius:Math.max(3,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...zs)-Math.min(...zs))),
+     strength:clamp(Number(b.strength??c.strength??3),0,12),
+     period:630/cliffRepeatCount(live,map.biome),
+     steps:clamp(Number(b.steps??c.steps??2),1,3),
+     smoothing:clamp(Number(b.smoothing??c.smoothing??.55),0,1),
+     peakFlatten:clamp(Number(b.peakFlatten??c.peakFlatten??.4),0,1),
+     sample
     });
-    if(output){
-     working=applyResult(output);newGeometries.push(working);results.push({zone:zone.name||zone.id,...output.stats});
-    }
+    if(output){working=applyResult(output);newGeometries.push(working);results.push(output.stats)}
    }
    if(disposed||id!==ticket||terrain.geometry!==current){newGeometries.forEach(g=>g.dispose());return}
-   disposeDerived();terrain.geometry=working;derived=newGeometries;onGeometryChanged();
-   const moved=results.reduce((sum,x)=>sum+x.moved,0),subdivided=results.reduce((sum,x)=>sum+x.subdivided,0);
+   disposeDerived();terrain.geometry=working;derived=newGeometries;
+   onGeometryChanged();renderer.sync();void renderer.rebuild();
    parameters();
-   status.textContent+=' · '+results.length+' zonas con geometría refinada · '+moved+
-    ' vértices desplazados · '+subdivided+' caras refinadas.';
-   if(!moved)status.textContent+=' Las zonas marcadas no contienen caras suficientemente inclinadas.';
+   status.textContent+=' · '+results.reduce((n,x)=>n+x.moved,0)+' vértices desplazados · '+
+    results.reduce((n,x)=>n+x.subdivided,0)+' caras subdivididas · suavizado activo';
   }catch(error){
    if(disposed||id!==ticket)return;
-   status.textContent='Error aplicando heightmap: '+error.message;toast(status.textContent);
+   status.textContent='Error aplicando relieve: '+error.message;toast(status.textContent);
+   void renderer.rebuild();
   }
  }
  function schedule(){clearTimeout(timer);timer=setTimeout(()=>{void bake()},120)}
- function update(field,value){snapshot();settings()[field]=value;persist();schedule()}
- enabled.onchange=()=>update('enabled',enabled.checked);
+ function update(key,value){
+  const biome=activeBiome();if(!biome)return;
+  snapshot();biomeSettings(biome)[key]=value;persist();schedule();
+ }
+ enabled.onchange=()=>{snapshot();settings().enabled=enabled.checked;persist();schedule()};
  strength.onchange=()=>update('strength',clamp(Number(strength.value)||0,0,12));
- period.onchange=()=>update('period',clamp(Number(period.value)||24,2,180));
- if(repeats)repeats.onchange=()=>update('period',630/clamp(Number(repeats.value)||26.25,3.5,315));
  steps.onchange=()=>update('steps',clamp(Number(steps.value)||2,1,3));
- function invalidate(){imageCache.clear();schedule()}
- function dispose(){disposed=true;clearTimeout(timer);++ticket;disposeDerived()}
+ smoothing.onchange=()=>update('smoothing',clamp(Number(smoothing.value)/100||0,0,1));
+ flatten.onchange=()=>update('peakFlatten',clamp(Number(flatten.value)/100||0,0,1));
+ target.addEventListener('change',parameters);
+ function invalidate(){imageCache.clear();renderer.invalidate();schedule()}
+ function dispose(){disposed=true;clearTimeout(timer);++ticket;disposeDerived();renderer.dispose()}
  parameters();
  return {schedule,invalidate,refresh:parameters,dispose,getState:()=>({
   marked:registeredCliffZones(live).length,mapped:registeredCliffZones(live).filter(x=>x.map).length,
-  activeMeshes:derived.length
- })};
+  activeMeshes:derived.length,colorMeshes:renderer.getState().count
+ }),syncColor:()=>renderer.sync(),setColorsVisible:v=>renderer.setVisible(v)};
 }

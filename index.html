@@ -170,7 +170,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <section id="texturePanel">
 <h2>▧ Texturizado · Materiales por bioma</h2>
 
-<p class="hint">Biblioteca de texturas del repositorio. Filtra por bioma y ajusta el tamaño de cada textura con «Editar». La vista muestra una sola repetición junto al explorador.</p>
+
 <label>Bioma<select id="textureBiome" style="width:100%;padding:7px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px"></select></label>
 <div style="display:flex;align-items:center;gap:7px;margin:4px 0">
  <label style="display:flex;align-items:center;gap:8px;flex:1"><input id="textureShow" type="checkbox" checked> Mostrar texturas</label>
@@ -179,20 +179,13 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </div>
 <p id="textureRenderStatus" class="hint">Preparando materiales del terreno…</p>
 <section id="cliffHeightPanel" style="margin:12px 0;padding:10px;border:1px solid #548574;border-radius:9px">
- <h3 style="margin:0 0 8px">Relieve geométrico de acantilados · Fase 1</h3>
- <p class="hint">Primero subdivide uniformemente la pared marcada con ⛰; después desplaza los nuevos vértices según el heightmap. Los contrastes de imagen nunca controlan la subdivisión.</p>
- <div id="cliffBiomeCards" aria-label="Imágenes y escalas de los cinco biomas de acantilados"></div>
- <button type="button" id="cliffHeightPick" style="width:100%" hidden>Selección directa desactivada: usar Creador de zonas</button>
- <div class="grid2" style="margin-top:7px">
-  <label>Radio (unidades)<input id="cliffHeightRadius" type="number" min="4" max="150" step="1" value="32"></label>
-  <label>Profundidad de relieve<input id="cliffHeightStrength" type="number" min="0" max="12" step=".25" value="2.5"></label>
-  <label>Repeticiones del heightmap en 630 unidades<input id="cliffHeightRepeats" type="number" min="3.5" max="315" step=".25" value="26.25"></label>
-  <label>Unidades por repetición<input id="cliffHeightPeriod" type="number" min="2" max="180" step=".25" value="24"></label>
-  <label>Subdivisión uniforme<select id="cliffHeightSteps" style="width:100%"><option value="1">1 nivel</option><option value="2" selected>2 niveles</option><option value="3">3 niveles</option></select></label>
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+  <h3 style="margin:0">Acantilados · color y relieve</h3>
+  <button type="button" class="infoHelp" title="Los acantilados se definen con ⛰ en Creador de zonas. Color y heightmap comparten la misma escala. El relieve se genera solo cuando existe un heightmap." aria-label="Ayuda para acantilados" style="padding:2px 8px">ⓘ</button>
  </div>
- <label style="display:flex;align-items:center;gap:7px;margin:7px 0"><input id="cliffHeightEnabled" type="checkbox" checked> Aplicar heightmap a las zonas de acantilado marcadas</label>
- <button type="button" id="cliffHeightRemove" hidden>Restaurar geometría original</button>
- <p class="hint" id="cliffHeightStatus" aria-live="polite">Preparando generador geométrico…</p>
+ <div id="cliffBiomeCards" aria-label="Galería de imágenes de color y mapas de alturas"></div>
+ <label style="display:flex;align-items:center;gap:7px;margin:7px 0"><input id="cliffHeightEnabled" type="checkbox" checked> Activar relieve geométrico del heightmap</label>
+ <p class="hint" id="cliffHeightStatus" aria-live="polite">Preparando relieve…</p>
  </section>
 <dialog id="textureScaleDialog" style="border:1px solid #5f927e;border-radius:12px;background:#122b24;color:#eafff2;width:min(94vw,960px);max-width:960px;padding:15px">
  <h2 id="textureScaleTitle" style="margin:0 0 7px">Editar aspecto de textura</h2>
@@ -201,14 +194,34 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <div class="grid2" style="margin-top:8px"><label>Repeticiones en el mapa (630 unidades)<input id="textureScaleNumber" type="number" min=".25" max="1000" step=".25" value="8" style="display:block;width:100%;color:white;background:#193b30;border:1px solid #568674;padding:7px"></label><div><strong id="textureScaleWorld">78.75 unidades por repetición</strong><p class="hint" id="textureScalePreviewStatus">Cargando vista 3D…</p></div></div>
  <div class="grid2" style="margin-top:10px"><button id="textureScaleCancel" type="button">Cancelar</button><button id="textureScaleApply" type="button">Guardar escala</button></div>
  </dialog>
-<h2>Texturas del repositorio</h2><p id="textureCatalogCount" class="hint"></p><div id="textureCatalog"></div><h2 id="textureActiveSlotsTitle">Ranuras activas del bioma</h2><div id="textureSlots"></div>
-<h2>Propiedades procedurales</h2>
-<label>Escala del ruido <output id="textureNoiseValue">20</output><input id="textureNoise" type="range" min="1" max="200" step="1" value="20"></label>
-<label>Semilla de variaciones<input id="textureSeed" type="number" min="1" max="9999999" step="1" value="1"></label>
-<label>Transición entre biomas (unidades) <output id="textureTransitionValue">4</output><input id="textureTransition" type="range" min="0" max="50" step=".5" value="4"></label>
-<p id="textureSize" class="hint"></p>
-<button id="textureResetBiome" type="button" style="width:100%">Restablecer material de este bioma</button>
-<p class="hint">Las etiquetas, rutas y parámetros de materiales se guardan con el escenario. Las imágenes originales permanecen en el repositorio. Los biomas pueden asignarse manualmente o generarse desde las zonas definidas.</p>
+<h2>Texturas del repositorio</h2><p id="textureCatalogCount" class="hint"></p><div id="textureCatalog"></div>
+<h2>Propiedades procedurales <button type="button" title="Elige una textura para editarla sin duplicar controles. En acantilados, repeticiones controla color y heightmap simultáneamente; geometría solo modifica el heightmap." aria-label="Ayuda de propiedades procedurales" style="padding:2px 7px">ⓘ</button></h2>
+<label>Textura a editar<select id="textureTarget" style="width:100%;background:#1e4034;color:#fff;padding:7px"></select></label>
+<div class="grid2">
+ <label>Repeticiones (630 unidades)<input id="textureUnifiedRepeats" type="number" min=".25" max="1000" step=".25" value="8"></label>
+ <label>Intensidad de color (%)<input id="textureUnifiedIntensity" type="number" min="0" max="100" step="5" value="100"></label>
+</div>
+<div id="cliffGeometryControls" hidden>
+ <div style="display:flex;align-items:center;justify-content:space-between;margin-top:7px">
+  <strong style="font-size:12px">Geometría del heightmap</strong>
+  <button type="button" title="Profundidad desplaza vértices; subdivisión añade geometría uniforme; suavizado redondea las crestas y achatado reduce puntas aisladas. Los bordes originales permanecen fijos." aria-label="Ayuda geometría del heightmap" style="padding:2px 7px">ⓘ</button>
+ </div>
+ <div class="grid2">
+  <label>Profundidad<input id="cliffHeightStrength" type="number" min="0" max="12" step=".25" value="3"></label>
+  <label>Subdivisión<select id="cliffHeightSteps" style="width:100%"><option value="1">1 nivel</option><option value="2" selected>2 niveles</option><option value="3">3 niveles</option></select></label>
+  <label>Suavizar picos (%)<input id="cliffHeightSmoothing" type="number" min="0" max="100" step="5" value="55"></label>
+  <label>Achatar puntas (%)<input id="cliffHeightFlatten" type="number" min="0" max="100" step="5" value="40"></label>
+ </div>
+</div>
+<div id="textureTargetDetails"></div>
+<div class="grid2">
+ <label>Escala del ruido<input id="textureNoise" type="number" min="1" max="200" step="1" value="20"></label>
+ <label>Semilla<input id="textureSeed" type="number" min="1" max="9999999" step="1" value="1"></label>
+ <label>Transición biomas<input id="textureTransition" type="number" min="0" max="50" step=".5" value="4"></label>
+</div>
+<output id="textureNoiseValue" hidden>20</output><output id="textureTransitionValue" hidden>4</output>
+<p id="textureSize" class="hint" hidden></p>
+<button id="textureResetBiome" type="button" style="width:100%">Restablecer material del bioma seleccionado</button>
 <div id="biomeGeneratorPanel" style="border-top:1px solid #497967;margin-top:12px;padding-top:10px">
 <h2>Generador procedural de biomas</h2>
 <p class="hint">Reparte los cinco biomas entre las zonas existentes sin modificar alturas, recortes ni objetos. Repetir una semilla y reglas idénticas devuelve la misma distribución.</p>
@@ -390,7 +403,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
-<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.122
+<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.123
  <span id="editorSaveState" style="font-weight:400;display:block;opacity:.8">Guardado local</span></div>
 <div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
@@ -431,5 +444,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.122').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.123').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>

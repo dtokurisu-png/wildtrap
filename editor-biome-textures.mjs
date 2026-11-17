@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.121';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.123';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -134,7 +134,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   catalogPanel.replaceChildren();
   const filter=select.value;
   let shown=0;
-  for(const category of TEXTURE_KINDS){
+  for(const category of TEXTURE_KINDS.filter(c=>!c.id.startsWith('cliff-'))){
    const files=REPO_TEXTURES.filter(t=>t.kind===category.id&&(filter==='all'||(filter==='untagged'?!tagFor(t):tagFor(t)===filter)));
    const group=element('section');
    group.style.cssText='border:1px solid #406c5c;border-radius:9px;padding:8px;margin:8px 0';
@@ -174,85 +174,113 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   $('textureCatalogCount').textContent=shown+' de '+REPO_TEXTURES.length+' texturas';
  }
 
+ const target=$('textureTarget'),repeat=$('textureUnifiedRepeats'),intensity=$('textureUnifiedIntensity'),
+  details=$('textureTargetDetails');
+ const targets=[];
+ for(const biome of BIOMES){
+  targets.push({value:'cliff:'+biome.id,label:biome.name+' · Acantilado',biome:biome.id,cliff:true});
+  for(const slot of SLOTS)targets.push({value:'slot:'+biome.id+':'+slot.id,label:biome.name+' · '+slot.name,
+   biome:biome.id,slot:slot.id,cliff:false});
+ }
+ for(const entry of targets){
+  const option=document.createElement('option');option.value=entry.value;option.textContent=entry.label;
+  target.append(option);
+ }
+ target.value='cliff:plains';
+ const current=()=>targets.find(t=>t.value===target.value)||targets[0];
+ function cliffSettings(biome){
+  if(!live.cliffHeightSettings||typeof live.cliffHeightSettings!=='object')live.cliffHeightSettings={};
+  if(!live.cliffHeightSettings.biomes||typeof live.cliffHeightSettings.biomes!=='object')
+   live.cliffHeightSettings.biomes={};
+  if(!live.cliffHeightSettings.biomes[biome])live.cliffHeightSettings.biomes[biome]={};
+  return live.cliffHeightSettings.biomes[biome];
+ }
+ function cliffRepeats(biome){
+  const own=Number(live.cliffHeightSettings?.biomes?.[biome]?.repeats);
+  if(Number.isFinite(own)&&own>=3.5&&own<=315)return own;
+  const prior=Number(live.cliffHeightSettings?.period);
+  if(biome==='plains'&&prior>=2&&prior<=180)return 630/prior;
+  const saved=Number(live.textureCatalogScale?.['cliff-'+biome+'-color']);
+  return Number.isFinite(saved)&&saved>=3.5&&saved<=315?saved:26.25;
+ }
  function render(){
   if(!root.isConnected)return;
-  const data=model();
-  $('textureActiveSlotsTitle').textContent='Ranuras activas · '+BIOMES.find(b=>b.id===biomeId).name;
-  renderCatalog();
-  slots.replaceChildren();
-  const total=BIOMES.reduce((sum,b)=>sum+SLOTS.reduce((n,s)=>n+(ensure()[b.id]?.slots?.[s.id]?.image?.length||0),0),0);
-  $('textureSize').textContent=(total/1024).toFixed(0)+' KB incrustados en JSON; las imágenes del repositorio se cargan por URL';
+  const data=model();renderCatalog();
+  const entry=current(),record=entry.cliff?cliffSettings(entry.biome):ensure()[entry.biome].slots[entry.slot];
+  repeat.value=String(Math.round((entry.cliff?cliffRepeats(entry.biome):record.scale)*100)/100);
+  repeat.min=entry.cliff?'3.5':'.25';repeat.max=entry.cliff?'315':'1000';
+  intensity.value=String(Math.round((entry.cliff?(record.intensity??1):record.opacity)*100));
+  details.replaceChildren();
+  if(entry.cliff){
+   const hint=document.createElement('small');hint.textContent='Color y heightmap comparten repeticiones. Los parámetros geométricos aparecen arriba.';
+   details.append(hint);
+  }else{
+   const info=document.createElement('div');info.style.cssText='display:flex;gap:8px;align-items:center;margin-top:7px';
+   if(record.image){
+    const img=document.createElement('img');img.src=getTextureAssetUrl(record.image);img.alt=record.name||entry.slot;
+    img.style.cssText='width:56px;height:56px;object-fit:cover;border-radius:7px';info.append(img);
+   }
+   const title=document.createElement('small');title.textContent=record.name||'Sin textura asignada';info.append(title);
+   details.append(info);
+   const attach=document.createElement('label');attach.className='fileBtn';attach.textContent='Cambiar imagen';
+   attach.style.cssText='display:inline-block;margin:7px 6px 4px 0';
+   const input=document.createElement('input');input.type='file';input.accept='image/png,image/jpeg,image/webp';
+   attach.append(input);details.append(attach);
+   input.onchange=async()=>{
+    const file=input.files?.[0];if(!file)return;
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>MAX_IMAGE){
+     toast('Formato o tamaño no admitido (máximo 380 KB)');return;
+    }
+    const reader=new FileReader();
+    reader.onload=()=>{
+     const url=String(reader.result||'');if(!/^data:image\/(png|jpeg|webp);base64,/.test(url))return;
+     const total=BIOMES.reduce((sum,b)=>sum+SLOTS.reduce((n,sl)=>n+(ensure()[b.id].slots[sl.id].image?.length||0),0),0);
+     if(total-(record.image?.length||0)+url.length>MAX_TOTAL){toast('Límite de imágenes incrustadas alcanzado');return}
+     snapshot();record.image=url;record.name=file.name.slice(0,130);persist();render();onChange();
+    };
+    reader.readAsDataURL(file);
+   };
+   const clear=document.createElement('button');clear.textContent='Quitar imagen';clear.disabled=!record.image;
+   clear.onclick=()=>{snapshot();record.image='';record.name='';persist();render();onChange()};
+   details.append(clear);
+  }
+  $('textureActiveSlotsTitle')?.replaceChildren();
+  $('textureSize').textContent='Imágenes del repositorio se cargan por URL';
   $('textureNoise').value=data.noise.scale;
   $('textureNoiseValue').textContent=String(data.noise.scale);
   $('textureSeed').value=data.noise.seed;
   $('textureTransition').value=data.edgeBlend;
   $('textureTransitionValue').textContent=String(data.edgeBlend);
-  for(const def of SLOTS){
-   
-   const item=data.slots[def.id];
-   const card=element('div','');
-   card.style.cssText='border:1px solid #3d6a56;border-radius:9px;padding:9px;margin:9px 0;background:#1c3b30';
-   const missing=item.image&&!isPublishedTextureUrl(item.image);
-   const heading=element('b','',def.name+(missing?' ⚠':''));
-   if(missing)heading.title='Imagen retirada de GitHub. Selecciona otra existente.';
-   card.append(heading);
-   const preview=element('div');
-   preview.style.cssText='min-height:64px;margin:7px 0;border-radius:6px;background:#294c3e;display:flex;align-items:center;justify-content:center;overflow:hidden';
-   if(item.image){
-    const img=element('img');img.alt=def.name;img.src=getTextureAssetUrl(item.image);
-    img.style.cssText='width:100%;height:100px;object-fit:cover';preview.append(img);
-   }else preview.append(element('small','', 'Sin textura cargada'));
-   card.append(preview);
-   const name=element('small','',item.name||'Archivo pendiente');card.append(name);
-   const upload=element('label','fileBtn','Importar PNG / JPG / WebP');
-   upload.style.cssText='display:block;margin-top:7px';
-   const input=element('input');input.type='file';input.accept='image/png,image/jpeg,image/webp';
-   upload.append(input);card.append(upload);
-   input.onchange=async()=>{
-    const file=input.files?.[0];if(!file)return;
-    if(!['image/png','image/jpeg','image/webp'].includes(file.type)){toast('Formato no admitido');return;}
-    if(file.size>MAX_IMAGE){toast('Imagen demasiado grande: máximo 380 KB por textura. Comprime la imagen antes de importar.');return;}
-    const used=BIOMES.reduce((sum,b)=>sum+SLOTS.reduce((n,s)=>n+(ensure()[b.id].slots[s.id].image?.length||0),0),0);
-    const predicted=Math.ceil(file.size*4/3)+32;
-    if(used-(item.image?.length||0)+predicted>MAX_TOTAL){toast('Límite de imágenes incrustadas alcanzado: exporta o reduce el tamaño de tus texturas');return;}
-    const reader=new FileReader();
-    reader.onload=()=>{
-     const url=String(reader.result||'');
-     if(!/^data:image\/(png|jpeg|webp);base64,/.test(url)||url.length>MAX_IMAGE*1.4){toast('No se pudo validar la textura');return;}
-     mutate(m=>{m.slots[def.id].image=url;m.slots[def.id].name=file.name.slice(0,130)});
-    };
-    reader.onerror=()=>toast('No se pudo leer el archivo');
-    reader.readAsDataURL(file);
-   };
-   const clear=element('button','','Quitar textura');clear.style.margin='7px 0';
-   clear.disabled=!item.image;
-   clear.onclick=()=>mutate(m=>{m.slots[def.id].image='';m.slots[def.id].name=''});
-   card.append(clear);
-   const scaleLabel=element('label','', 'Repetición / escala: '+item.scale);
-   const scale=element('input');scale.type='range';scale.min='.25';scale.max='1000';scale.step='.25';scale.value=String(item.scale);
-   scale.oninput=()=>{scaleLabel.firstChild.textContent='Repetición / escala: '+scale.value};
-   scale.onchange=()=>mutate(m=>m.slots[def.id].scale=Number(scale.value));
-   scaleLabel.append(scale);card.append(scaleLabel);
-   if(def.type==='blend'){
-    const intensity=element('label','', 'Intensidad: '+Math.round(item.opacity*100)+' %');
-    const slider=element('input');slider.type='range';slider.min='0';slider.max='100';slider.step='5';slider.value=String(Math.round(item.opacity*100));
-    slider.oninput=()=>{intensity.firstChild.textContent='Intensidad: '+slider.value+' %'};
-    slider.onchange=()=>mutate(m=>m.slots[def.id].opacity=Number(slider.value)/100);
-    intensity.append(slider);card.append(intensity);
-   }
-   slots.append(card);
-  }
  }
+ target.onchange=()=>{render();target.dispatchEvent(new CustomEvent('cliffTargetChanged'))};
+ repeat.onchange=()=>{
+  const entry=current();snapshot();
+  const value=cl(Number(repeat.value)||8,entry.cliff?3.5:.25,entry.cliff?315:1000);
+  if(entry.cliff){
+   cliffSettings(entry.biome).repeats=value;
+   if(!live.textureCatalogScale||typeof live.textureCatalogScale!=='object')live.textureCatalogScale={};
+   live.textureCatalogScale['cliff-'+entry.biome+'-color']=value;
+  }else ensure()[entry.biome].slots[entry.slot].scale=value;
+  persist();render();onChange();
+ };
+ intensity.onchange=()=>{
+  const entry=current();snapshot();const value=cl(Number(intensity.value)/100||0,0,1);
+  if(entry.cliff)cliffSettings(entry.biome).intensity=value;
+  else ensure()[entry.biome].slots[entry.slot].opacity=value;
+  persist();render();onChange();
+ };
  $('textureNoise').oninput=e=>$('textureNoiseValue').textContent=e.target.value;
  $('textureNoise').onchange=e=>mutate(m=>m.noise.scale=Number(e.target.value));
  $('textureSeed').onchange=e=>mutate(m=>m.noise.seed=cl(Math.round(Number(e.target.value)||1),1,9999999));
  $('textureTransition').oninput=e=>$('textureTransitionValue').textContent=e.target.value;
  $('textureTransition').onchange=e=>mutate(m=>m.edgeBlend=Number(e.target.value));
  $('textureResetBiome').onclick=()=>{
-  if(!confirm('¿Restablecer las ranuras y parámetros de '+BIOMES.find(b=>b.id===biomeId).name+'?'))return;
-  mutate(()=>{ensure()[biomeId]=defaults()[biomeId]});
+  const selected=current();if(selected.cliff)return toast('Selecciona primero una textura de suelo o complementaria');
+  if(!confirm('¿Restablecer materiales de '+selected.biome+'?'))return;
+  snapshot();ensure()[selected.biome]=defaults()[selected.biome];persist();render();onChange();
  };
  render();
+ target.dispatchEvent(new Event('change'));
  return {refresh:render,refreshAssets:()=>{
   // Repaint every visible thumbnail without changing saved slot paths or
   // material scales, then update an already-open 3D preview.

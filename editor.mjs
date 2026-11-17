@@ -2011,9 +2011,9 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.121');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.123');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,
-    getTextureAssetUrl,onChange:()=>terrainPainter?.schedule()});
+    getTextureAssetUrl,onChange:()=>{terrainPainter?.schedule();cliffHeightTool?.schedule()}});
   textureTool.refresh();
  }catch(error){
   console.error('Error cargando Texturizado:',error);
@@ -2049,7 +2049,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeCliffHeightTool(){
  try{
-  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.122');
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.123');
   cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
    onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
   cliffHeightTool.schedule();
@@ -2061,15 +2061,15 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.119');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.123');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});
   window.__terrainTexturePainter=terrainPainter;
   const toggle=$('textureShow');
   toggle.checked=live.settings?.biomeTexturesVisible!==false;
-  toggle.onchange=()=>{snapshot();live.settings.biomeTexturesVisible=toggle.checked;terrainPainter?.setEnabled(toggle.checked);persist();draw()};
-  terrainPainter.setEnabled(toggle.checked);
+  toggle.onchange=()=>{snapshot();live.settings.biomeTexturesVisible=toggle.checked;terrainPainter?.setEnabled(toggle.checked);cliffHeightTool?.setColorsVisible(toggle.checked);persist();draw()};
+  terrainPainter.setEnabled(toggle.checked);cliffHeightTool?.setColorsVisible(toggle.checked);
  }catch(error){
   console.error('Error preparando render de texturas:',error);
   $('textureRenderStatus').textContent='Error al preparar texturas: '+error.message;
