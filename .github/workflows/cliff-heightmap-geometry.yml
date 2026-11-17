@@ -12,6 +12,9 @@ on:
       - 'tests/cliff-heightmap-real-smoke.html'
       - 'tests/browser-cliff-heightmap.mjs'
       - 'editor.mjs'
+      - 'index.html'
+      - 'editor-biome-generator.mjs'
+      - 'editor-terrain-texture-renderer.mjs'
       - '.github/workflows/cliff-heightmap-geometry.yml'
   workflow_dispatch:
 jobs:
