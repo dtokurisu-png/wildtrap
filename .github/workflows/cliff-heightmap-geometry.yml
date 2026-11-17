@@ -1,0 +1,27 @@
+name: Validar desplazamiento geométrico por heightmap
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cliff-heightmap-geometry.mjs'
+      - 'cliff-heightmap-editor.mjs'
+      - 'tests/cliff-heightmap-geometry.test.mjs'
+      - 'editor.mjs'
+      - '.github/workflows/cliff-heightmap-geometry.yml'
+  workflow_dispatch:
+jobs:
+  geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar sintaxis geométrica e integración
+        run: |
+          node --check cliff-heightmap-geometry.mjs
+          node --check cliff-heightmap-editor.mjs
+          node --check editor.mjs
+      - name: Comprobar desplazamiento real y continuidad
+        run: node tests/cliff-heightmap-geometry.test.mjs

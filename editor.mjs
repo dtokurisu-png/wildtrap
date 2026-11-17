@@ -55,7 +55,7 @@ const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasi
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
 const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],objectGroups:[],holes:[],cuts3d:[],zones:[],nextId:1,settings:{heightMax:120}};
-let holesEditor=null,vertexEditor=null,terrainVertexEditor=null,terrainInspector=null,objectMeshOverlays=null,zoneTool=null,textureTool=null,terrainPainter=null,biomeGeneratorTool=null,playerSpawnPanel=null,testingScene=false;
+let holesEditor=null,vertexEditor=null,terrainVertexEditor=null,terrainInspector=null,objectMeshOverlays=null,zoneTool=null,textureTool=null,terrainPainter=null,cliffHeightTool=null,biomeGeneratorTool=null,playerSpawnPanel=null,testingScene=false;
 let textureRevisionWatcher=null;
 const getTextureAssetUrl=url=>revisionedTextureUrl(url,textureRevisionWatcher?.getRevision()||'editor-0.9.107');
 // Modo seguro usa otro espacio local: nunca sobreescribe el proyecto habitual.
@@ -287,7 +287,7 @@ for(let i=0;i<COUNT;i++){
  const green=.40+clamp(h/55,0,1)*-.25;color.setRGB(.20+green*.18,green+.20,.26+green*.08);
  rgb[i*3]=color.r;rgb[i*3+1]=color.g;rgb[i*3+2]=color.b;
 }
-p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();holesEditor?.syncGeometry();terrainInspector?.refresh();terrainVertexEditor?.refresh();zoneTool?.refresh();terrainPainter?.schedule();
+p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();holesEditor?.syncGeometry();cliffHeightTool?.schedule();terrainInspector?.refresh();terrainVertexEditor?.refresh();zoneTool?.refresh();terrainPainter?.schedule();
 }
 function shape(type,geo,color,x,y,z,group=surface){const m=new THREE.Mesh(geo,solid(color));m.position.set(x,y,z);group.add(m);return m}
 function marker(x,z,color,scale=2){const g=new THREE.Group();g.name='EditorOnlyMarker';g.userData.editorOnly=true;g.position.set(x,heightAt(x,z),z);surface.add(g);
@@ -1677,7 +1677,7 @@ view.addEventListener('wheel',e=>{
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
 $('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
-$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.terrainVertexOffsets={};live.terrainSeams=[];live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.terrainVertexOffsets={};live.terrainSeams=[];live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.cliffHeightmaps=[];cliffHeightTool?.refresh();live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 function restoreHistoryState(data){
  // Restore the complete scene, including zones, textures and cuts.
  // Do not replace the live reference used by the other editor modules.
@@ -1688,10 +1688,10 @@ function restoreHistoryState(data){
  
  live.terrainVertexOffsets=v.terrainVertexOffsets&&typeof v.terrainVertexOffsets==='object'?v.terrainVertexOffsets:{};
  if(!Array.isArray(live.holes))live.holes=[];
- if(!Array.isArray(live.zones))live.zones=[];
+ if(!Array.isArray(live.zones))live.zones=[];cliffHeightTool?.refresh();
  if(!Array.isArray(v.cuts3d))live.cuts3d=[];
  live.objectGroups=cleanObjectGroups(v.objectGroups);
- playerSpawnPanel?.refresh();zoneTool?.refreshAll();textureTool?.refresh();
+ playerSpawnPanel?.refresh();zoneTool?.refreshAll();cliffHeightTool?.refresh();textureTool?.refresh();
  biomeGeneratorTool?.refresh();terrainPainter?.schedule();
  selectedIds.clear();
  for(const id of meshSelection)if(live.nodes.some(n=>n.id===id))selectedIds.add(id);
@@ -1921,7 +1921,7 @@ try{
  if(saved){
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
-   Object.assign(live,d);live.terrainSeams=Array.isArray(d.terrainSeams)?d.terrainSeams:[];live.terrainVertexOffsets=d.terrainVertexOffsets&&typeof d.terrainVertexOffsets==='object'?d.terrainVertexOffsets:{};live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
+   Object.assign(live,d);live.terrainSeams=Array.isArray(d.terrainSeams)?d.terrainSeams:[];live.terrainVertexOffsets=d.terrainVertexOffsets&&typeof d.terrainVertexOffsets==='object'?d.terrainVertexOffsets:{};live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();cliffHeightTool?.refresh();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
    live.settings={heightMax:120,...(d.settings&&typeof d.settings==='object'?d.settings:{})};
    recoveredDraft=true;
    playerSpawnPanel?.refresh();
@@ -1951,7 +1951,7 @@ async function loadPublishedWorld(){
   live.terrainVertexOffsets=world.terrainVertexOffsets&&typeof world.terrainVertexOffsets==='object'?world.terrainVertexOffsets:{};
   live.holes=Array.isArray(world.holes)?world.holes:[];
   live.cuts3d=Array.isArray(world.cuts3d)?world.cuts3d:[];
-  live.objectGroups=cleanObjectGroups(world.objectGroups);live.zones=Array.isArray(world.zones)?world.zones:[];zoneTool?.refreshAll();live.biomeMaterials=world.biomeMaterials&&typeof world.biomeMaterials==='object'?world.biomeMaterials:{};live.biomeGenerator=world.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
+  live.objectGroups=cleanObjectGroups(world.objectGroups);live.zones=Array.isArray(world.zones)?world.zones:[];zoneTool?.refreshAll();cliffHeightTool?.refresh();live.biomeMaterials=world.biomeMaterials&&typeof world.biomeMaterials==='object'?world.biomeMaterials:{};live.biomeGenerator=world.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
   live.settings={heightMax:120,...(world.settings&&typeof world.settings==='object'?world.settings:{})};
   selectedIds.clear();selectedId=null;
   // Do not reset the user's last camera merely because the published map loaded.
@@ -2047,6 +2047,18 @@ async function initializePlayerSpawnPanel(){
  }catch(error){console.error('Error en la herramienta de spawns:',error);toast('Error al cargar spawns: '+error.message)}
 }
 void initializePlayerSpawnPanel();
+async function initializeCliffHeightTool(){
+ try{
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.117');
+  cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
+   onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
+  cliffHeightTool.schedule();
+  window.__cliffHeightmapEditor=cliffHeightTool;
+ }catch(error){console.error('Error preparando heightmap geométrico:',error);
+  const output=$('cliffHeightStatus');if(output)output.textContent='Error: '+error.message;
+ }
+}
+void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
   const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.116');
@@ -2102,6 +2114,7 @@ const updateTextureStatus=message=>{
 textureRevisionWatcher=createTextureRevisionWatcher({
  onRevision:()=>{
   terrainPainter?.invalidateTextureImages();
+  cliffHeightTool?.invalidate();
   textureTool?.refreshAssets?.();
   void reloadPublishedTextureCatalog();
  },
