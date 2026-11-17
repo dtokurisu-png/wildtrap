@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.110';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.116';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -23,7 +23,7 @@ const defaults=()=>{
  }]));
  return data;
 };
-// Keep explicit user overrides, but seed empty slots with the 25 committed PNGs.
+// Keep explicit user overrides, but seed empty slots with the available ground and complementary PNGs.
 // The exported JSON stores URLs, never base64 copies of repo textures.
 export function ensureBiomeTextureDefaults(raw){
  const out=normalizeBiomeMaterials(raw);
@@ -101,7 +101,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   if(!record){toast('No se encontró la ranura de la textura');return}
   try{
    if(!previewController){
-    const {createTextureScalePreview}=await import('./editor-texture-scale-preview.mjs?v=0.9.106');
+    const {createTextureScalePreview}=await import('./editor-texture-scale-preview.mjs?v=0.9.116');
     previewController=createTextureScalePreview({toast,getTextureAssetUrl,onApply:next=>{
      snapshot();
      const current=ensure()[next.biome]?.slots?.[next.slot];

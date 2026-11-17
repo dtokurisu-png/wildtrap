@@ -6,20 +6,20 @@ import {putDraft,getDraft} from './editor-draft-storage.mjs?v=0.9.59';
 import {categoryForNode,cleanObjectGroups} from './scene-object-catalog.mjs?v=0.9.10';
 // Playtest is loaded on demand. Broken external GLB/FBX cannot prevent the editor boot.
 import {createTerrainHoles} from './terrain-holes.mjs?v=0.9.96';
-import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.111';
+import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.116';
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.50';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.61';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
 import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.103';
-import {restoreTerrainSeams,seamVertexIds} from './terrain-seams.mjs?v=0.9.94';
+import {restoreTerrainSeams,seamVertexIds} from './terrain-seams.mjs?v=0.9.116';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createTextureRevisionWatcher,revisionedTextureUrl} from './editor-texture-live-refresh.mjs?v=0.9.109';
-import {syncPublishedTextureCatalog,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.110';
+import {syncPublishedTextureCatalog,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.116';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
@@ -1991,7 +1991,7 @@ animate();
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
 async function initializeZoneTool(){
  try{
-  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.92');
+  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.116');
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
@@ -2011,7 +2011,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.114');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.116');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,
     getTextureAssetUrl,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
@@ -2025,7 +2025,7 @@ async function initializeTextureTool(){
 void initializeTextureTool();
 async function initializeBiomeGenerator(){
  try{
-  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.70');
+  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.116');
   biomeGeneratorTool=createBiomeGeneratorPanel({live,snapshot,persist,toast,
    onChange:()=>terrainPainter?.schedule(),onZoneChange:()=>zoneTool?.refreshAll()});
  }catch(error){
@@ -2049,7 +2049,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.114');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.116');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});
@@ -2111,7 +2111,7 @@ window.__wildtrapTextureRevisionWatcher=textureRevisionWatcher;
 $('textureReloadImages')?.addEventListener('click',()=>{
  textureRevisionWatcher.refreshNow();
  void reloadPublishedTextureCatalog();
- toast('Recargando imágenes, materiales y heightmaps del repositorio');
+ toast('Recargando imágenes y materiales del terreno');
 });
 textureRevisionWatcher.start();
 window.addEventListener('pagehide',()=>textureRevisionWatcher?.dispose());
