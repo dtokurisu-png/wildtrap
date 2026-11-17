@@ -70,52 +70,130 @@ function protectionField(position,seamPaths,radius=2.5){
   return value;
  };
 }
+// A heightmap is a GEOMETRY source, not a material that must repeat hundreds
+// of times with the color PNG. Map it across the whole cliff wall, vertically.
+// Using color repeat (often 100–450 per world) on a 3-unit mesh caused severe
+// aliasing: random tiny offsets while the shape stayed practically unchanged.
+export function cliffWallProjection(triangles){
+ const b={minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity,
+  minZ:Infinity,maxZ:-Infinity};
+ for(const tri of triangles||[])for(const p of tri){
+  b.minX=Math.min(b.minX,p[0]);b.maxX=Math.max(b.maxX,p[0]);
+  b.minY=Math.min(b.minY,p[1]);b.maxY=Math.max(b.maxY,p[1]);
+  b.minZ=Math.min(b.minZ,p[2]);b.maxZ=Math.max(b.maxZ,p[2]);
+ }
+ if(!Number.isFinite(b.minX))return null;
+ const widthX=b.maxX-b.minX,widthZ=b.maxZ-b.minZ;
+ const axis=widthX>=widthZ?0:2;
+ return {axis,minU:axis===0?b.minX:b.minZ,
+  spanU:Math.max(.001,axis===0?widthX:widthZ),
+  minY:b.minY,spanY:Math.max(.001,b.maxY-b.minY)};
+}
+export function cliffHeightmapTone(source){
+ if(!source?.data||!source.width||!source.height)return null;
+ const d=source.data,n=source.width*source.height,step=Math.max(1,Math.floor(n/32768));
+ let total=0,low=1,high=0,count=0;
+ for(let i=0;i<n;i+=step){
+  const k=i*4,alpha=d[k+3]/255;
+  if(alpha<.1)continue;
+  const value=(d[k]*.2126+d[k+1]*.7152+d[k+2]*.0722)/255;
+  low=Math.min(low,value);high=Math.max(high,value);
+  total+=value;count++;
+ }
+ if(!count)return null;
+ return {mean:total/count,low,high,contrast:high-low};
+}
+export function hasMeaningfulCliffRelief(stats,{
+ minRange=.16,minRms=.075,minMoved=12
+}={}){
+ return Boolean(stats?.moved>=minMoved&&stats?.range>=minRange&&
+  stats?.rms>=minRms&&stats?.toneContrast>=.06&&
+  stats?.sampledRange>=.07&&stats?.shapeChanged===true);
+}
 export function buildCliffBodyHeightmapBuffers(refined,{
- heightmap,strength=1.5,seamPaths=[],protectRadius=2.5
+ heightmap,strength=1.5,seamPaths=[],protectRadius=1.5,wallProjection=null
 }={}){
  const pos=refined?.attributes?.position?.array||refined?.positions;
  const uvs=refined?.attributes?.uv?.array||refined?.uvs;
  const normals=refined?.attributes?.normal?.array||refined?.normals;
  if(!pos||!uvs||!normals||pos.length%9!==0||uvs.length*3!==pos.length*2||
    normals.length!==pos.length||!heightmap)return null;
- const attenuation=protectionField(pos,seamPaths,Math.max(.1,protectRadius));
- const out=new Float32Array(pos.length),newNormals=new Float32Array(normals.length);
+ const tone=cliffHeightmapTone(heightmap);
  const amplitude=Math.max(0,Math.min(4,Number(strength)||0));
- let moved=0,maxOffset=0;
+ if(!tone||tone.contrast<.06||amplitude<=0)return null;
+ const wall=wallProjection||cliffWallProjection(Array.from(
+  {length:pos.length/9},(_,i)=>Array.from({length:3},(_,j)=>[
+   pos[i*9+j*3],pos[i*9+j*3+1],pos[i*9+j*3+2]
+  ])));
+ if(!wall||wall.spanY<.4)return null;
+ const attenuation=protectionField(pos,seamPaths,Math.max(.5,protectRadius));
+ const out=new Float32Array(pos.length),newNormals=new Float32Array(normals.length);
  const offsets=new Map();
+ let moved=0,maxOffset=-Infinity,minOffset=Infinity,sum2=0,
+  sampleMin=1,sampleMax=0;
  for(let i=0;i<pos.length;i+=3){
   const p=[pos[i],pos[i+1],pos[i+2]],pk=key(...p);
-  let d=offsets.get(pk);
-  if(d===undefined){
-   const uv=i/3*2;
-   d=sampleCliffHeight(heightmap,uvs[uv],uvs[uv+1],{repeat:true})*
-    amplitude*attenuation(p);
-   offsets.set(pk,d);
+  let entry=offsets.get(pk);
+  if(!entry){
+   const u=wall.axis===0?p[0]:p[2];
+   const wallU=Math.max(0,Math.min(1,(u-wall.minU)/wall.spanU));
+   const wallV=Math.max(0,Math.min(1,(p[1]-wall.minY)/wall.spanY));
+   const sample=sampleCliffHeight(heightmap,wallU,wallV,{repeat:false});
+   // Center the grayscale and allow peaks AND hollows. A constant white
+   // map no longer pushes the entire wall outward and pretends to be relief.
+   const contrast=Math.max(.15,tone.contrast);
+   const fade=attenuation(p);
+   const offset=(sample-tone.mean)/contrast*amplitude*1.8*fade;
+   entry={offset,sample};
+   offsets.set(pk,entry);
   }
-  const nx=normals[i],ny=normals[i+1],nz=normals[i+2],length=Math.hypot(nx,ny,nz)||1;
-  out[i]=p[0]+d*nx/length;out[i+1]=p[1]+d*ny/length;out[i+2]=p[2]+d*nz/length;
-  if(d>1e-4)moved++;
-  maxOffset=Math.max(maxOffset,d);
+  const d=entry.offset;
+  const nx=normals[i],ny=normals[i+1],nz=normals[i+2];
+  // On a steep wall move horizontally along the wall normal. Never turn
+  // horizontal grass/ground triangles into wavy vertical spikes.
+  const lateral=Math.hypot(nx,nz);
+  const slope=Math.min(1,lateral/.65);
+  const dx=lateral>.05?nx/lateral:0,dz=lateral>.05?nz/lateral:0;
+  const shift=d*slope;
+  out[i]=p[0]+shift*dx;out[i+1]=p[1];out[i+2]=p[2]+shift*dz;
+  if(Math.abs(shift)>1e-4)moved++;
+  maxOffset=Math.max(maxOffset,shift);minOffset=Math.min(minOffset,shift);
+  sum2+=shift*shift;
+  sampleMin=Math.min(sampleMin,entry.sample);
+  sampleMax=Math.max(sampleMax,entry.sample);
  }
- // Recompute smooth normals from DISPLACED triangles. Nonindexed Three.js
- // computeVertexNormals would otherwise produce faceted shading per triangle.
- const normalSums=new Map();
+ const stats={moved,maxOffset:Math.max(0,maxOffset),minOffset:Math.min(0,minOffset),
+  range:maxOffset-minOffset,rms:Math.sqrt(sum2/(pos.length/3)),
+  sampledRange:sampleMax-sampleMin,toneContrast:tone.contrast,vertices:pos.length/3,
+  shapeChanged:false};
+ stats.shapeChanged=stats.range>=.16&&stats.rms>=.075&&
+  stats.moved>=Math.max(12,Math.floor(stats.vertices*.01))&&
+  stats.sampledRange>=.07&&tone.contrast>=.06;
+ stats.applied=hasMeaningfulCliffRelief(stats);
+ if(!stats.applied)return {positions:null,uvs:null,normals:null,
+  triangles:0,stats};
+ // Recompute shading normals based on the DEFORMED geometry rather than the
+ // original, otherwise the material continues looking perfectly flat.
+ const sums=new Map();
  for(let i=0;i<out.length;i+=9){
-  const ax=out[i+3]-out[i],ay=out[i+4]-out[i+1],az=out[i+5]-out[i+2];
-  const bx=out[i+6]-out[i],by=out[i+7]-out[i+1],bz=out[i+8]-out[i+2];
-  const face=[ay*bz-az*by,az*bx-ax*bz,ax*by-ay*bx];
+  const ab=[out[i+3]-out[i],out[i+4]-out[i+1],out[i+5]-out[i+2]];
+  const ac=[out[i+6]-out[i],out[i+7]-out[i+1],out[i+8]-out[i+2]];
+  const face=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],
+   ab[0]*ac[1]-ab[1]*ac[0]];
   for(let j=0;j<3;j++){
-   const k=i+j*3,lookup=key(out[k],out[k+1],out[k+2]);
-   const sum=normalSums.get(lookup)||[0,0,0];
-   sum[0]+=face[0];sum[1]+=face[1];sum[2]+=face[2];normalSums.set(lookup,sum);
+   const k=i+j*3,pk=key(out[k],out[k+1],out[k+2]);
+   const sum=sums.get(pk)||[0,0,0];
+   for(let q=0;q<3;q++)sum[q]+=face[q];
+   sums.set(pk,sum);
   }
  }
  for(let i=0;i<out.length;i+=3){
-  const sum=normalSums.get(key(out[i],out[i+1],out[i+2]))||
+  const sum=sums.get(key(out[i],out[i+1],out[i+2]))||
    [normals[i],normals[i+1],normals[i+2]];
-  const len=Math.hypot(...sum)||1;
-  newNormals[i]=sum[0]/len;newNormals[i+1]=sum[1]/len;newNormals[i+2]=sum[2]/len;
+  const length=Math.hypot(...sum)||1;
+  newNormals[i]=sum[0]/length;newNormals[i+1]=sum[1]/length;
+  newNormals[i+2]=sum[2]/length;
  }
  return {positions:out,uvs:new Float32Array(uvs),normals:newNormals,
-  triangles:out.length/9,stats:{moved,maxOffset}};
+  triangles:out.length/9,stats};
 }
