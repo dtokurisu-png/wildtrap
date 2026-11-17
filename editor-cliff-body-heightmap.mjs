@@ -110,8 +110,19 @@ export function hasMeaningfulCliffRelief(stats,{
   stats?.rms>=minRms&&stats?.toneContrast>=.06&&
   stats?.sampledRange>=.07&&stats?.shapeChanged===true);
 }
+// Build edge/seam attenuation ONCE for the entire selected cliff.
+// Do not treat artificial 160-face renderer batch borders as cliff edges:
+// the old per-batch field often forced every vertex to zero displacement.
+export function createCliffZoneProtection(triangles,seamPaths=[],radius=1.5){
+ if(!Array.isArray(triangles)||!triangles.length)return ()=>0;
+ const positions=new Float32Array(triangles.length*9);
+ let k=0;
+ for(const tri of triangles)for(const p of tri)
+  for(let axis=0;axis<3;axis++)positions[k++]=p[axis];
+ return protectionField(positions,seamPaths,Math.max(.5,radius));
+}
 export function buildCliffBodyHeightmapBuffers(refined,{
- heightmap,strength=1.5,seamPaths=[],protectRadius=1.5,wallProjection=null
+ heightmap,strength=1.5,seamPaths=[],protectRadius=1.5,wallProjection=null,protectionAt=null
 }={}){
  const pos=refined?.attributes?.position?.array||refined?.positions;
  const uvs=refined?.attributes?.uv?.array||refined?.uvs;
@@ -126,7 +137,8 @@ export function buildCliffBodyHeightmapBuffers(refined,{
    pos[i*9+j*3],pos[i*9+j*3+1],pos[i*9+j*3+2]
   ])));
  if(!wall||wall.spanY<.4)return null;
- const attenuation=protectionField(pos,seamPaths,Math.max(.5,protectRadius));
+ const attenuation=typeof protectionAt==='function'?protectionAt:
+  protectionField(pos,seamPaths,Math.max(.5,protectRadius));
  const out=new Float32Array(pos.length),newNormals=new Float32Array(normals.length);
  const offsets=new Map();
  let moved=0,maxOffset=-Infinity,minOffset=Infinity,sum2=0,
