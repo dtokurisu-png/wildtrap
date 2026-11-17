@@ -21,8 +21,10 @@ try{
   const label=d.querySelector('#cliffHeightStatus')?.textContent||'';
   if(label.includes('vértices desplazados')){
    const count=Number(label.match(/(\d+) vértices desplazados/)?.[1]||0);
-   clearInterval(interval);document.body.dataset.result=count>0&&label.includes('zonas marcadas')?'PASS':'FAIL';
-   document.querySelector('#result').textContent=label;return;
+   const marked=[...d.querySelectorAll('#zoneList button')].some(b=>b.textContent.includes('⛰ ✓')&&b.title.includes('Acantilado asociado'));
+   const dialog=!!d.getElementById('zoneCliffDialog');
+   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&label.includes('zonas marcadas')?'PASS':'FAIL';
+   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog;return;
   }
   if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}
  },250);
