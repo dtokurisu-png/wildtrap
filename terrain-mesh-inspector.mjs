@@ -99,9 +99,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
    statistics.triangles.toLocaleString('es')+' caras triangulares · '+
    total.toLocaleString('es')+' vértices activos · '+
    (dots.length/3).toLocaleString('es')+' dibujados · '+
-   Math.max(0,position.count-total).toLocaleString('es')+' vértices sin caras'+
-   (cliffSource?' · ACANTILADOS '+cliffSource.toLocaleString('es')+' → '+
-    cliffFaces.toLocaleString('es')+' triángulos (x'+(cliffFaces/cliffSource).toFixed(1)+')':'');
+   Math.max(0,position.count-total).toLocaleString('es')+' vértices sin caras';
   setInfo('Vista de la geometría original del terreno.');
   display();
  }
