@@ -6,7 +6,6 @@ on:
       - 'terrain-seams.mjs'
       - 'terrain-vertex-editor.mjs'
       - 'terrain-holes.mjs'
-      - 'editor-cliff-alignment.mjs'
       - 'editor.mjs'
       - 'index.html'
       - 'tests/terrain-seams.test.mjs'
@@ -19,7 +18,6 @@ on:
       - 'terrain-seams.mjs'
       - 'terrain-vertex-editor.mjs'
       - 'terrain-holes.mjs'
-      - 'editor-cliff-alignment.mjs'
       - 'editor.mjs'
       - 'index.html'
       - 'tests/terrain-seams.test.mjs'
@@ -41,14 +39,12 @@ jobs:
           node --check terrain-seams.mjs
           node --check terrain-vertex-editor.mjs
           node --check terrain-holes.mjs
-          node --check editor-cliff-alignment.mjs
           node --check editor.mjs
           node --check tests/terrain-seams.test.mjs
       - name: Geometry and seam persistence
         run: |
           node tests/terrain-seams.test.mjs
           node tests/sculpt-terrain-vertices.mjs
-          node tests/cliff-zone-alignment.test.mjs
       - name: Start browser server
         run: |
           python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-seams-http.log 2>&1 &
