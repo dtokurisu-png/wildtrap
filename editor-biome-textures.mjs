@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES,PLAINS_CLIFF_MAPS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.110';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.110';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -12,27 +12,15 @@ const SLOTS=[
  {id:'ground',name:'Textura base',type:'ground'},
  {id:'detail1',name:'Complementaria 1',type:'blend'},
  {id:'detail2',name:'Complementaria 2',type:'blend'},
- {id:'detail3',name:'Complementaria 3',type:'blend'},
- {id:'cliff',name:'Acantilado · Base',type:'cliff'},
- {id:'cliffBodyColor',name:'Acantilado · Body Color',type:'cliffMap'},
- {id:'cliffBodyHeight',name:'Acantilado · Body Height',type:'cliffMap'}
+ {id:'detail3',name:'Complementaria 3',type:'blend'}
 ];
 const MAX_IMAGE=380*1024,MAX_TOTAL=2600*1024;
 const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
 const defaults=()=>{
  const data=Object.fromEntries(BIOMES.map(b=>[b.id,{
-  slots:Object.fromEntries(SLOTS.map(s=>[s.id,{name:'',image:'',scale:8,opacity:s.id==='ground'||s.id==='cliff'?1:.5}])),
+  slots:Object.fromEntries(SLOTS.map(s=>[s.id,{name:'',image:'',scale:8,opacity:s.id==='ground'?1:.5}])),
   noise:{scale:20,seed:1},edgeBlend:4
  }]));
- // The two existing Llanura PNGs supply the base, Body Color and Body Height slots.
- for(const file of PLAINS_CLIFF_TEXTURE_FILES){
-  const target=data.plains.slots[file.role];
-  target.image=textureUrl(file);target.name=file.file;target.scale=8;target.opacity=1;
- }
- const cliff=data.plains.slots.cliff;
- cliff.image=PLAINS_CLIFF_MAPS.base;
- cliff.name='Textura de Acantilado llanura CUERPO.png';
- cliff.scale=8;cliff.opacity=1;
  return data;
 };
 // Keep explicit user overrides, but seed empty slots with the 25 committed PNGs.
@@ -41,7 +29,7 @@ export function ensureBiomeTextureDefaults(raw){
  const out=normalizeBiomeMaterials(raw);
  for(const biome of BIOMES){
   const catalog=REPO_TEXTURES.filter(t=>t.biome===biome.id);
-  const keys=[['ground',catalog.find(t=>t.kind==='ground')],['cliff',catalog.find(t=>t.kind==='cliff')]];
+  const keys=[['ground',catalog.find(t=>t.kind==='ground')]];
   catalog.filter(t=>t.kind==='blend').forEach((t,i)=>keys.push(['detail'+(i+1),t]));
   for(const [slot,file] of keys){
    if(!file||!out[biome.id]?.slots?.[slot])continue;
@@ -52,36 +40,6 @@ export function ensureBiomeTextureDefaults(raw){
   }
  }
  return out;
-}
-// Migrate only known obsolete Llanura filename variants. Keep independently
-// chosen custom/other-biome materials and every saved scale unchanged.
-export function normalizePlainsCliffImage(image,role){
- if(typeof image!=='string'||!image.startsWith('./assets/terrain/texturas/'))return image;
- let filename;
- try{filename=decodeURIComponent(image.slice('./assets/terrain/texturas/'.length).split(/[?#]/)[0])}
- catch(_){return image}
- const oldBase=[
-  'Textura de Acantilado llanura  CUERPO.png',
-  'Textura de Acantilado llanura Cubierto de Hierba.png'
- ];
- const oldColor=[
-  'Textura de Acantilado llanura  CUERPO- COLOR.png',
-  'Textura de Acantilado llanura CUERPO- COLOR.png',
-  'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png'
- ];
- const oldHeight=[
-  'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png',
-  'Textura de Acantilado llanura Cubierto de Hierba-HEIGTH.png',
-  'Textura de Acantilado llanura  CUERPO-HEIGTH.png',
-  'Textura de Acantilado llanura CUERPO-HEIGHT.png',
-  'Textura de Acantilado llanura CUERPO-HEIGHTMAP.png'
- ];
- if(role==='cliffBodyHeight'&&oldHeight.includes(filename))
-  return PLAINS_CLIFF_MAPS.bodyHeight;
- if((role==='cliff'&&oldBase.includes(filename))||
-    (role==='cliffBodyColor'&&oldColor.includes(filename)))
-  return PLAINS_CLIFF_MAPS.base;
- return image;
 }
 export function normalizeBiomeMaterials(raw){
  const out=defaults();
@@ -95,31 +53,14 @@ export function normalizeBiomeMaterials(raw){
    target.name=typeof v.name==='string'?v.name.slice(0,130):'';
    // Only user-uploaded images, never externally supplied script/URLs.
    const originalSource=typeof v.image==='string'?v.image:'';
-   const imageSource=biome.id==='plains'?
-    normalizePlainsCliffImage(originalSource,slot.id):originalSource;
-   if(imageSource!==originalSource){
-    target.name=slot.id==='cliffBodyHeight'?
-     'Textura de Acantilado llanura CUERPO-HEIGTH.png':
-     'Textura de Acantilado llanura CUERPO.png';
-   }
-   // Preserve old same-origin PNG paths when files have been removed:
+   const imageSource=originalSource;
+    // Preserve old same-origin PNG paths when files have been removed:
    // show a missing warning rather than silently rewriting the user's map.
    target.image=(REPO_TEXTURES.some(t=>textureUrl(t)===imageSource)||
     /^\.\/assets\/terrain\/texturas\/[^?#]{1,300}\.(png|jpe?g|webp)$/i.test(imageSource))?imageSource:
     /^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(imageSource)&&imageSource.length<=MAX_IMAGE*1.4?imageSource:'';
    target.scale=cl(Number(v.scale)||8,.25,1000);
    target.opacity=cl(Number.isFinite(Number(v.opacity))?Number(v.opacity):target.opacity,0,1);
-  }
-  // Older saved maps tuned the single cliff texture (often 400–450 repeats).
-  // Reuse that visible scale for Body Color once instead of resetting it to
-  // a hidden 20-unit tile or a default of 1. Keep explicit Body overrides.
-  if(biome.id==='plains'){
-   const bodyRaw=src.slots?.cliffBodyColor;
-   const cliffRaw=src.slots?.cliff;
-   const originalScale=Number(cliffRaw?.scale);
-   if(Number.isFinite(originalScale)&&originalScale>=.25&&
-      (!bodyRaw||(Number(bodyRaw.scale)<=8&&originalScale>8)))
-    dest.slots.cliffBodyColor.scale=cl(originalScale,.25,1000);
   }
   dest.noise.scale=cl(Number(src.noise?.scale)||20,1,200);
   dest.noise.seed=cl(Math.round(Number(src.noise?.seed)||1),1,9999999);
@@ -166,32 +107,16 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
      const current=ensure()[next.biome]?.slots?.[next.slot];
      if(!current)return;
      current.name=next.name;current.image=next.url;current.scale=next.scale;
-     // Body Color defines the ONE actual UV scale for color AND displacement.
-     // Keep saved Body Height metadata synchronized with the visual scale.
-     if(next.biome==='plains'&&next.slot==='cliffBodyColor')
-      ensure().plains.slots.cliffBodyHeight.scale=next.scale;
      // Store the chosen repeat count for this exact repository texture.
      if(!live.textureCatalogScale||typeof live.textureCatalogScale!=='object')live.textureCatalogScale={};
      live.textureCatalogScale[next.id]=next.scale;
-     // The same texture can already be in another active slot:
-     // update its footprint without changing the image assignment.
-     if(!(next.biome==='plains'&&(next.slot==='cliff'||next.slot==='cliffBodyColor'))){
-      for(const config of Object.values(ensure())){
-       for(const entry of Object.values(config.slots||{}))
-        if(entry!==current&&entry.image===next.url)entry.scale=next.scale;
-      }
-     }
      persist();render();onChange();
      toast('Escala aplicada: '+next.scale+' repeticiones en el mapa');
     }});
    }
    const url=textureUrl(t);
    const prev=Number(live.textureCatalogScale?.[t.id]);
-   // A single CUERPO.png serves two Llanura material slots. Respect
-   // each slot's own saved repeat count (100 versus 450, for example).
-   const known=record.image===url&&Number.isFinite(Number(record.scale))?
-    record.scale:Number.isFinite(prev)&&prev>=.25&&prev<=1000?prev:8;
-   previewController.open({id:t.id,name:t.file,url,biome,slot,scale:known});
+   previewController.open({id:t.id,name:t.file,url,biome,slot,scale:record.image===url?record.scale:(Number.isFinite(prev)?prev:8)});
   }catch(error){toast('No se pudo abrir editor de textura: '+error.message)}
  }
 
@@ -210,7 +135,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   const filter=select.value;
   let shown=0;
   for(const category of TEXTURE_KINDS){
-   const files=REPO_TEXTURES.filter(t=>!(filter==='plains'&&t.kind==='cliff'&&t.biome==='plains'&&!t.role)&&t.kind===category.id&&(filter==='all'||(filter==='untagged'?!tagFor(t):tagFor(t)===filter)));
+   const files=REPO_TEXTURES.filter(t=>t.kind===category.id&&(filter==='all'||(filter==='untagged'?!tagFor(t):tagFor(t)===filter)));
    const group=element('section');
    group.style.cssText='border:1px solid #406c5c;border-radius:9px;padding:8px;margin:8px 0';
    group.append(element('h3','',category.name+' ('+files.length+')'));
@@ -231,10 +156,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
     row.append(biome);
     const slot=element('select');slot.setAttribute('aria-label','Ranura de '+t.file);
     slot.style.cssText='width:80px;min-width:0;background:#1e4034;color:#fff;padding:6px';
-    const validSlots=t.kind==='ground'?['ground']:
-     t.kind==='heightmap'?['cliffBodyHeight']:
-     t.kind==='cliff'?['cliff','cliffBodyColor']:
-     ['detail1','detail2','detail3'];
+    const validSlots=t.kind==='ground'?['ground']:['detail1','detail2','detail3'];
     for(const key of validSlots){const option=element('option','',SLOTS.find(s=>s.id===key).name);option.value=key;slot.append(option)}
     row.append(slot);
     const edit=element('button','','Editar');edit.type='button';
@@ -261,84 +183,8 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   $('textureSeed').value=data.noise.seed;
   $('textureTransition').value=data.edgeBlend;
   $('textureTransitionValue').textContent=String(data.edgeBlend);
-  const plainCards=[];
-  const plainCliffAssets=[
-   {id:'tx16',file:'Textura de Acantilado llanura CUERPO.png',
-    biome:'plains',kind:'cliff',role:'cliff'},
-   ...PLAINS_CLIFF_TEXTURE_FILES
-  ];
-  for(const file of plainCliffAssets){
-   if(biomeId!=='plains')break;
-   const def=SLOTS.find(s=>s.id===file.role),item=data.slots[def.id];
-   const card=element('div');card.dataset.cliffMapSlot=file.role;
-   card.style.cssText='min-width:0;background:#1b3930;border:1px solid #4c7866;border-radius:8px;padding:7px;display:grid;gap:5px';
-   const missing=item.image&&!isPublishedTextureUrl(item.image);
-   const heading=element('b','',def.name+(missing?' ⚠':''));heading.style.fontSize='12px';
-   if(missing)heading.title='Imagen retirada de GitHub. Selecciona otra existente.';
-   card.append(heading);
-   const img=element('img');img.alt=def.name;img.src=getTextureAssetUrl(item.image||textureUrl(file));
-   img.loading='lazy';img.style.cssText='width:100%;height:104px;object-fit:cover;border-radius:5px';
-   card.append(img);
-   // Every visible map is a real saved slot; users may substitute a repository
-   // image without changing procedural geometry or uploading duplicate bytes.
-   const choose=element('select');
-   choose.setAttribute('aria-label','Imagen para '+def.name);
-   choose.style.cssText='width:100%;min-width:0;color:#fff;background:#20473a;border:1px solid #527c6c;padding:5px;font-size:11px';
-   const candidates=REPO_TEXTURES.filter(t=>file.kind==='heightmap'?
-    t.kind==='heightmap':t.kind==='cliff');
-   for(const t of candidates){
-    const opt=element('option','',t.file);opt.value=textureUrl(t);choose.append(opt);
-   }
-   // Custom images saved earlier remain usable after reload.
-   if(item.image&&!candidates.some(t=>textureUrl(t)===item.image)){
-    const opt=element('option','',item.name||'Imagen personalizada');opt.value=item.image;choose.append(opt);
-   }
-   choose.value=item.image||textureUrl(file);
-   choose.onchange=()=>{
-    const t=REPO_TEXTURES.find(t=>textureUrl(t)===choose.value);
-    mutate(m=>{
-     m.slots[def.id].image=choose.value;
-     m.slots[def.id].name=t?.file||item.name||def.name;
-    });
-   };
-   card.append(choose);
-   if(file.role==='cliff'||file.role==='cliffBodyColor'){
-    const label=element('label','','Repeticiones (630 unidades)');
-    const scale=element('input');scale.type='number';
-    scale.min='.25';scale.max='1000';scale.step='.25';
-    scale.value=String(item.scale);
-    scale.title=file.role==='cliff'?
-     'Repeticiones de la textura principal CUERPO':
-     'Repeticiones reales del Body Color y Body Height';
-    scale.setAttribute('aria-label',file.role==='cliff'?
-     'Repeticiones acantilado base':'Repeticiones acantilado Body');
-    scale.style.cssText='width:100%;background:#1e4034;color:#fff;border:1px solid #588c77;padding:6px';
-    scale.onchange=()=>{
-     const next=cl(Number(scale.value)||8,.25,1000);
-     mutate(m=>{m.slots[file.role].scale=next;
-      if(file.role==='cliffBodyColor')m.slots.cliffBodyHeight.scale=next});
-    };
-    label.append(scale);card.append(label);
-    const edit=element('button','','Editar escala');
-    edit.type='button';edit.title='Ajustar el Body junto al Explorador WT';
-    edit.onclick=()=>{
-     const chosen=REPO_TEXTURES.find(t=>textureUrl(t)===(item.image||textureUrl(file)));
-     if(chosen)void openEditor(chosen,'plains',file.role);
-     else toast('Selecciona una imagen del repositorio para editar su escala');
-    };
-    card.append(edit);
-   }
-   plainCards.push(card);
-  }
-  if(biomeId==='plains'){
-   const section=element('div');section.id='plainsCliffActiveMaps';
-   section.style.cssText='margin:9px 0;padding:8px;border:1px solid #5b927a;border-radius:9px';
-   section.append(element('h3','','Acantilado · Llanura'));
-   const grid=element('div');grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px';
-   grid.append(...plainCards);section.append(grid);slots.append(section);
-  }
   for(const def of SLOTS){
-   if(def.type==='cliffMap'||(biomeId==='plains'&&def.id==='cliff'))continue;
+   
    const item=data.slots[def.id];
    const card=element('div','');
    card.style.cssText='border:1px solid #3d6a56;border-radius:9px;padding:9px;margin:9px 0;background:#1c3b30';

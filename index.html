@@ -177,33 +177,6 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <button id="textureReloadImages" type="button" title="Volver a cargar las imágenes del repositorio sin tocar el escenario" aria-label="Actualizar imágenes del repositorio" style="width:34px;height:30px;min-width:34px;padding:0;border-radius:7px">↻</button>
  <span id="textureUpdateStatus" role="status" aria-live="polite" title="Estado de actualización de imágenes" style="font-size:10px;opacity:.78;max-width:95px"></span>
 </div>
-<div id="plainsCliffPanel" style="border:1px solid #568978;border-radius:9px;padding:8px;margin:9px 0">
- <div style="display:flex;gap:7px;align-items:center;justify-content:space-between">
-  <strong>Acantilado · Llanura</strong>
-  <button id="plainsCliffHelp" type="button" title="Información sobre heightmaps de acantilados" aria-label="Ayuda: heightmaps de acantilado" style="width:28px;min-width:28px;height:28px;padding:0;border-radius:50%">ⓘ</button>
- </div>
- <div style="margin:6px 0;color:#c9ffe4;font-size:12px">Body Color + Body Height</div>
- <label>Relieve <output id="plainsCliffStrengthValue">1.5</output>
-  <input id="plainsCliffStrength" type="range" min="0" max="4" step=".25" value="1.5">
- </label>
- <div class="grid2" style="margin-top:6px">
- <button id="plainsCliffViewMaps" type="button">Ver materiales</button>
- <button id="plainsCliffGenerate" type="button">Generar</button>
- </div>
- <output id="plainsCliffStatus" class="hint" style="display:block;white-space:normal;overflow-wrap:anywhere;margin:7px 0" hidden></output>
- <div style="display:flex;align-items:flex-start;gap:8px;margin-top:4px">
-  <img id="plainsCliffHeightProof" alt="Imagen real utilizada para desplazar la malla de acantilado" hidden
-    style="width:86px;height:86px;object-fit:contain;background:#26352e;border:1px solid #577e70;border-radius:5px" />
-  <span class="hint">Comprobación: esta miniatura muestra el PNG que el generador ha cargado realmente como mapa de alturas. El resultado indicará si el relieve se aplicó o fue rechazado.</span>
- </div>
-</div>
-<dialog id="plainsCliffHelpDialog" aria-labelledby="plainsCliffHelpTitle" style="background:#18372c;color:#e5fff0;border:1px solid #55977c;border-radius:12px;max-width:min(420px,92vw);padding:16px">
- <h3 id="plainsCliffHelpTitle" style="margin:0 0 9px">Acantilado de llanura</h3>
- <p>CUERPO.png conserva su repetición de color. CUERPO-HEIGTH.png se proyecta verticalmente sobre el acantilado para generar crestas y hendiduras reales, sin repetirlo cientos de veces como el color.</p>
- <p>Solo se subdividen las zonas donde el heightmap de verdad cambia la forma de la pared. Si no hay desplazamiento geométrico verificable, se conserva la malla original sin subdividir. Las costuras siguen protegidas.</p>
- <p>La geometría se genera sin modificar los vértices originales ni las costuras guardadas. El modo Probar la incorpora en las colisiones.</p>
- <form method="dialog"><button type="submit">Cerrar</button></form>
-</dialog>
 <p id="textureRenderStatus" class="hint">Preparando materiales del terreno…</p>
 <dialog id="textureScaleDialog" style="border:1px solid #5f927e;border-radius:12px;background:#122b24;color:#eafff2;width:min(94vw,960px);max-width:960px;padding:15px">
  <h2 id="textureScaleTitle" style="margin:0 0 7px">Editar aspecto de textura</h2>
@@ -256,14 +229,6 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <p class="hint" id="zonePointCount"></p>
 <p id="zoneTypeHint" class="hint">El bioma se asigna mediante generación procedural, no por el nombre.</p>
 </div>
-<dialog id="zoneCliffDialog" style="background:#18372c;color:#e5fff0;border:1px solid #55977c;border-radius:12px;max-width:min(400px,95vw)">
-<form method="dialog" id="zoneCliffForm">
-<h2>Asociar acantilado a una región</h2>
-<p class="hint">El acantilado heredará el bioma y la textura de acantilado de la región elegida.</p>
-<label>Región principal<select id="zoneCliffParent" style="display:block;width:100%;padding:8px;background:#1e4034;color:white"></select></label>
-<div class="grid2" style="margin-top:10px"><button value="cancel">Cancelar</button><button id="zoneCliffConfirm" value="confirm">Guardar asociación</button></div>
-</form>
-</dialog>
 </section>
 <section id="holesPanel">
 <h2>✂ Cuchillo poligonal 3D · Terreno y modelos GLB</h2>
@@ -401,7 +366,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
-<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.114
+<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.115
  <span id="editorSaveState" style="font-weight:400;display:block;opacity:.8">Guardado local</span></div>
 <div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
@@ -442,5 +407,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.114').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.115').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>

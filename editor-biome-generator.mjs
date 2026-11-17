@@ -56,7 +56,7 @@ export function createBiomeGeneratorPanel({live,snapshot,persist,toast,onChange=
   });
  }
  function refresh(){
-  const v=config(),zones=Array.isArray(live.zones)?live.zones.filter(z=>!z.isCliff):[];
+  const v=config(),zones=Array.isArray(live.zones)?live.zones:[];
   $('biomeGeneratorSeed').value=v.seed;
   for(const id of BIOME_IDS){
    root.querySelector('[data-enabled="'+id+'"]').checked=v.enabled.includes(id);
@@ -81,32 +81,13 @@ export function createBiomeGeneratorPanel({live,snapshot,persist,toast,onChange=
  function generate(advance){
   const original=config();
   const candidate={...original,seed:advance?nextBiomeSeed(original.seed):original.seed};
-  const mainZones=(live.zones||[]).filter(z=>!z.isCliff);
+  const mainZones=(live.zones||[]);
   const result=generateBiomeAssignments(mainZones,candidate);
   if(!result.ok){toast(result.error);$('biomeGeneratorResult').textContent=result.error;return;}
   snapshot();
   const mapping=new Map(result.assignments.map(a=>[a.zoneId,a.biomeId]));
   for(const zone of mainZones)zone.biomeId=mapping.get(zone.id)||zone.biomeId||null;
-  // Cliff regions do not roll an independent biome; they inherit the chosen region.
-  for(const zone of live.zones||[])if(zone.isCliff){
-   const parent=mainZones.find(z=>z.id===zone.cliffParentId);
-   zone.biomeId=parent?.biomeId||null;
-   zone.biomeLocked=false;
-  }
-  live.biomeMaterials=ensureBiomeTextureDefaults(live.biomeMaterials);
-  live.biomeGenerator={...candidate,lastGeneration:{seed:candidate.seed,count:result.assignments.length}};
-  storedRef=live.biomeGenerator;
-  persist();refresh();onZoneChange();onChange();
-  const message='Semilla '+result.seed+' · '+result.assignments.length+' zonas · '+result.changed+' cambios · '+result.adjacency+' fronteras';
-  $('biomeGeneratorResult').textContent=message;toast('Biomas distribuidos: '+result.changed+' zonas actualizadas');
- }
- $('biomeGenerate').onclick=()=>generate(false);
- $('biomeRegenerate').onclick=()=>generate(true);
- $('biomeGeneratorSeed').addEventListener('keydown',e=>{if(e.key==='Enter'){e.target.blur();e.preventDefault()}});
- $('biomeLockAll').onclick=()=>{
-  if(!live.zones?.length)return;
-  snapshot();
-  for(const z of live.zones)z.biomeLocked=!z.isCliff&&!!z.biomeId;
+  for(const z of live.zones)z.biomeLocked=!!z.biomeId;
   persist();refresh();onZoneChange();
   toast('Asignación actual conservada: zonas con bioma bloqueadas');
  };

@@ -1,210 +1,153 @@
 export const REPO_TEXTURES=[
- {
-  "id": "tx01",
-  "file": "Acantilado decierto con borde arenoso.png",
-  "biome": "desert",
-  "kind": "cliff",
-  "size": 2183386
- },
- {
-  "id": "tx02",
-  "file": "Acantilado pantanoso de musgo y raíces.png",
-  "biome": "swamp",
-  "kind": "cliff",
-  "size": 2217864
- },
- {
-  "id": "tx03",
-  "file": "Baldosa rocosa con musgo en capas.png",
-  "biome": "mountain",
-  "kind": "blend",
-  "size": 2133214
- },
- {
-  "id": "tx04",
-  "file": "Charca de pantano con nenúfares.png",
-  "biome": "swamp",
-  "kind": "blend",
-  "size": 1696145
- },
- {
-  "id": "tx05",
-  "file": "Círculo de pantano sobre transparencia.png",
-  "biome": "swamp",
-  "kind": "blend",
-  "size": 3114973
- },
- {
-  "id": "tx06",
-  "file": "Muro de acantilado rocoso en capas.png",
-  "biome": "mountain",
-  "kind": "cliff",
-  "size": 2231597
- },
- {
-  "id": "tx07",
-  "file": "Parche de hierba seca pintada.png",
-  "biome": "plains",
-  "kind": "blend",
-  "size": 2480513
- },
- {
-  "id": "tx08",
-  "file": "Parche de pradera florida pintada.png",
-  "biome": "plains",
-  "kind": "blend",
-  "size": 2371305
- },
- {
-  "id": "tx09",
-  "file": "Parche de suelo forestal con musgo y piedras.png",
-  "biome": "forest",
-  "kind": "blend",
-  "size": 2126203
- },
- {
-  "id": "tx10",
-  "file": "Parche de suelo forestal erosionado.png",
-  "biome": "forest",
-  "kind": "blend",
-  "size": 2010369
- },
- {
-  "id": "tx11",
-  "file": "Parche de terreno desértico estilizado (2).png",
-  "biome": "desert",
-  "kind": "blend",
-  "size": 2409750
- },
- {
-  "id": "tx12",
-  "file": "Parche de terreno rocoso y musgoso.png",
-  "biome": "mountain",
-  "kind": "blend",
-  "size": 2165706
- },
- {
-  "id": "tx13",
-  "file": "Parche de tierra con raíces y musgo.png",
-  "biome": "forest",
-  "kind": "blend",
-  "size": 2198193
- },
- {
-  "id": "tx14",
-  "file": "Parche de tierra y pasto pisoteado.png",
-  "biome": "plains",
-  "kind": "blend",
-  "size": 2396189
- },
- {
-  "id": "tx15",
-  "file": "Parche montañoso rocoso con hierba.png",
-  "biome": "mountain",
-  "kind": "blend",
-  "size": 1933568
- },
- {
-  "id": "tx16",
-  "file": "Textura de Acantilado llanura CUERPO.png",
-  "biome": "plains",
-  "kind": "cliff",
-  "size": 2965478
- },
- {
-  "id": "tx17",
-  "file": "Textura de Tierra Desértica Agrietada.png",
-  "biome": "desert",
-  "kind": "blend",
-  "size": 2282093
- },
- {
-  "id": "tx18",
-  "file": "Textura de arena dorada ondulada.png",
-  "biome": "desert",
-  "kind": "blend",
-  "size": 2294623
- },
- {
-  "id": "tx19",
-  "file": "WT_Pantano_Blend_A_Transparencia_Real_RGBA.png",
-  "biome": "swamp",
-  "kind": "blend",
-  "size": 1950050
- },
- {
-  "id": "tx20",
-  "file": "acantilado bosque.png",
-  "biome": "forest",
-  "kind": "cliff",
-  "size": 2479866
- },
- {
-  "id": "tx21",
-  "file": "suelo base boscoso pintado.png",
-  "biome": "forest",
-  "kind": "ground",
-  "size": 1916779
- },
- {
-  "id": "tx22",
-  "file": "suelo base de desierto arena dorada.png",
-  "biome": "desert",
-  "kind": "ground",
-  "size": 1962465
- },
- {
-  "id": "tx23",
-  "file": "suelo base de llanura_Cesped_Natural_8K_Seamless.png",
-  "biome": "plains",
-  "kind": "ground",
-  "size": 32437086
- },
- {
-  "id": "tx24",
-  "file": "suelo base de montaña.png",
-  "biome": "mountain",
-  "kind": "ground",
-  "size": 2708115
- },
- {
-  "id": "tx25",
-  "file": "suelo base de pantano Musgoso.png",
-  "biome": "swamp",
-  "kind": "ground",
-  "size": 2333667
- }
+  {
+    "id": "tx03",
+    "file": "Baldosa rocosa con musgo en capas.png",
+    "biome": "mountain",
+    "kind": "blend",
+    "size": 2133214
+  },
+  {
+    "id": "tx04",
+    "file": "Charca de pantano con nenúfares.png",
+    "biome": "swamp",
+    "kind": "blend",
+    "size": 1696145
+  },
+  {
+    "id": "tx05",
+    "file": "Círculo de pantano sobre transparencia.png",
+    "biome": "swamp",
+    "kind": "blend",
+    "size": 3114973
+  },
+  {
+    "id": "tx07",
+    "file": "Parche de hierba seca pintada.png",
+    "biome": "plains",
+    "kind": "blend",
+    "size": 2480513
+  },
+  {
+    "id": "tx08",
+    "file": "Parche de pradera florida pintada.png",
+    "biome": "plains",
+    "kind": "blend",
+    "size": 2371305
+  },
+  {
+    "id": "tx09",
+    "file": "Parche de suelo forestal con musgo y piedras.png",
+    "biome": "forest",
+    "kind": "blend",
+    "size": 2126203
+  },
+  {
+    "id": "tx10",
+    "file": "Parche de suelo forestal erosionado.png",
+    "biome": "forest",
+    "kind": "blend",
+    "size": 2010369
+  },
+  {
+    "id": "tx11",
+    "file": "Parche de terreno desértico estilizado (2).png",
+    "biome": "desert",
+    "kind": "blend",
+    "size": 2409750
+  },
+  {
+    "id": "tx12",
+    "file": "Parche de terreno rocoso y musgoso.png",
+    "biome": "mountain",
+    "kind": "blend",
+    "size": 2165706
+  },
+  {
+    "id": "tx13",
+    "file": "Parche de tierra con raíces y musgo.png",
+    "biome": "forest",
+    "kind": "blend",
+    "size": 2198193
+  },
+  {
+    "id": "tx14",
+    "file": "Parche de tierra y pasto pisoteado.png",
+    "biome": "plains",
+    "kind": "blend",
+    "size": 2396189
+  },
+  {
+    "id": "tx15",
+    "file": "Parche montañoso rocoso con hierba.png",
+    "biome": "mountain",
+    "kind": "blend",
+    "size": 1933568
+  },
+  {
+    "id": "tx17",
+    "file": "Textura de Tierra Desértica Agrietada.png",
+    "biome": "desert",
+    "kind": "blend",
+    "size": 2282093
+  },
+  {
+    "id": "tx18",
+    "file": "Textura de arena dorada ondulada.png",
+    "biome": "desert",
+    "kind": "blend",
+    "size": 2294623
+  },
+  {
+    "id": "tx19",
+    "file": "WT_Pantano_Blend_A_Transparencia_Real_RGBA.png",
+    "biome": "swamp",
+    "kind": "blend",
+    "size": 1950050
+  },
+  {
+    "id": "tx21",
+    "file": "suelo base boscoso pintado.png",
+    "biome": "forest",
+    "kind": "ground",
+    "size": 1916779
+  },
+  {
+    "id": "tx22",
+    "file": "suelo base de desierto arena dorada.png",
+    "biome": "desert",
+    "kind": "ground",
+    "size": 1962465
+  },
+  {
+    "id": "tx23",
+    "file": "suelo base de llanura_Cesped_Natural_8K_Seamless.png",
+    "biome": "plains",
+    "kind": "ground",
+    "size": 32437086
+  },
+  {
+    "id": "tx24",
+    "file": "suelo base de montaña.png",
+    "biome": "mountain",
+    "kind": "ground",
+    "size": 2708115
+  },
+  {
+    "id": "tx25",
+    "file": "suelo base de pantano Musgoso.png",
+    "biome": "swamp",
+    "kind": "ground",
+    "size": 2333667
+  }
 ];
-// The repo currently contains TWO Llanura cliff PNGs, not three:
-// CUERPO.png supplies both the legacy single-color material and the
-// generated Body Color. CUERPO-HEIGTH.png displaces the refined geometry.
-export const PLAINS_CLIFF_TEXTURE_FILES=[
- {id:'tx16',file:'Textura de Acantilado llanura CUERPO.png',biome:'plains',kind:'cliff',role:'cliffBodyColor',size:2965478},
- {id:'tx29',file:'Textura de Acantilado llanura CUERPO-HEIGTH.png',biome:'plains',kind:'heightmap',role:'cliffBodyHeight',size:1890146}
-];
-// Base and Body Color are deliberately the SAME file. Do not duplicate
-// their catalog entry; each slot can still have its own saved repeat scale.
-REPO_TEXTURES.push(...PLAINS_CLIFF_TEXTURE_FILES.filter(
- f=>!REPO_TEXTURES.some(t=>t.file===f.file)
-));
-export const textureUrl=texture=>'./assets/terrain/texturas/'+encodeURIComponent(texture.file);
-// Llanura source files verified in assets/terrain/texturas.
-// "cliff" is the original single-material cliff, restored to CUERPO.png.
-// The optional procedural generator uses the other two dedicated images.
-export const PLAINS_CLIFF_MAPS={
- base:textureUrl({file:'Textura de Acantilado llanura CUERPO.png'}),
- bodyColor:textureUrl({file:'Textura de Acantilado llanura CUERPO.png'}),
- bodyHeight:textureUrl({file:'Textura de Acantilado llanura CUERPO-HEIGTH.png'})
-};
+
 // GitHub assets may be replaced, removed or added without a JS commit.
 // Keep the running catalog in sync with the repository tree. This catalogue
 // only lists images; it NEVER changes the current world's saved selections.
 let publishedFiles=null;
 const classifyTexture=file=>{
  const name=file.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- const kind=/height|heigth|desplazamiento/.test(name)?'heightmap':
-  /acantilado|muro|pared|roca labrada/.test(name)?'cliff':
-  /suelo base|piso base/.test(name)?'ground':'blend';
+ const kind=/suelo base|piso base/.test(name)?'ground':'blend';
  const biome=/llanura|pradera/.test(name)?'plains':
   /desiert|arena/.test(name)?'desert':
   /pantan/.test(name)?'swamp':
@@ -214,7 +157,7 @@ const classifyTexture=file=>{
 };
 export function syncPublishedTextureFiles(entries){
  if(!Array.isArray(entries))return {added:0,removed:0,total:REPO_TEXTURES.length};
- const valid=entries.filter(x=>typeof x.file==='string'&&
+ const valid=entries.filter(x=>typeof x.file==='string'&&!/acantilado|cliff|heigth|heightmap|desplazamiento/i.test(x.file)&&
   /\.(png|jpe?g|webp)$/i.test(x.file)&&x.file.length<=240);
  const old=new Map(REPO_TEXTURES.map(x=>[x.file,x]));
  const list=[],seen=new Set();
@@ -254,4 +197,4 @@ export async function syncPublishedTextureCatalog(request=fetch){
  return syncPublishedTextureFiles(data.tree.filter(t=>t.type==='blob'&&t.path.startsWith(prefix))
   .map(t=>({file:t.path.slice(prefix.length),size:t.size})));
 }
-export const TEXTURE_KINDS=[{id:'ground',name:'Texturas base'},{id:'blend',name:'Complementarias'},{id:'cliff',name:'Acantilados'},{id:'heightmap',name:'Heightmaps'}];
+export const TEXTURE_KINDS=[{id:'ground',name:'Texturas base'},{id:'blend',name:'Complementarias'}];

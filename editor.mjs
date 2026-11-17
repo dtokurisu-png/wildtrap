@@ -14,7 +14,6 @@ import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
 import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.103';
 import {restoreTerrainSeams,seamVertexIds} from './terrain-seams.mjs?v=0.9.94';
-import {straightenCliffZone} from './editor-cliff-alignment.mjs?v=0.9.96';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
@@ -890,11 +889,7 @@ const rect=view.getBoundingClientRect();
 mouse.x=((event.clientX-rect.left)/rect.width)*2-1;mouse.y=-((event.clientY-rect.top)/rect.height)*2+1;
 ray.setFromCamera(mouse,camera);
 if(mode==='holePaint')return holesEditor?.pick(ray)||null;
-// When a cliff was replaced by its real refined surface, the source
-// terrain has NO face there. Include the new cliff mesh in terrain picking,
-// preserving sculpting, placement and zone editing on those faces.
-const cliffMeshes=terrainPainter?.collisionRoot()?.children||[];
-const hits=ray.intersectObjects([terrain,...cliffMeshes],false);
+const hits=ray.intersectObject(terrain,false);
 if(hits.length)return{x:hits[0].point.x,z:hits[0].point.z,y:hits[0].point.y};
 return ray.ray.intersectPlane(plane,temp)?{x:temp.x,z:temp.z,y:heightAt(temp.x,temp.z)}:null;
 }
@@ -999,7 +994,7 @@ holesEditor=createTerrainHoles({
  renderCuts:!recoveryMode,nextUndoSerial
 });
 terrainInspector=createTerrainMeshInspector({scene,camera,view,terrain,$,
- isSelected:()=>terrainPropertiesSelected,getCliffOverlay:()=>terrainPainter?.collisionRoot()});
+ isSelected:()=>terrainPropertiesSelected,getCliffOverlay:()=>null});
 window.__terrainMeshInspector=terrainInspector;
 // No network, FBX parser or animation adapter is required to open the editor.
 let preview={
@@ -1011,7 +1006,7 @@ async function ensurePreview(){
  if(previewLoad)return previewLoad;
  previewLoad=import('./playtest.mjs?v=0.9.101').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
-   collisionRoots:()=>[surface,cavePiecesLayer,interiors,terrainPainter?.collisionRoot()].filter(Boolean),
+   collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
    onStop:()=>{testingScene=false;draw();updateMeshInspection();}
   });
@@ -1043,61 +1038,6 @@ terrainVertexEditor=createTerrainVertexEditor({scene,terrain,terrainGeo,camera,v
 window.__terrainVertexEditor=terrainVertexEditor;
 const seamHelp=$('terrainSeamHelp'),seamHelpDialog=$('terrainSeamHelpDialog');
 seamHelp?.addEventListener('click',()=>seamHelpDialog?.showModal());
-
-const plainsHelp=$('plainsCliffHelp'),plainsDialog=$('plainsCliffHelpDialog');
-plainsHelp?.addEventListener('click',()=>plainsDialog?.showModal());
-const plainsStrength=$('plainsCliffStrength'),plainsStrengthValue=$('plainsCliffStrengthValue');
-plainsStrength?.addEventListener('input',()=>{plainsStrengthValue.textContent=Number(plainsStrength.value).toFixed(2)});
-function syncPlainsCliffSettings(){
- const v=Number(live.cliffHeightmapPlains?.strength);
- const strength=Number.isFinite(v)&&v>=0&&v<=4?v:1.5;
- if(plainsStrength)plainsStrength.value=String(strength);
- if(plainsStrengthValue)plainsStrengthValue.textContent=strength.toFixed(2);
-}
-function loadSavedPlainsCliffSettings(source){
- const from=source?.cliffHeightmapPlains;
- if(!from||typeof from!=='object'||Array.isArray(from)){
-  live.cliffHeightmapPlains={enabled:false,strength:1.5};
- }else{
-  const n=(v,fallback,min,max)=>Number.isFinite(Number(v))?
-   Math.max(min,Math.min(max,Number(v))):fallback;
-  live.cliffHeightmapPlains={
-   enabled:from.enabled===true,strength:n(from.strength,1.5,0,4)
-  };
- }
- syncPlainsCliffSettings();
-}
-syncPlainsCliffSettings();
-$('plainsCliffViewMaps')?.addEventListener('click',()=>{
- const selector=$('textureBiome');
- if(!selector){toast('La biblioteca de texturas no está preparada');return}
- selector.value='plains';
- selector.dispatchEvent(new Event('change',{bubbles:true}));
- const target=$('plainsCliffActiveMaps');
- if(target)target.scrollIntoView({behavior:'smooth',block:'nearest'});
- else toast('Preparando ranuras del bioma Llanura…');
-});
-$('plainsCliffGenerate')?.addEventListener('click',()=>{
- const parents=new Map((live.zones||[]).filter(z=>!z.isCliff).map(z=>[z.id,z]));
- const available=(live.zones||[]).some(z=>z.isCliff&&parents.get(z.cliffParentId)?.biomeId==='plains');
- if(!available){
-  const message='Heightmap no aplicado: no hay acantilados ⛰ asociados a una región principal de Llanura. Revisa Zonas → ⛰ → Región principal.';
-  const output=$('plainsCliffStatus');
-  if(output){output.hidden=false;output.textContent=message;}
-  toast(message);return;
- }
- if(!terrainPainter){
-  const output=$('plainsCliffStatus');
-  if(output){output.hidden=false;output.textContent='El renderizador del terreno no está preparado; no se ha generado el relieve.';}
-  toast('El renderizador del terreno no está preparado');return;
- }
- snapshot();
- live.cliffHeightmapPlains={...(live.cliffHeightmapPlains||{}),
-  enabled:true,strength:Math.max(0,Math.min(4,Number(plainsStrength.value)||0))};
- const status=$('plainsCliffStatus');if(status){status.hidden=false;status.textContent='Generando…'}
- terrainPainter?.schedule();
- persist();
-});
 
 objectMeshOverlays=createObjectMeshOverlays({
  getNodes:()=>live.nodes,getRoots:id=>renderedNodes.get(id)||[]
@@ -1737,7 +1677,7 @@ view.addEventListener('wheel',e=>{
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
 $('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
-$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.terrainVertexOffsets={};live.terrainSeams=[];live.cliffHeightmapPlains={enabled:false,strength:1.5};syncPlainsCliffSettings();live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
+$('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.terrainVertexOffsets={};live.terrainSeams=[];live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
 function restoreHistoryState(data){
  // Restore the complete scene, including zones, textures and cuts.
  // Do not replace the live reference used by the other editor modules.
@@ -1745,7 +1685,7 @@ function restoreHistoryState(data){
  const v=JSON.parse(data);
  Object.assign(live,v);
  live.terrainSeams=Array.isArray(v.terrainSeams)?v.terrainSeams:[];
- loadSavedPlainsCliffSettings(v);
+ 
  live.terrainVertexOffsets=v.terrainVertexOffsets&&typeof v.terrainVertexOffsets==='object'?v.terrainVertexOffsets:{};
  if(!Array.isArray(live.holes))live.holes=[];
  if(!Array.isArray(live.zones))live.zones=[];
@@ -1901,8 +1841,8 @@ $('export').onclick=()=>{live.editorCamera=currentEditorCamera();download('wildt
 void import('./map-publisher.mjs?v=0.9.40').then(({createMapPublisher})=>{
  createMapPublisher({getScene:()=>({...live,editorCamera:currentEditorCamera()})});
 }).catch(error=>{const status=$('publishStatus');if(status)status.textContent='No se pudo iniciar el publicador: '+error.message;});
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);loadSavedPlainsCliffSettings(x);live.terrainSeams=Array.isArray(x.terrainSeams)?x.terrainSeams:[];live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
-updateMaxHeightControl();refreshTerrain();alignMarkedCliffZones();draw();
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.terrainSeams=Array.isArray(x.terrainSeams)?x.terrainSeams:[];live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
+updateMaxHeightControl();refreshTerrain();draw();
 if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
 persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
 function download(name,blob){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
@@ -1947,7 +1887,7 @@ async function restoreSavedBase(confirmOverwrite=false){
   if(confirmOverwrite)snapshot();
   Object.assign(live,data);
   live.terrainSeams=Array.isArray(data.terrainSeams)?data.terrainSeams:[];
-  loadSavedPlainsCliffSettings(data);
+  
   live.terrainVertexOffsets=data.terrainVertexOffsets&&typeof data.terrainVertexOffsets==='object'?data.terrainVertexOffsets:{};
   live.holes=[];
   live.cuts3d=[];
@@ -1981,7 +1921,7 @@ try{
  if(saved){
   const d=JSON.parse(saved);
   if(d.size===SIZE&&d.resolution===N&&d.heights?.length===COUNT&&Array.isArray(d.nodes)){
-   Object.assign(live,d);loadSavedPlainsCliffSettings(d);live.terrainSeams=Array.isArray(d.terrainSeams)?d.terrainSeams:[];live.terrainVertexOffsets=d.terrainVertexOffsets&&typeof d.terrainVertexOffsets==='object'?d.terrainVertexOffsets:{};live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
+   Object.assign(live,d);live.terrainSeams=Array.isArray(d.terrainSeams)?d.terrainSeams:[];live.terrainVertexOffsets=d.terrainVertexOffsets&&typeof d.terrainVertexOffsets==='object'?d.terrainVertexOffsets:{};live.holes=Array.isArray(d.holes)?d.holes:[];live.cuts3d=Array.isArray(d.cuts3d)?d.cuts3d:[];live.objectGroups=cleanObjectGroups(d.objectGroups);live.zones=Array.isArray(d.zones)?d.zones:[];zoneTool?.refreshAll();live.biomeMaterials=d.biomeMaterials&&typeof d.biomeMaterials==='object'?d.biomeMaterials:{};live.biomeGenerator=d.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();
    live.settings={heightMax:120,...(d.settings&&typeof d.settings==='object'?d.settings:{})};
    recoveredDraft=true;
    playerSpawnPanel?.refresh();
@@ -2007,7 +1947,7 @@ async function loadPublishedWorld(){
   if(world.size!==SIZE||world.resolution!==N||world.heights?.length!==COUNT||!Array.isArray(world.nodes))throw Error('Escenario publicado incompatible');
   Object.assign(live,world);
   live.terrainSeams=Array.isArray(world.terrainSeams)?world.terrainSeams:[];
-  loadSavedPlainsCliffSettings(world);
+  
   live.terrainVertexOffsets=world.terrainVertexOffsets&&typeof world.terrainVertexOffsets==='object'?world.terrainVertexOffsets:{};
   live.holes=Array.isArray(world.holes)?world.holes:[];
   live.cuts3d=Array.isArray(world.cuts3d)?world.cuts3d:[];
@@ -2017,7 +1957,7 @@ async function loadPublishedWorld(){
   // Do not reset the user's last camera merely because the published map loaded.
   if(!restoreEditorCamera(world.editorCamera,{remember:true}))
    live.editorCamera=currentEditorCamera();
-  playerSpawnPanel?.refresh();updateMaxHeightControl();refreshTerrain();alignMarkedCliffZones();draw();persist();
+  playerSpawnPanel?.refresh();updateMaxHeightControl();refreshTerrain();draw();persist();
   toast('Escenario oficial cargado desde el repositorio');
  }catch(err){console.warn('No se pudo cargar mapa oficial',err);void restoreSavedBase(false)}
 }
@@ -2049,37 +1989,16 @@ function animate(){
 animate();
 // The UI must not report ready before the recovered XYZ mesh has rendered.
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
-// A cliff zone is an editable contour. Apply one undoable correction per
-// contour revision, to the real terrain vertices (height + XZ offsets).
-// Existing projects with already-marked cliff zones are aligned on first load.
-function alignMarkedCliffZones({recordHistory=false}={}){
- const pending=(Array.isArray(live.zones)?live.zones:[]).filter(zone=>{
-  if(!zone?.isCliff||!Array.isArray(zone.points)||zone.points.length<3)return false;
-  const signature='rail-v1:'+JSON.stringify(zone.points.map(p=>[Number(p.x)||0,Number(p.z)||0]));
-  return zone.cliffAlignmentSignature!==signature;
- });
- if(!pending.length)return 0;
- if(recordHistory)snapshot();
- let total=0;
- for(const zone of pending){
-  const result=straightenCliffZone(live,zone,{size:SIZE,resolution:N});
-  total+=result.changed;
-  zone.cliffAlignmentSignature='rail-v1:'+JSON.stringify(zone.points.map(p=>[Number(p.x)||0,Number(p.z)||0]));
- }
- if(total)refreshTerrain();
- persist();
- return total;
-}
 async function initializeZoneTool(){
  try{
   const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.92');
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
-   onChange:()=>{alignMarkedCliffZones();terrainPainter?.schedule();biomeGeneratorTool?.refresh();},
+   onChange:()=>{terrainPainter?.schedule();biomeGeneratorTool?.refresh();},
    nextHistorySerial:nextUndoSerial,onPendingHistoryChange:updateHistoryButtons,
    onPendingEdit:()=>{redo.length=0;updateHistoryButtons()}});
-  alignMarkedCliffZones({recordHistory:true});
+  
   zoneTool.refreshAll();updateHistoryButtons();
   if(window.__workspaceLayout?.getState().workspace==='zones')setMode('zones');
  }catch(error){
@@ -2133,7 +2052,7 @@ async function initializeTerrainPainter(){
   const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.114');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
-   onCliffsGenerated:()=>terrainInspector?.refresh(true),getTextureAssetUrl});
+   getTextureAssetUrl});
   window.__terrainTexturePainter=terrainPainter;
   const toggle=$('textureShow');
   toggle.checked=live.settings?.biomeTexturesVisible!==false;
