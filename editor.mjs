@@ -20,7 +20,7 @@ import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createTextureRevisionWatcher,revisionedTextureUrl} from './editor-texture-live-refresh.mjs?v=0.9.109';
-import {syncPublishedTextureCatalog,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.109';
+import {syncPublishedTextureCatalog,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.110';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
@@ -2078,7 +2078,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.109');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.110');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,
     getTextureAssetUrl,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
@@ -2116,7 +2116,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.107');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.110');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    onCliffsGenerated:()=>terrainInspector?.refresh(true),getTextureAssetUrl});
