@@ -203,7 +203,8 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     rawColorURL;
    const image=loaded.get(colorURL)||null;
    const heightURL=generated?
-    (slots.cliffBodyHeight?.image||PLAINS_CLIFF_MAPS.bodyHeight):null;
+    normalizePlainsCliffImage(slots.cliffBodyHeight?.image||
+     PLAINS_CLIFF_MAPS.bodyHeight,'cliffBodyHeight'):null;
    const heightmap=heightURL?heightPixels(heightURL):null;
    if(plains&&generated){
     plainsStats.heightmapUrl=heightURL||'';
@@ -394,8 +395,10 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    const slots=live.biomeMaterials?.plains?.slots||{};
    urls.add(PLAINS_CLIFF_MAPS.base);
    if(slots.cliffBodyColor?.image)urls.add(slots.cliffBodyColor.image);
-   if(live.cliffHeightmapPlains?.enabled===true)
-    urls.add(slots.cliffBodyHeight?.image||PLAINS_CLIFF_MAPS.bodyHeight);
+   if(live.cliffHeightmapPlains?.enabled===true){
+    urls.add(normalizePlainsCliffImage(slots.cliffBodyHeight?.image||
+     PLAINS_CLIFF_MAPS.bodyHeight,'cliffBodyHeight'));
+   }
   }
   await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));
   if(ticket!==generation)return;
