@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.116';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.121';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -145,6 +145,10 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
     const picture=element('img');picture.src=getTextureAssetUrl(textureUrl(t));picture.alt=t.file;picture.loading='lazy';
     picture.style.cssText='height:100px;width:100%;object-fit:cover;border-radius:6px';card.append(picture);
     const caption=element('small','',t.file);caption.style.cssText='display:block;margin:4px 0;overflow-wrap:anywhere';card.append(caption);
+    if(t.kind.startsWith('cliff-')){
+     const note=element('small','',t.kind==='cliff-height'?'Mapa de alturas: controla la geometría desde Relieve geométrico de acantilados.':'Imagen original de color: conservada en biblioteca; no se aplica aún a la pared.');
+     note.style.cssText='display:block;margin-top:6px;color:#b5e8db';card.append(note);group.append(card);continue;
+    }
     const row=element('div');row.style.cssText='display:flex;align-items:center;gap:4px';
     const biome=element('select');biome.setAttribute('aria-label','Bioma de '+t.file);
     biome.style.cssText='min-width:0;flex:1;background:#1e4034;color:#fff;padding:6px';

@@ -19,7 +19,7 @@ import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
 import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-state.mjs?v=0.9.18';
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
 import {createTextureRevisionWatcher,revisionedTextureUrl} from './editor-texture-live-refresh.mjs?v=0.9.109';
-import {syncPublishedTextureCatalog,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.116';
+import {syncPublishedTextureCatalog,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.121';
 import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
@@ -2011,7 +2011,7 @@ async function initializeZoneTool(){
 void initializeZoneTool();
 async function initializeTextureTool(){
  try{
-  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.116');
+  const {createBiomeTextureEditor}=await import('./editor-biome-textures.mjs?v=0.9.121');
   textureTool=createBiomeTextureEditor({live,snapshot,persist,toast,
     getTextureAssetUrl,onChange:()=>terrainPainter?.schedule()});
   textureTool.refresh();
@@ -2049,7 +2049,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeCliffHeightTool(){
  try{
-  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.120');
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.121');
   cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
    onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
   cliffHeightTool.schedule();

@@ -1,4 +1,11 @@
 export const REPO_TEXTURES=[
+  {id:'cliff-plains-color',file:'Textura de Acantilado llanura CUERPO.png',biome:'plains',kind:'cliff-color',size:2965478},
+  {id:'cliff-plains-height',file:'Textura de Acantilado llanura CUERPO-HEIGTH.png',biome:'plains',kind:'cliff-height',size:1890146},
+  {id:'cliff-swamp-color',file:'Acantilado pantanoso de musgo y raíces.png',biome:'swamp',kind:'cliff-color',size:2153645},
+  {id:'cliff-desert-color',file:'Acantilado decierto con borde arenoso.png',biome:'desert',kind:'cliff-color',size:1957044},
+  {id:'cliff-mountain-color',file:'Muro de acantilado rocoso en capas.png',biome:'mountain',kind:'cliff-color',size:2414130},
+  {id:'cliff-forest-color',file:'acantilado bosque.png',biome:'forest',kind:'cliff-color',size:2589554},
+
   {
     "id": "tx03",
     "file": "Baldosa rocosa con musgo en capas.png",
@@ -148,7 +155,7 @@ export const textureUrl=texture=>'./assets/terrain/texturas/'+encodeURIComponent
 let publishedFiles=null;
 const classifyTexture=file=>{
  const name=file.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- const kind=/suelo base|piso base/.test(name)?'ground':'blend';
+ const kind=/heigth|heightmap|height|desplazamiento/.test(name)?'cliff-height':/acantilado|cliff/.test(name)?'cliff-color':/suelo base|piso base/.test(name)?'ground':'blend';
  const biome=/llanura|pradera/.test(name)?'plains':
   /desiert|arena/.test(name)?'desert':
   /pantan/.test(name)?'swamp':
@@ -158,7 +165,7 @@ const classifyTexture=file=>{
 };
 export function syncPublishedTextureFiles(entries){
  if(!Array.isArray(entries))return {added:0,removed:0,total:REPO_TEXTURES.length};
- const valid=entries.filter(x=>typeof x.file==='string'&&!/acantilado|cliff|heigth|heightmap|desplazamiento/i.test(x.file)&&
+ const valid=entries.filter(x=>typeof x.file==='string'&&
   /\.(png|jpe?g|webp)$/i.test(x.file)&&x.file.length<=240);
  const old=new Map(REPO_TEXTURES.map(x=>[x.file,x]));
  const list=[],seen=new Set();
@@ -198,4 +205,4 @@ export async function syncPublishedTextureCatalog(request=fetch){
  return syncPublishedTextureFiles(data.tree.filter(t=>t.type==='blob'&&t.path.startsWith(prefix))
   .map(t=>({file:t.path.slice(prefix.length),size:t.size})));
 }
-export const TEXTURE_KINDS=[{id:'ground',name:'Texturas base'},{id:'blend',name:'Complementarias'}];
+export const TEXTURE_KINDS=[{id:'ground',name:'Texturas base'},{id:'blend',name:'Complementarias'},{id:'cliff-color',name:'Acantilados · color (biblioteca)'},{id:'cliff-height',name:'Acantilados · heightmaps (geometría)'}];

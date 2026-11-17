@@ -15,6 +15,9 @@ on:
       - 'index.html'
       - 'editor-biome-generator.mjs'
       - 'editor-terrain-texture-renderer.mjs'
+      - 'editor-texture-catalog.mjs'
+      - 'editor-biome-textures.mjs'
+      - 'tests/cliff-texture-catalog.test.mjs'
       - '.github/workflows/cliff-heightmap-geometry.yml'
   workflow_dispatch:
 jobs:
@@ -33,10 +36,13 @@ jobs:
           node --check cliff-zone-bindings.mjs
           node --check editor-zones.mjs
           node --check editor.mjs
+          node --check editor-texture-catalog.mjs
+          node --check editor-biome-textures.mjs
       - name: Comprobar desplazamiento real y continuidad
         run: |
           node tests/cliff-heightmap-geometry.test.mjs
           node tests/cliff-zone-classification.test.mjs
+          node tests/cliff-texture-catalog.test.mjs
       - name: Iniciar servidor local de la revisión
         run: |
           python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-heightmap-http.log 2>&1 &

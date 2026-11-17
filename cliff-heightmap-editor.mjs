@@ -6,7 +6,7 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl=url=>url,onGeometryChanged=()=>{}}){
  const $=id=>document.getElementById(id);
  const status=$('cliffHeightStatus'),enabled=$('cliffHeightEnabled'),radius=$('cliffHeightRadius'),
-  strength=$('cliffHeightStrength'),period=$('cliffHeightPeriod'),steps=$('cliffHeightSteps'),
+  strength=$('cliffHeightStrength'),period=$('cliffHeightPeriod'),repeats=$('cliffHeightRepeats'),steps=$('cliffHeightSteps'),
   pick=$('cliffHeightPick'),remove=$('cliffHeightRemove');
  if(!status||!enabled||!strength||!period||!steps)throw Error('Falta panel geométrico de heightmap');
  if(radius)radius.closest('label').hidden=true;
@@ -20,13 +20,16 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
  };
  function parameters(){
   const c=settings();enabled.checked=c.enabled!==false;
-  strength.value=c.strength??3;period.value=c.period??24;steps.value=c.steps??2;
+  strength.value=c.strength??3;period.value=c.period??24;
+  if(repeats)repeats.value=String(Math.round((630/(Number(c.period)||24))*100)/100);
+  steps.value=c.steps??2;
   const marked=registeredCliffZones(live),ready=marked.filter(x=>x.map);
   const pending=marked.filter(x=>!x.parent).length,missing=marked.filter(x=>x.parent&&!x.map).length;
   status.textContent=marked.length?
    marked.length+' zonas marcadas como acantilado · '+ready.length+' con heightmap disponible'+
    (pending?' · '+pending+' sin región principal':'')+
-   (missing?' · '+missing+' pendientes de mapa de alturas':''):
+   (missing?' · '+missing+' pendientes de mapa de alturas':'')+
+   ' · '+(630/(Number(c.period)||24)).toFixed(2)+' repeticiones por 630 unidades':
    'No hay zonas marcadas como acantilado. Usa el botón ⛰ del Creador de zonas y asóciala a su región principal.';
  }
  function disposeDerived(){
@@ -120,6 +123,7 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
  enabled.onchange=()=>update('enabled',enabled.checked);
  strength.onchange=()=>update('strength',clamp(Number(strength.value)||0,0,12));
  period.onchange=()=>update('period',clamp(Number(period.value)||24,2,180));
+ if(repeats)repeats.onchange=()=>update('period',630/clamp(Number(repeats.value)||26.25,3.5,315));
  steps.onchange=()=>update('steps',clamp(Number(steps.value)||2,1,3));
  function invalidate(){imageCache.clear();schedule()}
  function dispose(){disposed=true;clearTimeout(timer);++ticket;disposeDerived()}
