@@ -59,8 +59,10 @@
      scale:450,opacity:1
     },
     cliffBodyHeight:{
-     name:'Textura de Acantilado llanura CUERPO-HEIGTH.png',
-     image:'./assets/terrain/texturas/'+encodeURIComponent('Textura de Acantilado llanura CUERPO-HEIGTH.png'),
+     // Old browser project: heightmap used the DELETED grassy filename.
+     // The editor must migrate the saved URL, not merely display the PNG.
+     name:'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png',
+     image:'./assets/terrain/texturas/'+encodeURIComponent('Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png'),
      scale:450,opacity:1
     }
    }}},
@@ -75,7 +77,7 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.112'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.113'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
@@ -142,8 +144,20 @@
   assert(stats.shapeRange>.16,'El mapa no alteró la forma del acantilado');
   assert(stats.maxOffset>0&&stats.maxOffset<8,'El desplazamiento de crestas excedió el control');
   assert(stats.heightmapZones>=1,'El PNG CUERPO-HEIGTH no se está muestreando');
+  assert(stats.heightmapLoaded===true,'El PNG existe pero no fue cargado como mapa de alturas');
+  assert(stats.heightmapWidth>=32&&stats.heightmapHeight>=32,
+   'El mapa de alturas no se decodificó realmente');
+  assert(stats.heightmapContrast>.06,
+   'El mapa de alturas cargado no presenta contraste suficiente');
+  assert(decodeURIComponent(stats.heightmapUrl).includes('Textura de Acantilado llanura CUERPO-HEIGTH.png'),
+   'Se está intentando generar usando la ruta ANTIGUA de alturas');
+  const proof=d.getElementById('plainsCliffHeightProof');
+  assert(proof&&!proof.hidden&&decodeURIComponent(proof.src).includes('CUERPO-HEIGTH.png'),
+   'La previsualización no muestra el archivo PNG cargado en el generador');
   const heightStatus=d.getElementById('plainsCliffStatus')?.textContent||'';
-  assert(heightStatus.includes('heightmap aplicado'),
+  assert(heightStatus.includes('Textura de Acantilado llanura CUERPO-HEIGTH.png'),
+   'El diagnóstico no explica qué mapa se usó');
+  assert(heightStatus.includes('HEIGHTMAP APLICADO'),
    'El editor no confirma que se haya aplicado el PNG de alturas');
   const root=painter.collisionRoot(),parts=root.children.filter(x=>x.userData.cliffZoneId==='cliff1');
   // A texture swap alone is insufficient. These triangles must physically
@@ -235,6 +249,9 @@
    'No se guardó la repetición visible de Body Color');
   assert(saved.biomeMaterials?.plains?.slots?.cliffBodyHeight?.scale===450,
    'Body Height debe compartir escala con el color');
+  assert(decodeURIComponent(saved.biomeMaterials.plains.slots.cliffBodyHeight.image)
+   .includes('Textura de Acantilado llanura CUERPO-HEIGTH.png'),
+   'El editor guardó de nuevo el mapa de alturas retirado');
   assert(saved.heights.every((h,i)=>h===before.heights[i]),
    'La herramienta alteró el terreno original o los vértices editados');
   assert(JSON.stringify(saved.terrainVertexOffsets)===JSON.stringify(before.terrainVertexOffsets),
@@ -277,7 +294,7 @@
   assert(JSON.stringify(afterRefresh.biomeMaterials)===JSON.stringify(saved.biomeMaterials),
    'Actualizar imágenes cambió las texturas guardadas');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · v0.9.112 relieve real condicionado a forma del heightmap; color UV independiente; malla sin heightmap no subdividida';
+  document.getElementById('result').textContent='PASS · v0.9.113 heightmap CUERPO-HEIGTH recuperado de nombre antiguo; PNG real decodificado; perímetro global protegido; relieve visible';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>
