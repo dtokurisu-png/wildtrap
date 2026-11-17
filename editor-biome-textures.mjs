@@ -69,6 +69,15 @@ export function normalizePlainsCliffImage(image,role){
   'Textura de Acantilado llanura CUERPO- COLOR.png',
   'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png'
  ];
+ const oldHeight=[
+  'Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png',
+  'Textura de Acantilado llanura Cubierto de Hierba-HEIGTH.png',
+  'Textura de Acantilado llanura  CUERPO-HEIGTH.png',
+  'Textura de Acantilado llanura CUERPO-HEIGHT.png',
+  'Textura de Acantilado llanura CUERPO-HEIGHTMAP.png'
+ ];
+ if(role==='cliffBodyHeight'&&oldHeight.includes(filename))
+  return PLAINS_CLIFF_MAPS.bodyHeight;
  if((role==='cliff'&&oldBase.includes(filename))||
     (role==='cliffBodyColor'&&oldColor.includes(filename)))
   return PLAINS_CLIFF_MAPS.base;
@@ -89,7 +98,9 @@ export function normalizeBiomeMaterials(raw){
    const imageSource=biome.id==='plains'?
     normalizePlainsCliffImage(originalSource,slot.id):originalSource;
    if(imageSource!==originalSource){
-    target.name='Textura de Acantilado llanura CUERPO.png';
+    target.name=slot.id==='cliffBodyHeight'?
+     'Textura de Acantilado llanura CUERPO-HEIGTH.png':
+     'Textura de Acantilado llanura CUERPO.png';
    }
    // Preserve old same-origin PNG paths when files have been removed:
    // show a missing warning rather than silently rewriting the user's map.
