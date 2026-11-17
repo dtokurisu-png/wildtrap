@@ -123,15 +123,17 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
    Math.max(0,position.count-total).toLocaleString('es')+' vértices sin caras'+
    (cliffSource?' · ACANTILADOS '+cliffSource.toLocaleString('es')+' → '+
     cliffFaces.toLocaleString('es')+' triángulos (x'+(cliffFaces/cliffSource).toFixed(1)+')':'');
-  setInfo('Malla del terreno en cian; triángulos subdivididos reales del acantilado en naranja. La malla base queda intacta.');
+  setInfo('Cian: terreno conservado; naranja: acantilados subdivididos que sustituyen la superficie original y reciben heightmap.');
   display();
  }
  function highlightFace(hit){
   release(faceVisuals);
-  const geo=terrain.geometry,pos=geo.getAttribute('position'),indices=geo.index?.array;
+  const generated=hit.object!==terrain;
+  const geo=hit.object.geometry,pos=geo.getAttribute('position'),indices=geo.index?.array;
   const offset=hit.faceIndex*3;
-  if(!indices||offset<0||offset+2>=indices.length)return;
-  const ids=[indices[offset],indices[offset+1],indices[offset+2]];
+  if(offset<0||offset+2>=(indices?.length||pos.count))return;
+  const ids=indices?[indices[offset],indices[offset+1],indices[offset+2]]:
+   [offset,offset+1,offset+2];
   const normal=hit.face.normal.clone().normalize();
   const corners=ids.map(id=>new THREE.Vector3(
    pos.getX(id),pos.getY(id),pos.getZ(id)).addScaledVector(normal,.06));
@@ -150,9 +152,11 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
   const lines=own(new THREE.LineSegments(linesGeo,linesMat),linesGeo,linesMat,faceVisuals);
   lines.renderOrder=16;
   const p=hit.point;
-  setInfo('Cara #'+hit.faceIndex+' · vértices '+ids.join(', ')+
+  setInfo((generated?'ACANTILADO REFINADO · ':'Malla de terreno · ')+
+   'cara #'+hit.faceIndex+' · triángulo XYZ '+ids.join(', ')+
    ' · X '+p.x.toFixed(2)+' / Y '+p.y.toFixed(2)+' / Z '+p.z.toFixed(2)+
-   '. Cara activa de la malla recortada, no de la malla original.');
+   (generated?' · geometría realmente desplazada por el heightmap':
+    ' · geometría no sustituida'));
  }
  function inspect(event){
   if(!active||!terrain.visible||event.button!==0)return false;
@@ -161,11 +165,11 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
    -(event.clientY-bounds.top)/bounds.height*2+1);
   raycaster.setFromCamera(ndc,camera);
   terrain.updateMatrixWorld(true);
-  const hit=raycaster.intersectObject(terrain,false)[0];
+  const hit=raycaster.intersectObjects([terrain,...(getCliffOverlay()?.children||[])],false)[0];
   if(hit)highlightFace(hit);
   else{
    release(faceVisuals);
-   setInfo('No hay ninguna cara visible aquí: puede ser un agujero real. Gira la cámara y selecciona el triángulo que todavía permanece.');
+   setInfo('No hay caras de terreno o acantilado aquí. Gira la cámara para inspeccionar la superficie.');
   }
   return true;
  }
