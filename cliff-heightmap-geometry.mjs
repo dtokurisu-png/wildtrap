@@ -41,15 +41,9 @@ export function buildCliffHeightmapGeometry(source,{point,normalXZ,zonePoints=nu
  const rounds=clamp(Math.floor(Number(steps)||2),1,3);
  for(let pass=0;pass<rounds;pass++){
   if(triangles.length>=maxTriangles)break;
-  const marked=new Set();
-  const active=triangles.map(t=>{
-   if(!qualifies(t))return false;
-   const a=vertices[t[0]],b=vertices[t[1]],c=vertices[t[2]];
-   const mean=[(a[0]+b[0]+c[0])/3,(a[1]+b[1]+c[1])/3,(a[2]+b[2]+c[2])/3];
-   const variation=Math.max(sampleAt(a),sampleAt(b),sampleAt(c),sampleAt(mean))-
-    Math.min(sampleAt(a),sampleAt(b),sampleAt(c),sampleAt(mean));
-   return variation>.025;
-  });
+  // Step 1: uniform geometric subdivision in every marked cliff face.
+  // Heightmap pixels NEVER decide whether a triangle is split.
+  const marked=new Set(),active=triangles.map(qualifies);
   for(let i=0;i<triangles.length;i++)if(active[i]){
    const [a,b,c]=triangles[i];
    marked.add(edgeKey(a,b));marked.add(edgeKey(b,c));marked.add(edgeKey(c,a));
@@ -66,17 +60,27 @@ export function buildCliffHeightmapGeometry(source,{point,normalXZ,zonePoints=nu
    mids.set(key,id);return id;
   }
   const next=[];
-  for(const t of triangles){
-   const [a,b,c]=t,m0=mid(a,b),m1=mid(b,c),m2=mid(c,a);
-   if(m0===null&&m1===null&&m2===null){next.push(t);continue}
-   const ring=[a,...(m0===null?[]:[m0]),b,...(m1===null?[]:[m1]),c,...(m2===null?[]:[m2])];
-   // Triangle fan around a new interior vertex. All edge midpoints are globally shared.
-   const id=vertices.length;
-   vertices.push(t.map(k=>vertices[k]).reduce((p,q)=>p.map((v,i)=>v+q[i]/3),[0,0,0]));
-   if(uv)uv.push(t.map(k=>uv[k]).reduce((p,q)=>p.map((v,i)=>v+q[i]/3),[0,0]));
-   if(colors)colors.push(t.map(k=>colors[k]).reduce((p,q)=>p.map((v,i)=>v+q[i]/3),[0,0,0]));
-   for(let k=0;k<ring.length;k++)next.push([ring[k],ring[(k+1)%ring.length],id]);
-   subdivided++;
+  for(let triIndex=0;triIndex<triangles.length;triIndex++){
+   const [a,b,c]=triangles[triIndex];
+   const ab=mid(a,b),bc=mid(b,c),ca=mid(c,a);
+   const cuts=Number(ab!==null)+Number(bc!==null)+Number(ca!==null);
+   if(cuts===0){next.push([a,b,c]);continue}
+   // Conforming 1-to-4 tessellation on fully marked faces. Shared edge
+   // midpoints are reused by neighbors to avoid T-junction cracks.
+   if(cuts===3){
+    next.push([a,ab,ca],[ab,b,bc],[ca,bc,c],[ab,bc,ca]);
+   }else if(cuts===1){
+    if(ab!==null)next.push([a,ab,c],[ab,b,c]);
+    else if(bc!==null)next.push([b,bc,a],[bc,c,a]);
+    else next.push([c,ca,b],[ca,a,b]);
+   }else if(ab===null){
+    next.push([c,ca,bc],[a,b,bc],[a,bc,ca]);
+   }else if(bc===null){
+    next.push([a,ab,ca],[ab,b,c],[ab,c,ca]);
+   }else{
+    next.push([b,bc,ab],[a,ab,c],[ab,bc,c]);
+   }
+   if(active[triIndex])subdivided++;
   }
   triangles=next;
  }

@@ -24,11 +24,20 @@ assert.equal(buildCliffHeightmapGeometry(plain,options),null,
 const far=buildCliffHeightmapGeometry(wall,{...options,point:{x:280,z:280}});
 assert.equal(far,null,'An unselected remote wall must not change');
 const zero=buildCliffHeightmapGeometry(wall,{...options,sample:()=>.5});
-assert.equal(zero,null,'A flat heightmap must not cause unnecessary subdivision');
+assert.ok(zero&&zero.stats.subdivided>0,'Every marked wall must subdivide, even with a perfectly flat heightmap');
+assert.equal(zero.stats.moved,0,'A flat heightmap should not displace newly created vertices');
+assert.deepEqual([...zero.indices],[...result.indices],'Heightmap contrast must not determine tessellation');
+assert.equal(zero.stats.vertices,result.stats.vertices,'Vertex density must be independent of image intensities');
+const allWhite=buildCliffHeightmapGeometry(wall,{...options,sample:()=>1});
+assert.deepEqual([...allWhite.indices],[...result.indices],'Uniform bright heightmaps must produce the same mesh topology');
+assert.ok(allWhite.stats.moved>0,'Bright heightmap still displaces after uniform subdivision');
+let reads=0;
+const counted=buildCliffHeightmapGeometry(wall,{...options,sample:(u,v)=>{reads++;return .5}});
+assert.ok(counted?.stats.subdivided>0&&reads>0,'Subdivision is performed before height sampling');
 const rectangular=[{x:-14,z:-4},{x:14,z:-4},{x:14,z:4},{x:-14,z:4}];
 const restricted=buildCliffHeightmapGeometry(wall,{...options,zonePoints:rectangular});
 assert.ok(restricted?.stats.moved>0,'A marked polygon must displace real cliff triangles');
 const outside=[{x:150,z:150},{x:170,z:150},{x:170,z:170},{x:150,z:170}];
 assert.equal(buildCliffHeightmapGeometry(wall,{...options,zonePoints:outside}),null,
  'Cliff map must never deform terrain outside marked zone polygons');
-console.log('PASS physical heightmap: localized wall-only mesh displacement, selective tessellation, seam boundaries, flat/no-map guards');
+console.log('PASS physical heightmap: localized wall-only mesh displacement, UNIFORM tessellation independent of heightmap intensities, seam boundaries');

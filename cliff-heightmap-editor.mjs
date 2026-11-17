@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.119';
+import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.120';
 import {registeredCliffZones} from './cliff-zone-bindings.mjs?v=0.9.119';
 const texturePath=file=>'./assets/terrain/texturas/'+encodeURIComponent(file);
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));

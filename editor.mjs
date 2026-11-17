@@ -2049,7 +2049,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeCliffHeightTool(){
  try{
-  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.119');
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.120');
   cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
    onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
   cliffHeightTool.schedule();
