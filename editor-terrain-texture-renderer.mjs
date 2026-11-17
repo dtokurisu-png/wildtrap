@@ -2,7 +2,7 @@ import {buildRefinedCliffGeometry,buildOriginalCliffMaterialGeometry} from './ed
 import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
-import {BIOMES,normalizePlainsCliffImage} from './editor-biome-textures.mjs?v=0.9.110';
+import {BIOMES,normalizePlainsCliffImage} from './editor-biome-textures.mjs?v=0.9.114';
 import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.110';
 import {buildCliffBodyHeightmapBuffers,cliffWallProjection,cliffHeightmapTone,createCliffZoneProtection} from './editor-cliff-body-heightmap.mjs?v=0.9.113';
 import {maskTerrainCliffFaces} from './editor-cliff-surface-replacement.mjs?v=0.9.111';
