@@ -4,7 +4,7 @@ import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
 import {BIOMES,normalizePlainsCliffImage} from './editor-biome-textures.mjs?v=0.9.110';
 import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.110';
-import {buildCliffBodyHeightmapBuffers,cliffWallProjection} from './editor-cliff-body-heightmap.mjs?v=0.9.112';
+import {buildCliffBodyHeightmapBuffers,cliffWallProjection,cliffHeightmapTone,createCliffZoneProtection} from './editor-cliff-body-heightmap.mjs?v=0.9.113';
 import {maskTerrainCliffFaces} from './editor-cliff-surface-replacement.mjs?v=0.9.111';
 
 // Visual materials only: never changes the heightmap, cuts, GLBs or world data.
@@ -33,7 +33,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   }
  }
  const imageCache=new Map(),loaded=new Map(),heightCache=new Map();
- let plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,minOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0,rejectedZones:0,unrefinedFaces:0,shapeRange:0};
+ let plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,minOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0,rejectedZones:0,unrefinedFaces:0,shapeRange:0,cliffZones:0,unlinkedCliffs:0,heightmapLoaded:false,heightmapWidth:0,heightmapHeight:0,heightmapContrast:0,heightmapUrl:'',zonesReport:[]};
  function heightPixels(url){
   if(!url)return null;
   if(heightCache.has(url))return heightCache.get(url);
@@ -90,7 +90,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    }
   }
   hasCliffs=false;
-  plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,minOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0,rejectedZones:0,unrefinedFaces:0,shapeRange:0};
+  plainsStats={zones:0,sourceTriangles:0,subdividedTriangles:0,bodyTriangles:0,moved:0,maxOffset:0,minOffset:0,meshes:0,subdivisionRatio:0,heightmapZones:0,rejectedZones:0,unrefinedFaces:0,shapeRange:0,cliffZones:0,unlinkedCliffs:0,heightmapLoaded:false,heightmapWidth:0,heightmapHeight:0,heightmapContrast:0,heightmapUrl:'',zonesReport:[]};
  }
  function polygon(ctx,points){
   if(!Array.isArray(points)||points.length<3)return false;
@@ -181,6 +181,10 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   let allSource=0,allGenerated=0,zoneCount=0;
   for(const zone of live.zones||[]){
    const biome=parentBiome(zone);
+   if(zone.isCliff){
+    plainsStats.cliffZones++;
+    if(!biome)plainsStats.unlinkedCliffs++;
+   }
    // A marked cliff must be subdivided even when its parent has no biome or texture.
    if(!zone.isCliff&&!BIOMES.some(b=>b.id===biome))continue;
    const plains=biome==='plains'&&zone.isCliff===true;
@@ -201,6 +205,13 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    const heightURL=generated?
     (slots.cliffBodyHeight?.image||PLAINS_CLIFF_MAPS.bodyHeight):null;
    const heightmap=heightURL?heightPixels(heightURL):null;
+   if(plains&&generated){
+    plainsStats.heightmapUrl=heightURL||'';
+    plainsStats.heightmapLoaded=Boolean(heightmap);
+    plainsStats.heightmapWidth=heightmap?.width||0;
+    plainsStats.heightmapHeight=heightmap?.height||0;
+    plainsStats.heightmapContrast=cliffHeightmapTone(heightmap)?.contrast||0;
+   }
    // Scale belongs to the ACTUAL chosen material. Do not silently apply the
    // Body Color repetition when the original cliff slot is being displayed.
    const visibleScale=Math.max(.25,Math.min(1000,Number(
@@ -252,6 +263,9 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    let zoneGenerated=0,zoneMoved=0,zoneMax=0,zoneMin=0,zoneRange=0,
     zoneMeshes=0,zoneRefined=0,zoneUnrefined=0;
    const wall=generated&&heightmap?cliffWallProjection(source):null;
+   // Protect the true cliff rim only. Individual renderer chunks are NOT
+   // physical edges: treating them as such previously suppressed the relief.
+   const globalProtection=wall?createCliffZoneProtection(source,zoneSeams,1.5):null;
    const strength=Math.max(0,Math.min(4,Number(live.cliffHeightmapPlains?.strength)||0));
    const canDisplace=Boolean(generated&&heightmap&&wall&&strength>0);
    // Heightmap projection: 1 grayscale image across each vertical cliff wall.
@@ -268,7 +282,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
      if(refined){
       const displaced=buildCliffBodyHeightmapBuffers(refined,{
        heightmap,strength,wallProjection:wall,seamPaths:zoneSeams,
-       protectRadius:1.5
+       protectRadius:1.5,protectionAt:globalProtection
       });
       if(displaced?.stats?.applied&&displaced.positions){
        finalGeometry=new THREE.BufferGeometry();
@@ -328,6 +342,18 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     plainsStats.shapeRange=Math.max(plainsStats.shapeRange,zoneRange);
     plainsStats.unrefinedFaces+=zoneUnrefined;
     plainsStats.meshes+=zoneMeshes;
+    plainsStats.zonesReport.push({
+     id:String(zone.id),name:String(zone.name||zone.id),
+     sourceTriangles:source.length,reliefMeshes:zoneRefined,
+     unchangedTriangles:zoneUnrefined,shapeRange:zoneRange,
+     fileLoaded:Boolean(heightmap),
+     reason:zoneRefined>0?'Relieve generado en la geometría':
+      !generated?'Generador desactivado':
+      !heightmap?'El PNG de alturas no pudo cargarse':
+      !wall||wall.spanY<.4?'El acantilado no tiene altura vertical':
+      strength===0?'La intensidad está en cero':
+      'El relieve fue rechazado; comprobar mapa, escala y contorno'
+    });
    }
   }
   plainsStats.subdivisionRatio=plainsStats.sourceTriangles?
@@ -383,17 +409,38 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    'Sin texturas de terreno para las zonas asignadas.';
   buildCliffs();apply();
   const output=document.getElementById('plainsCliffStatus');
-  if(output)output.textContent=plainsStats.zones?
-   (plainsStats.zones+' zonas · '+
-    (live.cliffHeightmapPlains?.enabled?
-     (plainsStats.heightmapZones?
-      plainsStats.moved+' vértices desplazados · '+plainsStats.sourceTriangles+
-       ' → '+plainsStats.subdividedTriangles+' triángulos · relieve real '+
-       plainsStats.shapeRange.toFixed(2)+' u · heightmap aplicado':
-      '⚠ Sin relieve geométrico verificable. Malla original conservada ('+
-       plainsStats.unrefinedFaces+' caras sin subdividir)'):
-     'Malla original conservada · sin subdivisión por heightmap')):
-   'No hay zonas de acantilado de Llanura';
+  if(output){
+   const want=live.cliffHeightmapPlains?.enabled===true,map=plainsStats;
+   const reasons=map.zonesReport.map(z=>z.name+': '+z.reason).join(' · ');
+   const file=map.heightmapUrl?
+    decodeURIComponent(map.heightmapUrl.split('/').at(-1)):'ninguno';
+   const imageInfo=map.heightmapLoaded?
+    file+' ('+map.heightmapWidth+'×'+map.heightmapHeight+
+     ' píxeles, contraste '+(map.heightmapContrast*100).toFixed(1)+' %)':
+    'No cargado: '+file;
+   const message=map.zones?
+    (map.zones+' acantilado(s) de Llanura · '+
+     (want?(map.heightmapZones?
+      'HEIGHTMAP APLICADO: '+map.moved+' vértices desplazados · relieve '+
+       map.shapeRange.toFixed(2)+' unidades':
+      'HEIGHTMAP SIN EFECTO: malla original conservada'):
+     'Generador desactivado: sin subdivisión')):
+    (map.cliffZones?'Hay '+map.cliffZones+' acantilados, pero ninguno asociado al bioma Llanura':
+     'No hay zonas marcadas como acantilado');
+   output.hidden=!want&&map.cliffZones===0;
+   output.textContent=message+(want?' · Archivo real: '+imageInfo:'')+
+    (reasons?' · '+reasons:'');
+   output.title=output.textContent;
+   const preview=document.getElementById('plainsCliffHeightProof');
+   if(preview){
+    preview.hidden=!want||!map.heightmapLoaded;
+    if(!preview.hidden){
+     const source=getTextureAssetUrl(map.heightmapUrl);
+     if(preview.src!==new URL(source,document.baseURI).href)preview.src=source;
+     preview.title='Mapa de altura cargado y muestreado: '+file;
+    }
+   }
+  }
  }
  function apply(){
   // Transparency is not used for terrain; only replace material when surface imagery exists.
