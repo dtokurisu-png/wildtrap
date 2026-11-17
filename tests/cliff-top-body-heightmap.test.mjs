@@ -1,50 +1,89 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {sampleCliffHeight} from '../editor-cliff-top-body.mjs';
-import {buildCliffBodyHeightmapBuffers} from '../editor-cliff-body-heightmap.mjs';
+import {buildCliffBodyHeightmapBuffers,cliffWallProjection,cliffHeightmapTone,
+ hasMeaningfulCliffRelief} from '../editor-cliff-body-heightmap.mjs';
 import {PLAINS_CLIFF_TEXTURE_FILES,PLAINS_CLIFF_MAPS,REPO_TEXTURES,textureUrl} from '../editor-texture-catalog.mjs';
 import {ensureBiomeTextureDefaults,normalizePlainsCliffImage} from '../editor-biome-textures.mjs';
 
-const map=(v=255,w=4,h=4)=>({width:w,height:h,
+const solid=(v=255,w=16,h=16)=>({width:w,height:h,
  data:Uint8ClampedArray.from(Array.from({length:w*h},()=>[v,v,v,255]).flat())});
-const white=map(),black=map(0);
-assert.ok(sampleCliffHeight(white,.5,.5,{repeat:true})>.99);
-assert.equal(sampleCliffHeight(black,50,35,{repeat:true}),0);
-const positions=[],normals=[],uvs=[],size=24,step=2,scale=450/630;
-function push(x,y){positions.push(x,y,0);normals.push(0,0,1);uvs.push(x*scale,y*scale)}
+const white=solid(),black=solid(0);
+assert.ok(sampleCliffHeight(white,.5,.5,{repeat:false})>.99);
+assert.equal(sampleCliffHeight(black,.4,.6,{repeat:false}),0);
+// Bright central mountain, shadowed low surrounding pixels. This is a
+// deterministic geometry signal; uniform white/black must NEVER count as relief.
+const w=32,h=32,data=new Uint8ClampedArray(w*h*4);
+for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+ const distance=Math.hypot((x-(w-1)/2)/((w-1)/2),(y-(h-1)/2)/((h-1)/2));
+ const height=Math.round(255*Math.max(0,1-distance));
+ const k=(y*w+x)*4;data[k]=data[k+1]=data[k+2]=height;data[k+3]=255;
+}
+const heightmap={width:w,height:h,data};
+const tone=cliffHeightmapTone(heightmap);
+assert(tone&&tone.contrast>.9,'Heightmap contains real mountain and valley contrast');
+const positions=[],normals=[],uvs=[],size=24,step=1;
+function push(x,y){positions.push(x,y,0);normals.push(0,0,1);
+ uvs.push(x*450/630,y*450/630)}
 for(let y=0;y<size;y+=step)for(let x=0;x<size;x+=step){
  push(x,y);push(x+step,y);push(x,y+step);
  push(x+step,y);push(x+step,y+step);push(x,y+step);
 }
-const refined={positions:new Float32Array(positions),uvs:new Float32Array(uvs),normals:new Float32Array(normals)};
+const refined={positions:new Float32Array(positions),uvs:new Float32Array(uvs),
+ normals:new Float32Array(normals)};
 const frozen=refined.positions.slice();
-const result=buildCliffBodyHeightmapBuffers(refined,{heightmap:white,strength:2});
-assert.ok(result&&result.triangles===positions.length/9);
-assert.ok(result.stats.moved>0,'Grayscale heightmap must physically deform the cliff');
-assert.ok(result.stats.maxOffset>.5&&result.stats.maxOffset<=2.000001);
-assert.deepEqual(refined.positions,frozen,'Never mutate user-edited base geometry');
-assert.deepEqual(result.uvs,refined.uvs,'Body color and heightmap share EXACTLY the visible editor UVs');
-assert.ok(Math.max(...result.uvs)>1,'Visible repetition 450 yields actual repeated wall UV');
-const positionsAt=(out,x,y)=>{
+const projection={axis:0,minU:0,spanU:24,minY:0,spanY:24};
+const result=buildCliffBodyHeightmapBuffers(refined,{
+ heightmap,strength:2,wallProjection:projection
+});
+assert(result?.stats.applied,'A visible grayscale mountain must produce real geometry');
+assert(hasMeaningfulCliffRelief(result.stats));
+assert.equal(result.triangles,positions.length/9);
+assert(result.stats.moved>12&&result.stats.range>.4);
+assert(result.stats.minOffset<-.1&&result.stats.maxOffset>.1,
+ 'Both shadow valleys and bright peaks must deform the cliff');
+assert.deepEqual(refined.positions,frozen,
+ 'Never mutate saved vertices even when the generated cliff changes shape');
+assert.deepEqual(result.uvs,refined.uvs,
+ 'The COLOR UV repeat is unchanged by the independent heightmap projection');
+const at=(out,x,y)=>{
  const values=[];
+ if(!out?.positions)return values;
  for(let i=0;i<out.positions.length;i+=3)
-  if(Math.abs(out.positions[i]-x)<1e-5&&Math.abs(out.positions[i+1]-y)<1e-5)
+  if(Math.abs(out.positions[i]-x)<.00001&&Math.abs(out.positions[i+1]-y)<.00001)
    values.push(out.positions[i+2]);
  return values;
 };
-assert.equal(Math.min(...positionsAt(result,0,0)),0,'Outermost cliff corner stays fixed');
-assert.ok(Math.min(...positionsAt(result,12,12))>0,'Interior receives real Z displacement');
+assert.equal(Math.min(...at(result,0,0)),0,'Cliff rim stays pinned');
+assert(Math.max(...at(result,12,12))>.15,'Center mountain actually protrudes in Z');
+assert(Math.min(...at(result,3,12))<-.02,'Shadow valley is inset into the cliff');
 const seam=[[12,6,0],[12,18,0]];
 const protectedResult=buildCliffBodyHeightmapBuffers(refined,{
- heightmap:white,strength:2,seamPaths:[seam]
+ heightmap,strength:2,seamPaths:[seam],wallProjection:projection
 });
-assert.equal(Math.min(...positionsAt(protectedResult,12,12)),0,
- 'Explicit user seam XYZ is protected from heightmap displacement');
-assert.ok(Math.min(...positionsAt(protectedResult,8,12))>0,
- 'Vertices away from seam may still receive relief');
-const noRelief=buildCliffBodyHeightmapBuffers(refined,{heightmap:white,strength:0});
-assert.equal(noRelief.stats.moved,0,'Relief slider zero must disable displacement');
-assert.deepEqual(noRelief.positions,refined.positions);
+assert(protectedResult?.stats.applied);
+assert.equal(Math.min(...at(protectedResult,12,12)),0,
+ 'Protected user seam XYZ remains pinned despite a high mountain');
+assert(Math.max(...at(protectedResult,8,12))>0,
+ 'Adjacent rock away from seam can still protrude');
+const changedColorUV={...refined,uvs:new Float32Array(refined.uvs.map(v=>v*10))};
+const independent=buildCliffBodyHeightmapBuffers(changedColorUV,{
+ heightmap,strength:2,wallProjection:projection
+});
+assert.deepEqual(independent.positions,result.positions,
+ 'Color repetition 450 vs 4500 must NOT alias the physical grayscale shape');
+assert.equal(buildCliffBodyHeightmapBuffers(refined,{
+ heightmap:white,strength:2,wallProjection:projection}),null,
+ 'Uniform WHITE image must leave original mesh completely unrefined');
+assert.equal(buildCliffBodyHeightmapBuffers(refined,{
+ heightmap:black,strength:2,wallProjection:projection}),null,
+ 'Uniform BLACK image must leave original mesh completely unrefined');
+assert.equal(buildCliffBodyHeightmapBuffers(refined,{
+ heightmap,strength:0,wallProjection:projection}),null,
+ 'Relief OFF/strength=0 must never subdivide or displace');
+const inferred=cliffWallProjection([[[0,0,0],[24,0,0],[0,24,0]],
+ [[24,0,0],[24,24,0],[0,24,0]]]);
+assert.deepEqual(inferred,projection);
 assert.deepEqual(PLAINS_CLIFF_TEXTURE_FILES.map(x=>x.role),
  ['cliffBodyColor','cliffBodyHeight'],'Llanura offers precisely 2 body assets; no Top');
 const baseFile='Textura de Acantilado llanura CUERPO.png';
@@ -99,14 +138,19 @@ assert.equal(legacy.plains.slots.cliff.scale,100,
 const cliff=readFileSync(new URL('../editor-cliff-mesh.mjs',import.meta.url),'utf8');
 const renderer=readFileSync(new URL('../editor-terrain-texture-renderer.mjs',import.meta.url),'utf8');
 const biome=readFileSync(new URL('../editor-biome-textures.mjs',import.meta.url),'utf8');
-assert.match(cliff,/clamp\(Math\.ceil\(longest\/maxEdge\),3,6\)/);
-assert.match(cliff,/subdivisionRatio/);
-assert.match(renderer,/const CHUNK=2400/,'All zones subdivide without silently reducing density');
+assert.match(cliff,/minDivisions=3,maxDivisions=6/);
+assert.match(cliff,/buildOriginalCliffMaterialGeometry/);
+assert.match(renderer,/const CHUNK=canDisplace\?160:2400/);
 assert.match(renderer,/buildRefinedCliffGeometry\(batch/);
-assert.match(renderer,/before<batch\.length\*6/,'Every cliff needs at least 6x its original triangles');
-assert.match(renderer,/buildCliffBodyHeightmapBuffers\(geometry/);
-assert.doesNotMatch(renderer,/buildCliffTopBodyBuffers\(/);
-assert.match(renderer,/repeat:visibleScale/,'Actual UV scale must be the visible Body scale');
+assert.match(renderer,/buildOriginalCliffMaterialGeometry\(batch/);
+assert.match(renderer,/if\(displaced\?\.stats\?\.applied&&displaced\.positions\)/,
+ 'Refined geometry can only replace the source if real heightmap shape variation was verified');
+assert.match(renderer,/cliffWallProjection\(source\)/,
+ 'Heightmap must be vertically projected over the actual cliff wall');
+assert.match(renderer,/removedSourceFaces\.add\(face\)/,
+ 'Only accepted heightmap deformation can remove original faces');
+assert.match(renderer,/repeat:visibleScale/,
+ 'Color texture repeat retains its independent scale');
 assert.match(renderer,/const generated=plains&&live\.cliffHeightmapPlains\?\.enabled===true/,
  'The ordinary cliff must use CUERPO.png unless procedural generation is enabled');
 assert.match(renderer,/slots\.cliff\?\.image\|\|PLAINS_CLIFF_MAPS\.base/,
@@ -124,4 +168,4 @@ assert.match(scalePreview,/slot==='cliffBodyColor'\|\|slot==='cliffBodyHeight'/,
  'CUERPO Color and Height previews must both be upright vertical cliff surfaces');
 const inspector=readFileSync(new URL('../terrain-mesh-inspector.mjs',import.meta.url),'utf8');
 assert.match(inspector,/getCliffOverlay\(\)/,'Inspector must display real subdivided cliff meshes');
-console.log('PASS: actual CUERPO + HEIGTH files, old-path migrations, true heightmap vertex displacement, preserved scales and seams');
+console.log('PASS: grayscale mountain peaks and valleys change XYZ geometry; uniform/zero maps do not subdivide; color UV remains independent');
