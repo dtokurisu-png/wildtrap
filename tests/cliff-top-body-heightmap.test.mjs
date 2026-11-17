@@ -56,7 +56,7 @@ const at=(out,x,y)=>{
 };
 assert.equal(Math.min(...at(result,0,0)),0,'Cliff rim stays pinned');
 assert(Math.max(...at(result,12,12))>.15,'Center mountain actually protrudes in Z');
-assert(Math.min(...at(result,3,12))<-.02,'Shadow valley is inset into the cliff');
+assert(Math.min(...at(result,4,4))<-.08,'Dark corner valley must be inset into the cliff');
 const seam=[[12,6,0],[12,18,0]];
 const protectedResult=buildCliffBodyHeightmapBuffers(refined,{
  heightmap,strength:2,seamPaths:[seam],wallProjection:projection
