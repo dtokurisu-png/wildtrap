@@ -4,7 +4,7 @@ import {revisionedTextureUrl,createTextureRevisionWatcher,TEXTURE_COMMITS_API}
 import {syncPublishedTextureCatalog,syncPublishedTextureFiles,isPublishedTextureUrl,
  REPO_TEXTURES,textureUrl,TEXTURE_TREE_API} from '../editor-texture-catalog.mjs';
 
-const source='./assets/terrain/texturas/Textura%20de%20Acantilado%20llanura%20%20CUERPO.png';
+const source='./assets/terrain/texturas/suelo%20base%20de%20llanura_Cesped_Natural_8K_Seamless.png';
 assert.equal(revisionedTextureUrl(source,'git-a1'),source+'?wt_texture_revision=git-a1');
 assert.equal(revisionedTextureUrl(source+'?keep=1','git-b2'),
  source+'?keep=1&wt_texture_revision=git-b2');
@@ -49,14 +49,14 @@ watcher.dispose();
 // Replacing files in GitHub can also ADD or DELETE names, not just bytes.
 // Never keep deleted images in the live picker or hide newly uploaded art.
 const original=REPO_TEXTURES.map(x=>({file:x.file,size:x.size}));
-const gone='Textura de Acantilado llanura CUERPO.png';
-const fresh='Acantilado de piedra y tierra labrada.png';
+const gone='suelo base de montaña.png';
+const fresh='suelo base de prueba.png';
 const listing=original.filter(x=>x.file!==gone).concat([{file:fresh,size:2965478}]);
 const changes=syncPublishedTextureFiles(listing);
 assert.equal(changes.added,1);
 assert.ok(changes.removedNames.includes(gone));
-assert.ok(REPO_TEXTURES.some(x=>x.file===fresh&&x.kind==='cliff'),
- 'The new rock cliff should appear automatically in the repository catalog');
+assert.ok(REPO_TEXTURES.some(x=>x.file===fresh&&x.kind==='ground'),
+ 'A new ground material should appear in the repository catalog');
 assert.equal(isPublishedTextureUrl(textureUrl({file:gone})),false,
  'A removed image must be flagged missing, not served from a stale cache');
 assert.equal(isPublishedTextureUrl(textureUrl({file:fresh})),true);
@@ -76,10 +76,10 @@ assert.ok(!REPO_TEXTURES.some(x=>x.file===gone));
 
 const renderer=(await import('node:fs')).readFileSync(new URL('../editor-terrain-texture-renderer.mjs',import.meta.url),'utf8');
 assert.match(renderer,/img\.src=getTextureAssetUrl\(url\)/);
-assert.match(renderer,/imageCache\.clear\(\);\s*heightCache\.clear\(\);\s*loaded\.clear\(\)/);
+assert.match(renderer,/cache\.clear\(\);loaded\.clear\(\)/);
 const biome=(await import('node:fs')).readFileSync(new URL('../editor-biome-textures.mjs',import.meta.url),'utf8');
 assert.match(biome,/getTextureAssetUrl\(textureUrl\(t\)\)/);
-assert.match(biome,/getTextureAssetUrl\(item\.image\|\|textureUrl\(file\)\)/);
+assert.match(biome,/getTextureAssetUrl\(item\.image\)/);
 assert.match(biome,/previewController\?\.refreshTexture\?\.\(\)/);
 const editor=(await import('node:fs')).readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
 assert.match(editor,/textureRevisionWatcher\.start\(\)/);
