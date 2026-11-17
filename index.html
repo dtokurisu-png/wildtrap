@@ -244,6 +244,14 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <p class="hint" id="zonePointCount"></p>
 <p id="zoneTypeHint" class="hint">El bioma se asigna mediante generación procedural, no por el nombre.</p>
 </div>
+<dialog id="zoneCliffDialog" style="background:#18372c;color:#e5fff0;border:1px solid #55977c;border-radius:12px;max-width:min(400px,95vw)">
+<form method="dialog" id="zoneCliffForm">
+<h2>Asociar acantilado a una región</h2>
+<p class="hint">El acantilado heredará el bioma de su región principal.</p>
+<label>Región principal<select id="zoneCliffParent" style="display:block;width:100%;padding:8px;background:#1e4034;color:white"></select></label>
+<div class="grid2" style="margin-top:10px"><button value="cancel">Cancelar</button><button id="zoneCliffConfirm" value="confirm">Guardar asociación</button></div>
+</form>
+</dialog>
 </section>
 <section id="holesPanel">
 <h2>✂ Cuchillo poligonal 3D · Terreno y modelos GLB</h2>
