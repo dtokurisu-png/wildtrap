@@ -5,6 +5,8 @@ on:
     paths:
       - 'editor-cliff-top-body.mjs'
       - 'editor-cliff-body-heightmap.mjs'
+      - 'editor-cliff-surface-replacement.mjs'
+      - 'tests/cliff-physical-surface.test.mjs'
       - 'editor-cliff-mesh.mjs'
       - 'terrain-mesh-inspector.mjs'
       - 'editor-terrain-texture-renderer.mjs'
@@ -26,6 +28,8 @@ on:
     paths:
       - 'editor-cliff-top-body.mjs'
       - 'editor-cliff-body-heightmap.mjs'
+      - 'editor-cliff-surface-replacement.mjs'
+      - 'tests/cliff-physical-surface.test.mjs'
       - 'editor-cliff-mesh.mjs'
       - 'terrain-mesh-inspector.mjs'
       - 'editor-terrain-texture-renderer.mjs'
@@ -53,6 +57,7 @@ jobs:
         run: |
           node --check editor-cliff-top-body.mjs
           node --check editor-cliff-body-heightmap.mjs
+          node --check editor-cliff-surface-replacement.mjs
           node --check editor-cliff-mesh.mjs
           node --check terrain-mesh-inspector.mjs
           node --check editor-terrain-texture-renderer.mjs
@@ -66,6 +71,7 @@ jobs:
         run: |
           node tests/texture-live-refresh.test.mjs
           node tests/cliff-top-body-heightmap.test.mjs
+          node tests/cliff-physical-surface.test.mjs
           node tests/cliff-horizontal-seams.mjs
           node tests/cliff-mesh-refinement.mjs
           node tests/cliff-zone-alignment.test.mjs
