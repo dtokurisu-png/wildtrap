@@ -3,14 +3,6 @@ import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.
 import {registeredCliffZones} from './cliff-zone-bindings.mjs?v=0.9.119';
 const texturePath=file=>'./assets/terrain/texturas/'+encodeURIComponent(file);
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-export function registeredCliffZones(live){
- const zones=Array.isArray(live?.zones)?live.zones:[];
- const mains=new Map(zones.filter(z=>z&&!z.isCliff).map(z=>[z.id,z]));
- return zones.filter(z=>z?.isCliff===true&&Array.isArray(z.points)&&z.points.length>=3)
-  .map(z=>({zone:z,parent:mains.get(z.cliffParentId)||null}))
-  .map(({zone,parent})=>({zone,parent,biome:parent?.biomeId||null,
-   map:CLIFF_HEIGHTMAPS.find(m=>m.biome===parent?.biomeId)||null}));
-}
 export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl=url=>url,onGeometryChanged=()=>{}}){
  const $=id=>document.getElementById(id);
  const status=$('cliffHeightStatus'),enabled=$('cliffHeightEnabled'),radius=$('cliffHeightRadius'),
