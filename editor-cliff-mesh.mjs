@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // Refine the VISUAL cliff surface only. The original terrain geometry,
 // its collision, saved zones, and any cut/hole topology remain unchanged.
-export function buildRefinedCliffGeometry(triangles,{repeat=8,maxEdge=3.0,maxTriangles=90000}={}){
+export function buildRefinedCliffGeometry(triangles,{repeat=8,maxEdge=3.0,maxTriangles=90000,minDivisions=3,maxDivisions=6}={}){
  if(!triangles?.length)return null;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  const len=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
@@ -11,14 +11,13 @@ export function buildRefinedCliffGeometry(triangles,{repeat=8,maxEdge=3.0,maxTri
  // Use a single subdivision count for the entire selected patch so that
  // adjoining source triangles share the exact same edge vertices. Adaptive
  // per-face counts introduce T junctions and visible cracks.
- // Every cliff-marked region MUST have at least 6× its source face
- // density. Three divisions produce 9 small, conforming triangles per
- // source triangle; never silently fall back to the coarse source grid.
- // The caller chunks large zones before tessellation to bound memory.
- let divisions=clamp(Math.ceil(longest/maxEdge),3,6);
- while(divisions>3&&triangles.length*divisions*divisions>maxTriangles)divisions--;
+ // Heightmapped cliffs can request dense, conforming triangulation so the
+ // actual grayscale rock shapes can be sampled. This function is NOT called
+ // for ordinary cliffs without an effective heightmap.
+ let divisions=clamp(Math.ceil(longest/maxEdge),minDivisions,maxDivisions);
+ while(divisions>minDivisions&&triangles.length*divisions*divisions>maxTriangles)divisions--;
  if(triangles.length*divisions*divisions>maxTriangles)
-  throw Error('Acantilado demasiado grande para un bloque: subdividir en lotes');
+  throw Error('Heightmap excede el presupuesto de malla; usa lotes más pequeños');
  const vertices=[],faces=[],uvFaces=[];
  const lookup=new Map(),edgeCounts=new Map();
  const key=p=>p.map(v=>Math.round(v*10000)).join(':');
@@ -144,4 +143,34 @@ export function buildRefinedCliffGeometry(triangles,{repeat=8,maxEdge=3.0,maxTri
  geometry.userData={sourceTriangles:triangles.length,
   divisions,generatedTriangles:pos.length/9,subdivisionRatio:(pos.length/9)/triangles.length};
  return geometry;
+}
+
+// Original cliff material: no subdivision, no smoothing and no heightmap
+// displacement. Only a tiny rendering offset prevents Z-fighting against the
+// immutable terrain source (which remains editable and intact).
+export function buildOriginalCliffMaterialGeometry(triangles,{repeat=8}={}){
+ if(!triangles?.length)return null;
+ const pos=[],uv=[],norm=[],scale=Math.max(.25,Number(repeat)||8)/630;
+ for(const tri of triangles){
+  const [a,b,c]=tri;
+  const ab=[b[0]-a[0],b[1]-a[1],b[2]-a[2]];
+  const ac=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+  const n=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],
+   ab[0]*ac[1]-ab[1]*ac[0]];
+  const length=Math.hypot(...n)||1;
+  const nn=n.map(x=>x/length),proj=Math.abs(nn[0])>Math.abs(nn[2])?2:0;
+  for(const p of tri){
+   pos.push(p[0]+nn[0]*.04,p[1]+nn[1]*.04,p[2]+nn[2]*.04);
+   norm.push(...nn);
+   uv.push(p[proj]*scale,p[1]*scale);
+  }
+ }
+ const geo=new THREE.BufferGeometry();
+ geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+ geo.setAttribute('normal',new THREE.Float32BufferAttribute(norm,3));
+ geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+ geo.computeBoundingSphere();
+ geo.userData={sourceTriangles:triangles.length,generatedTriangles:triangles.length,
+  divisions:1,subdivisionRatio:1,unrefined:true};
+ return geo;
 }
