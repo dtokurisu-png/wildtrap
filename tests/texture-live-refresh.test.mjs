@@ -49,7 +49,7 @@ watcher.dispose();
 // Replacing files in GitHub can also ADD or DELETE names, not just bytes.
 // Never keep deleted images in the live picker or hide newly uploaded art.
 const original=REPO_TEXTURES.map(x=>({file:x.file,size:x.size}));
-const gone='Textura de Acantilado llanura  CUERPO- COLOR.png';
+const gone='Textura de Acantilado llanura CUERPO.png';
 const fresh='Acantilado de piedra y tierra labrada.png';
 const listing=original.filter(x=>x.file!==gone).concat([{file:fresh,size:2965478}]);
 const changes=syncPublishedTextureFiles(listing);
