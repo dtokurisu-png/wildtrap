@@ -1,31 +1,41 @@
 import * as THREE from 'three';
-import {buildCliffHeightmapGeometry,detectDominantCliff} from './cliff-heightmap-geometry.mjs?v=0.9.118';
-
-// New heightmaps can be registered here without changing the geometry engine.
-// Images are geometry inputs ONLY; cliff color materials are intentionally absent.
-export const CLIFF_HEIGHTMAPS=[
- {id:'plains-body',label:'Llanura · cuerpo',biome:'plains',file:'Textura de Acantilado llanura CUERPO-HEIGTH.png'}
-];
+import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.119';
+import {registeredCliffZones} from './cliff-zone-bindings.mjs?v=0.9.119';
 const texturePath=file=>'./assets/terrain/texturas/'+encodeURIComponent(file);
-const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+export function registeredCliffZones(live){
+ const zones=Array.isArray(live?.zones)?live.zones:[];
+ const mains=new Map(zones.filter(z=>z&&!z.isCliff).map(z=>[z.id,z]));
+ return zones.filter(z=>z?.isCliff===true&&Array.isArray(z.points)&&z.points.length>=3)
+  .map(z=>({zone:z,parent:mains.get(z.cliffParentId)||null}))
+  .map(({zone,parent})=>({zone,parent,biome:parent?.biomeId||null,
+   map:CLIFF_HEIGHTMAPS.find(m=>m.biome===parent?.biomeId)||null}));
+}
 export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl=url=>url,onGeometryChanged=()=>{}}){
  const $=id=>document.getElementById(id);
- const btn=$('cliffHeightPick'),status=$('cliffHeightStatus'),enabled=$('cliffHeightEnabled'),
-  radius=$('cliffHeightRadius'),strength=$('cliffHeightStrength'),period=$('cliffHeightPeriod'),
-  steps=$('cliffHeightSteps'),remove=$('cliffHeightRemove');
- if(!btn||!status||!enabled||!radius||!strength||!period||!steps||!remove)throw Error('Panel del mapa de altura incompleto');
- let selecting=false,timer=0,ticket=0,derived=[],source=null,automatic=null,imageCache=new Map(),disposed=false;
- const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
- const configs=()=>Array.isArray(live.cliffHeightmaps)?live.cliffHeightmaps:[];
- const active=()=>configs().find(c=>c.id==='plains-body')||automatic;
+ const status=$('cliffHeightStatus'),enabled=$('cliffHeightEnabled'),radius=$('cliffHeightRadius'),
+  strength=$('cliffHeightStrength'),period=$('cliffHeightPeriod'),steps=$('cliffHeightSteps'),
+  pick=$('cliffHeightPick'),remove=$('cliffHeightRemove');
+ if(!status||!enabled||!strength||!period||!steps)throw Error('Falta panel geométrico de heightmap');
+ if(radius)radius.closest('label').hidden=true;
+ if(pick)pick.hidden=true;
+ if(remove)remove.hidden=true;
+ let timer=0,ticket=0,derived=[],source=null,disposed=false;
+ const imageCache=new Map();
+ const settings=()=>{
+  if(!live.cliffHeightSettings||typeof live.cliffHeightSettings!=='object')live.cliffHeightSettings={};
+  return live.cliffHeightSettings;
+ };
  function parameters(){
-  const c=active();
-  enabled.checked=c?.enabled!==false;
-  radius.value=c?.radius??32;strength.value=c?.strength??2.5;period.value=c?.period??24;steps.value=c?.steps??2;
-  remove.disabled=!c;btn.classList.toggle('active',selecting);
-  status.textContent=selecting?'Haz clic directamente sobre la pared empinada del acantilado':
-   c?.point?(configs().some(x=>x.id==='plains-body')?'Pared seleccionada':'Pared detectada automáticamente')+' · X '+c.point.x.toFixed(1)+' / Z '+c.point.z.toFixed(1)+'. Preparando relieve…':
-   'Aún no hay pared seleccionada. Pulsa «Seleccionar pared» y luego haz clic en el acantilado.';
+  const c=settings();enabled.checked=c.enabled!==false;
+  strength.value=c.strength??3;period.value=c.period??24;steps.value=c.steps??2;
+  const marked=registeredCliffZones(live),ready=marked.filter(x=>x.map);
+  const pending=marked.filter(x=>!x.parent).length,missing=marked.filter(x=>x.parent&&!x.map).length;
+  status.textContent=marked.length?
+   marked.length+' zonas marcadas como acantilado · '+ready.length+' con heightmap disponible'+
+   (pending?' · '+pending+' sin región principal':'')+
+   (missing?' · '+missing+' pendientes de mapa de alturas':''):
+   'No hay zonas marcadas como acantilado. Usa el botón ⛰ del Creador de zonas y asóciala a su región principal.';
  }
  function disposeDerived(){
   if(derived.length){
@@ -72,91 +82,58 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
   g.computeVertexNormals();g.computeBoundingSphere();g.computeBoundingBox();
   return g;
  }
+
  async function bake(){
   const id=++ticket;if(disposed)return;
   const current=terrain.geometry;
   if(!derived.includes(current))source=current;
-  const base=source||current;
-  automatic=configs().length?null:detectDominantCliff(geometryData(base));
-  if(automatic)automatic={...automatic,id:'plains-body',strength:7,period:24,steps:2,enabled:true};
-  const maps=configs().filter(c=>c?.point&&c.enabled!==false&&CLIFF_HEIGHTMAPS.some(m=>m.id===c.id));
-  if(automatic)maps.push(automatic);
-  if(!maps.length){
-   disposeDerived();status.textContent=configs().length?'Relieve desactivado. Geometría original conservada.':'No hay paredes empinadas detectadas. Selecciona una pared manualmente.';
-   onGeometryChanged();return;
+  const base=source||current,c=settings();
+  const associations=c.enabled===false?[]:registeredCliffZones(live).filter(x=>x.map);
+  if(!associations.length){
+   disposeDerived();parameters();onGeometryChanged();return;
   }
   try{
-   // Geometry is built off-scene then swapped atomically, avoiding partly displaced frames.
-   const samplers=await Promise.all(maps.map(async c=>{
-    const item=CLIFF_HEIGHTMAPS.find(m=>m.id===c.id);
-    return {c,sample:await decodeImage(item.file)};
-   }));
-   if(id!==ticket||disposed||terrain.geometry!==current)return;
-   let working=base,newGeometries=[],results=[];
-   for(const {c,sample} of samplers){
-    const output=buildCliffHeightmapGeometry(geometryData(working),{point:c.point,normalXZ:c.normalXZ,
-     radius:c.radius,strength:c.strength,period:c.period,steps:c.steps,sample});
-    if(output){working=applyResult(output);newGeometries.push(working);results.push(output.stats)}
+   const inputs=await Promise.all(associations.map(async entry=>({
+    ...entry,sample:await decodeImage(entry.map.file)
+   })));
+   if(disposed||id!==ticket||terrain.geometry!==current)return;
+   let working=base;const newGeometries=[],results=[];
+   for(const {zone,map,sample} of inputs){
+    const xs=zone.points.map(p=>p.x),zs=zone.points.map(p=>p.z);
+    const point={x:(Math.min(...xs)+Math.max(...xs))/2,z:(Math.min(...zs)+Math.max(...zs))/2};
+    const radius=Math.max(3,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...zs)-Math.min(...zs)));
+    const output=buildCliffHeightmapGeometry(geometryData(working),{
+     point,normalXZ:[1,0],zonePoints:zone.points,radius,
+     strength:clamp(Number(c.strength??3),0,12),period:clamp(Number(c.period??24),2,180),
+     steps:clamp(Number(c.steps??2),1,3),sample
+    });
+    if(output){
+     working=applyResult(output);newGeometries.push(working);results.push({zone:zone.name||zone.id,...output.stats});
+    }
    }
-   if(id!==ticket||disposed){newGeometries.forEach(g=>g.dispose());return}
-   // If a terrain rebuild happened while decoding, its new geometry wins.
-   if(terrain.geometry!==current){newGeometries.forEach(g=>g.dispose());return}
-   disposeDerived();
-   terrain.geometry=working===base?base:working;
-   derived=newGeometries;
-   onGeometryChanged();
-   status.textContent=results.length?
-    (automatic?'Detección automática · ':'Selección manual · ')+'Malla real: '+results.reduce((n,x)=>n+x.moved,0)+' vértices desplazados · '+
-    results.reduce((n,x)=>n+x.subdivided,0)+' caras refinadas · sin capa visual adicional.':
-    'No se encontró una pared con relieve significativo en esta selección. Selecciona otra cara o ajusta escala.';
+   if(disposed||id!==ticket||terrain.geometry!==current){newGeometries.forEach(g=>g.dispose());return}
+   disposeDerived();terrain.geometry=working;derived=newGeometries;onGeometryChanged();
+   const moved=results.reduce((sum,x)=>sum+x.moved,0),subdivided=results.reduce((sum,x)=>sum+x.subdivided,0);
+   parameters();
+   status.textContent+=' · '+results.length+' zonas con geometría refinada · '+moved+
+    ' vértices desplazados · '+subdivided+' caras refinadas.';
+   if(!moved)status.textContent+=' Las zonas marcadas no contienen caras suficientemente inclinadas.';
   }catch(error){
-   if(id!==ticket)return;
-   status.textContent='Error leyendo el mapa de alturas: '+error.message;
-   toast(status.textContent);
+   if(disposed||id!==ticket)return;
+   status.textContent='Error aplicando heightmap: '+error.message;toast(status.textContent);
   }
  }
- function schedule(){clearTimeout(timer);timer=setTimeout(()=>{void bake()},100)}
- function choose(e){
-  if(!selecting)return;
-  e.preventDefault();e.stopImmediatePropagation();selecting=false;
-  if(e.button!==0){parameters();return}
-  const rect=view.getBoundingClientRect();
-  mouse.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);
-  ray.setFromCamera(mouse,camera);terrain.updateMatrixWorld(true);
-  // When the displaced mesh is visible, raycast against the original triangles
-  // so selection never captures an artificial interpolated face.
-  const original=source||terrain.geometry;
-  const probe=new THREE.Mesh(original,new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
-  probe.matrixWorld.copy(terrain.matrixWorld);probe.matrixAutoUpdate=false;
-  const hit=ray.intersectObject(probe,false)[0];
-  probe.material.dispose();
-  if(!hit){toast('No se detectó una superficie del terreno');parameters();return}
-  const n=hit.face.normal,side=Math.hypot(n.x,n.z);
-  if(side<.65){toast('Selecciona una pared inclinada, no el suelo horizontal');parameters();return}
-  snapshot();
-  const previous=active()||{};automatic=null;
-  live.cliffHeightmaps=[...configs().filter(c=>c.id!=='plains-body'),{
-   id:'plains-body',point:{x:hit.point.x,z:hit.point.z},
-   normalXZ:[n.x/side,n.z/side],radius:previous.radius??32,
-   strength:previous.strength??2.5,period:previous.period??24,steps:previous.steps??2,enabled:true
-  }];
-  persist();parameters();schedule();
-  toast('Pared seleccionada · se aplicará el relieve directamente a su malla');
- }
- view.addEventListener('pointerdown',choose,true);
- btn.onclick=()=>{selecting=!selecting;parameters()};
- remove.onclick=()=>{if(!active())return;snapshot();automatic=null;live.cliffHeightmaps=[...configs().filter(c=>c.id!=='plains-body'),{id:'plains-body',enabled:false}];persist();parameters();schedule()};
- function change(field,value){const c=active();if(!c)return;snapshot();
-  if(!configs().some(x=>x.id==='plains-body')){live.cliffHeightmaps=[...configs(),{...c,id:'plains-body'}];automatic=null}
-  live.cliffHeightmaps.find(x=>x.id==='plains-body')[field]=value;persist();parameters();schedule()}
-
- radius.onchange=()=>change('radius',clamp(Number(radius.value)||32,4,150));
- strength.onchange=()=>change('strength',clamp(Number(strength.value)||2.5,0,12));
- period.onchange=()=>change('period',clamp(Number(period.value)||24,2,180));
- steps.onchange=()=>change('steps',clamp(Number(steps.value)||2,1,3));
- enabled.onchange=()=>change('enabled',enabled.checked);
+ function schedule(){clearTimeout(timer);timer=setTimeout(()=>{void bake()},120)}
+ function update(field,value){snapshot();settings()[field]=value;persist();schedule()}
+ enabled.onchange=()=>update('enabled',enabled.checked);
+ strength.onchange=()=>update('strength',clamp(Number(strength.value)||0,0,12));
+ period.onchange=()=>update('period',clamp(Number(period.value)||24,2,180));
+ steps.onchange=()=>update('steps',clamp(Number(steps.value)||2,1,3));
  function invalidate(){imageCache.clear();schedule()}
- function dispose(){disposed=true;clearTimeout(timer);++ticket;view.removeEventListener('pointerdown',choose,true);disposeDerived()}
+ function dispose(){disposed=true;clearTimeout(timer);++ticket;disposeDerived()}
  parameters();
- return {schedule,invalidate,refresh:parameters,dispose,getState:()=>({count:derived.length,selected:!!active(),selecting})};
+ return {schedule,invalidate,refresh:parameters,dispose,getState:()=>({
+  marked:registeredCliffZones(live).length,mapped:registeredCliffZones(live).filter(x=>x.map).length,
+  activeMeshes:derived.length
+ })};
 }

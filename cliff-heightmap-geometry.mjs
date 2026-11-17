@@ -7,7 +7,17 @@ function normal(a,b,c){
  const x=uy*vz-uz*vy,y=uz*vx-ux*vz,z=ux*vy-uy*vx,l=Math.hypot(x,y,z)||1;
  return [x/l,y/l,z/l];
 }
-export function buildCliffHeightmapGeometry(source,{point,normalXZ,radius=32,strength=2.5,period=24,steps=2,sample,maxTriangles=150000}={}){
+function insideCliffPolygon(x,z,points){
+ if(!Array.isArray(points)||points.length<3)return false;
+ let inside=false;
+ for(let i=0,j=points.length-1;i<points.length;j=i++){
+  const a=points[i],b=points[j];
+  if(!Number.isFinite(a.x)||!Number.isFinite(a.z)||!Number.isFinite(b.x)||!Number.isFinite(b.z))return false;
+  if((a.z>z)!==(b.z>z)&&x<(b.x-a.x)*(z-a.z)/(b.z-a.z)+a.x)inside=!inside;
+ }
+ return inside;
+}
+export function buildCliffHeightmapGeometry(source,{point,normalXZ,zonePoints=null,radius=32,strength=2.5,period=24,steps=2,sample,maxTriangles=150000}={}){
  if(!source||!point||typeof sample!=='function')return null;
  const [nx,nz]=normalXZ||[0,1],nl=Math.hypot(nx,nz)||1,axis=[nx/nl,nz/nl];
  const originalCount=source.positions.length/3;
@@ -22,9 +32,10 @@ export function buildCliffHeightmapGeometry(source,{point,normalXZ,radius=32,str
  const qualifies=tri=>{
   const a=vertices[tri[0]],b=vertices[tri[1]],c=vertices[tri[2]];
   const x=(a[0]+b[0]+c[0])/3,z=(a[2]+b[2]+c[2])/3;
-  if(Math.hypot(x-point.x,z-point.z)>maxR)return false;
+  if(zonePoints){if(!insideCliffPolygon(x,z,zonePoints))return false}
+  else if(Math.hypot(x-point.x,z-point.z)>maxR)return false;
   const n=normal(a,b,c);
-  return Math.abs(n[1])<.72&&Math.abs(n[0]*axis[0]+n[2]*axis[1])>.48;
+  return Math.abs(n[1])<.72&&(zonePoints||Math.abs(n[0]*axis[0]+n[2]*axis[1])>.48);
  };
  let subdivided=0;
  const rounds=clamp(Math.floor(Number(steps)||2),1,3);
@@ -85,7 +96,7 @@ export function buildCliffHeightmapGeometry(source,{point,normalXZ,radius=32,str
   if(!wallVotes[i]||wallVotes[i]!==allVotes[i])continue;
   const p=vertices[i],v=sampleAt(p),delta=(v-.5)*2*strength;
   if(Math.abs(delta)<.001)continue;
-  const fade=clamp((maxR-Math.hypot(p[0]-point.x,p[2]-point.z))/3,0,1);
+  const fade=zonePoints?1:clamp((maxR-Math.hypot(p[0]-point.x,p[2]-point.z))/3,0,1);
   const n=horizontal[i],length=Math.hypot(n[0],n[1])||1;
   p[0]+=n[0]/length*delta*fade;
   p[2]+=n[1]/length*delta*fade;
@@ -96,42 +107,3 @@ export function buildCliffHeightmapGeometry(source,{point,normalXZ,radius=32,str
   stats:{originalVertices:originalCount,vertices:vertices.length,triangles:triangles.length,subdivided,moved}};
 }
 
-/** Pick one coherent steep wall patch if the world has no explicit cliff assignment.
- * Does not persist or modify the terrain: the user can replace it by clicking a wall. */
-export function detectDominantCliff(source,{cellSize=24,minFaces=3}={}){
- const p=source?.positions,idx=source?.indices;
- if(!p||p.length<9)return null;
- const entries=new Map(),triangleCount=idx?Math.floor(idx.length/3):Math.floor(p.length/9);
- for(let t=0;t<triangleCount;t++){
-  const ids=idx?[idx[t*3],idx[t*3+1],idx[t*3+2]]:[t*3,t*3+1,t*3+2];
-  const a=Array.from(p.slice(ids[0]*3,ids[0]*3+3));
-  const b=Array.from(p.slice(ids[1]*3,ids[1]*3+3));
-  const c=Array.from(p.slice(ids[2]*3,ids[2]*3+3));
-  const n=normal(a,b,c);
-  if(Math.abs(n[1])>.72)continue;
-  const x=(a[0]+b[0]+c[0])/3,z=(a[2]+b[2]+c[2])/3;
-  const weight=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))+
-   Math.abs((b[2]-a[2])*(c[1]-a[1])-(b[1]-a[1])*(c[2]-a[2]));
-  const gx=Math.floor(x/cellSize),gz=Math.floor(z/cellSize),key=gx+':'+gz;
-  if(!entries.has(key))entries.set(key,{gx,gz,count:0,weight:0,x:0,z:0,nx:0,nz:0});
-  const group=entries.get(key),w=Math.max(.1,weight);
-  group.count++;group.weight+=w;group.x+=x*w;group.z+=z*w;group.nx+=n[0]*w;group.nz+=n[2]*w;
- }
- let best=null,bestScore=0;
- for(const group of entries.values()){
-  let count=0,weight=0,x=0,z=0,nx=0,nz=0;
-  for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++){
-   const neighbor=entries.get((group.gx+dx)+':'+(group.gz+dz));
-   if(!neighbor)continue;
-   count+=neighbor.count;weight+=neighbor.weight;
-   x+=neighbor.x;z+=neighbor.z;nx+=neighbor.nx;nz+=neighbor.nz;
-  }
-  if(count<minFaces||weight<1)continue;
-  const point={x:x/weight,z:z/weight},centerDistance=Math.hypot(point.x,point.z);
-  const score=weight/(1+centerDistance*.001);
-  if(score>bestScore){const length=Math.hypot(nx,nz);if(length<.0001)continue;
-   best={point,normalXZ:[nx/length,nz/length],radius:Math.max(32,cellSize*2),
-    detectedFaces:count};bestScore=score}
- }
- return best;
-}

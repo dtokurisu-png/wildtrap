@@ -1841,7 +1841,7 @@ $('export').onclick=()=>{live.editorCamera=currentEditorCamera();download('wildt
 void import('./map-publisher.mjs?v=0.9.40').then(({createMapPublisher})=>{
  createMapPublisher({getScene:()=>({...live,editorCamera:currentEditorCamera()})});
 }).catch(error=>{const status=$('publishStatus');if(status)status.textContent='No se pudo iniciar el publicador: '+error.message;});
-$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.terrainSeams=Array.isArray(x.terrainSeams)?x.terrainSeams:[];live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
+$('importJSON').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const x=JSON.parse(await file.text());if(x.size!==SIZE||x.resolution!==N||!Array.isArray(x.heights)||x.heights.length!==COUNT||!Array.isArray(x.nodes))throw Error('Formato o tamaño incompatible');snapshot();Object.assign(live,x);live.terrainSeams=Array.isArray(x.terrainSeams)?x.terrainSeams:[];live.terrainVertexOffsets=x.terrainVertexOffsets&&typeof x.terrainVertexOffsets==='object'?x.terrainVertexOffsets:{};live.holes=Array.isArray(x.holes)?x.holes:[];live.cuts3d=Array.isArray(x.cuts3d)?x.cuts3d:[];live.objectGroups=cleanObjectGroups(x.objectGroups);live.zones=Array.isArray(x.zones)?x.zones:[];zoneTool?.refreshAll();cliffHeightTool?.refresh();live.biomeMaterials=x.biomeMaterials&&typeof x.biomeMaterials==='object'?x.biomeMaterials:{};live.biomeGenerator=x.biomeGenerator||null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.settings={heightMax:120,...(x.settings&&typeof x.settings==='object'?x.settings:{})};selectedIds.clear();selectedId=null;playerSpawnPanel?.refresh();holesEditor.clearSelection();
 updateMaxHeightControl();refreshTerrain();draw();
 if(!restoreEditorCamera(x.editorCamera,{remember:true}))flushCameraSave();
 persist();toast('Proyecto cargado')}catch(err){toast('No se pudo cargar: '+err.message)}e.target.value=''});
@@ -1991,11 +1991,11 @@ animate();
 // La zona se carga en diferido: si falla, se mantiene intacto el editor original.
 async function initializeZoneTool(){
  try{
-  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.116');
+  const {createZoneEditor}=await import('./editor-zones.mjs?v=0.9.119');
   zoneTool=createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,snapshot,persist,toast,
    isActive:()=>mode==='zones',
    isBlocked:()=>testingScene||preview.active||preview.busy,
-   onChange:()=>{terrainPainter?.schedule();biomeGeneratorTool?.refresh();},
+   onChange:()=>{terrainPainter?.schedule();cliffHeightTool?.schedule();biomeGeneratorTool?.refresh();},
    nextHistorySerial:nextUndoSerial,onPendingHistoryChange:updateHistoryButtons,
    onPendingEdit:()=>{redo.length=0;updateHistoryButtons()}});
   
@@ -2025,9 +2025,9 @@ async function initializeTextureTool(){
 void initializeTextureTool();
 async function initializeBiomeGenerator(){
  try{
-  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.116');
+  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.119');
   biomeGeneratorTool=createBiomeGeneratorPanel({live,snapshot,persist,toast,
-   onChange:()=>terrainPainter?.schedule(),onZoneChange:()=>zoneTool?.refreshAll()});
+   onChange:()=>{terrainPainter?.schedule();cliffHeightTool?.schedule();},onZoneChange:()=>{zoneTool?.refreshAll();cliffHeightTool?.schedule();}});
  }catch(error){
   console.error('Error cargando el generador de biomas:',error);
   const panel=$('biomeGeneratorPanel');if(panel)panel.textContent='No se pudo iniciar el generador de biomas: '+error.message;
@@ -2049,7 +2049,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeCliffHeightTool(){
  try{
-  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.118');
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.119');
   cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
    onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
   cliffHeightTool.schedule();
@@ -2061,7 +2061,7 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.116');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.119');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});

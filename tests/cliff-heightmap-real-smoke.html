@@ -5,8 +5,8 @@ const fail=(x)=>{document.body.dataset.result='FAIL';document.querySelector('#re
 try{
  const n=129,h=Array(n*n).fill(0);
  for(let z=0;z<n;z++)for(let x=0;x<n;x++)h[z*n+x]=x<64?45:0;
- const draft={version:3,size:630,resolution:n,heights:h,nodes:[],objectGroups:[],holes:[],cuts3d:[],zones:[],
-  cliffHeightmaps:[],
+ const draft={version:3,size:630,resolution:n,heights:h,nodes:[],objectGroups:[],holes:[],cuts3d:[],
+  zones:[{id:'zone-main',name:'Llanura',biomeId:'plains',points:[{x:-160,z:-160},{x:160,z:-160},{x:160,z:160},{x:-160,z:160}]},\n   {id:'zone-cliff',name:'Acantilado',isCliff:true,cliffParentId:'zone-main',points:[{x:-9,z:-60},{x:9,z:-60},{x:9,z:60},{x:-9,z:60}]}],
   nextId:1,settings:{heightMax:120,biomeTexturesVisible:false}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
  const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=1000;frame.height=650;document.body.append(frame);
@@ -15,9 +15,9 @@ try{
   const d=frame.contentDocument,w=frame.contentWindow;
   if(!d?.querySelector('#boot[hidden]')||!w.__cliffHeightmapEditor)return;
   const label=d.querySelector('#cliffHeightStatus')?.textContent||'';
-  if(label.includes('Malla real:')){
-   const count=Number(label.match(/Malla real: (\d+)/)?.[1]||0);
-   clearInterval(interval);document.body.dataset.result=count>0&&label.includes('Detección automática')?'PASS':'FAIL';
+  if(label.includes('vértices desplazados')){
+   const count=Number(label.match(/(\d+) vértices desplazados/)?.[1]||0);
+   clearInterval(interval);document.body.dataset.result=count>0&&label.includes('zonas marcadas')?'PASS':'FAIL';
    document.querySelector('#result').textContent=label;return;
   }
   if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}

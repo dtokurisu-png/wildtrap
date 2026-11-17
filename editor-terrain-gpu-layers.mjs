@@ -141,7 +141,7 @@ export function createTerrainGPULayers({scene,terrain}){
   if(!enabled)return;
   const biomes=new Map();
   for(const zone of zones||[]){
-   if(!zone.biomeId||!Array.isArray(zone.points)||zone.points.length<3)continue;
+   if(zone.isCliff||!zone.biomeId||!Array.isArray(zone.points)||zone.points.length<3)continue;
    const config=materials?.[zone.biomeId];
    const base=config?.slots?.ground;
    if(!loaded.get(base?.image))continue;

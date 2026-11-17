@@ -1,4 +1,4 @@
-import {ensureBiomeTextureDefaults} from './editor-biome-textures.mjs?v=0.9.116';
+import {ensureBiomeTextureDefaults} from './editor-biome-textures.mjs?v=0.9.119';
 import {BIOME_IDS,defaultBiomeGenerator,normalizeBiomeGenerator,generateBiomeAssignments,nextBiomeSeed} from './biome-generator.mjs?v=0.9.69';
 const LABELS={mountain:'Montañoso',desert:'Desierto',plains:'Llanura',swamp:'Pantano',forest:'Bosque'};
 const PAIRS=[];

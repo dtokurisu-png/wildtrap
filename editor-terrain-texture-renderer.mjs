@@ -1,4 +1,4 @@
-import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.116';
+import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.119';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.116';
 export function createTerrainTexturePainter({scene,terrain,material,intangibleMaterial,live,toast,isTesting=()=>false,getTextureAssetUrl=url=>url}){
  const status=document.getElementById('textureRenderStatus'),gpuLayers=createTerrainGPULayers({scene,terrain});

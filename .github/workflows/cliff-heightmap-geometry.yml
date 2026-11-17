@@ -5,6 +5,9 @@ on:
     paths:
       - 'cliff-heightmap-geometry.mjs'
       - 'cliff-heightmap-editor.mjs'
+      - 'cliff-zone-bindings.mjs'
+      - 'editor-zones.mjs'
+      - 'tests/cliff-zone-classification.test.mjs'
       - 'tests/cliff-heightmap-geometry.test.mjs'
       - 'tests/cliff-heightmap-real-smoke.html'
       - 'tests/browser-cliff-heightmap.mjs'
@@ -24,9 +27,13 @@ jobs:
         run: |
           node --check cliff-heightmap-geometry.mjs
           node --check cliff-heightmap-editor.mjs
+          node --check cliff-zone-bindings.mjs
+          node --check editor-zones.mjs
           node --check editor.mjs
       - name: Comprobar desplazamiento real y continuidad
-        run: node tests/cliff-heightmap-geometry.test.mjs
+        run: |
+          node tests/cliff-heightmap-geometry.test.mjs
+          node tests/cliff-zone-classification.test.mjs
       - name: Iniciar servidor local de la revisión
         run: |
           python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-heightmap-http.log 2>&1 &

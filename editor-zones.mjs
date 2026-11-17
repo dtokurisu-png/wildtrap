@@ -69,7 +69,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
     const mesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:active?0x00ffdf:0x4dbad0,side:THREE.DoubleSide,transparent:true,opacity:active?.22:.11,depthWrite:false,depthTest:false}));
     mesh.renderOrder=55;layer.add(mesh);
    }
-   line(pts,active?0x00ffdf:0x78b9d3,true);
+   line(pts,zone.isCliff?0xffb46d:active?0x00ffdf:0x78b9d3,true);
    if(active)pts.forEach(p=>dot(p,0xffffff,2));
   });
   line(pending,0xffd57c);
@@ -88,9 +88,15 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
     selected=zone.id;pending=[];pendingRedo.length=0;hover=null;editVertices=false;
     addingVertex=false;renderPanel();refresh();onPendingHistoryChange();
    };
+   const cliff=document.createElement('button');
+   cliff.textContent=zone.isCliff?'⛰ ✓':'⛰';
+   cliff.title=zone.isCliff?'Acantilado asociado · pulsar para desmarcar':'Marcar como acantilado y elegir región principal';
+   cliff.setAttribute('aria-label',cliff.title);
+   cliff.classList.toggle('active',zone.isCliff===true);
+   cliff.onclick=()=>toggleCliff(zone.id);
    const eye=document.createElement('button');eye.textContent=zone.hidden?'◌':'◉';eye.title=zone.hidden?'Mostrar':'Ocultar';
    eye.onclick=()=>{snapshot();zone.hidden=!zone.hidden;commit();renderPanel();refresh()};
-   row.append(select,eye);list.append(row);
+   row.append(select,cliff,eye);list.append(row);
   }
   const zone=items().find(z=>z.id===selected);
   $('zoneProperties').hidden=!zone;
@@ -99,9 +105,12 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
    $('zoneName').value=zone.name||'';
    $('zonePointCount').textContent=zone.points.length+' vértices';
    
-   const biome=zone.biomeId||null;
+   const parent=items().find(z=>z.id===zone.cliffParentId);
+   const biome=zone.isCliff?(parent?.biomeId||null):(zone.biomeId||null);
    const titles={mountain:'Montaña',desert:'Desierto',plains:'Llanura',swamp:'Pantano',forest:'Bosque'};
-   $('zoneTypeHint').textContent='Bioma procedural: '+(titles[biome]||'pendiente')+' · Nombre independiente del bioma';
+   $('zoneTypeHint').textContent=zone.isCliff?
+    '⛰ Acantilado · Región: '+(parent?.name||'Sin asociación')+' · Bioma heredado: '+(titles[biome]||'pendiente'):
+    'Región principal · Bioma procedural: '+(titles[biome]||'pendiente')+' · Nombre independiente del bioma';
   }
   $('zonePendingCount').textContent=pending.length?pending.length+' puntos pendientes · pulsa el primero para cerrar':'Haz clic en el terreno para comenzar';
   $('zoneEditVertices').disabled=!zone;
@@ -112,6 +121,36 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   add.classList.toggle('active',addingVertex&&editVertices);
   add.textContent=addingVertex&&editVertices?'✓ Añadiendo puntos':'Añadir vértice';
  }
+ function toggleCliff(id){
+  const zone=items().find(z=>z.id===id);
+  if(!zone)return;
+  if(zone.isCliff){
+   snapshot();zone.isCliff=false;zone.cliffParentId=null;
+   commit();refreshAll();return;
+  }
+  if(items().some(z=>z.isCliff&&z.cliffParentId===id)){
+   toast('Esta región ya tiene acantilados asociados. Reasócialos antes de convertirla en acantilado.');
+   return;
+  }
+  const candidates=items().filter(z=>z.id!==id&&!z.isCliff);
+  if(!candidates.length){toast('Crea otra región principal para asociarle este acantilado');return;}
+  const dialog=$('zoneCliffDialog'),select=$('zoneCliffParent');
+  select.replaceChildren(...candidates.map(z=>{
+   const option=document.createElement('option');option.value=z.id;option.textContent=z.name||z.id;return option;
+  }));
+  dialog.dataset.zoneId=id;
+  if(!dialog.open)dialog.showModal();
+ }
+ const dialog=$('zoneCliffDialog');
+ dialog.addEventListener('close',()=>{
+  if(dialog.returnValue!=='confirm')return;
+  const zone=items().find(z=>z.id===dialog.dataset.zoneId);
+  const parent=items().find(z=>z.id===$('zoneCliffParent').value&&!z.isCliff);
+  if(!zone||!parent||zone.id===parent.id)return;
+  snapshot();zone.isCliff=true;zone.cliffParentId=parent.id;
+  delete zone.cliffAlignmentSignature;
+  commit();refreshAll();
+ });
  function refreshAll(){renderPanel();refresh();}
  function pointerPoint(e){
   const rect=view.getBoundingClientRect();
@@ -176,7 +215,7 @@ export function createZoneEditor({scene,terrainGeo,view,camera,live,heightAt,sna
   if(!valid(pending)){toast('Zona inválida: revisa cruces, vértices repetidos o superficie demasiado pequeña');return;}
   snapshot();
   const ids=new Set(items().map(z=>z.id));let i=1;while(ids.has('zone-'+i))i++;
-  const zone={id:'zone-'+i,name:'Zona '+String(i).padStart(2,'0'),points:pending.map(norm),hidden:false};
+  const zone={id:'zone-'+i,name:'Zona '+String(i).padStart(2,'0'),points:pending.map(norm),hidden:false,isCliff:false,cliffParentId:null};
   items().push(zone);selected=zone.id;pending=[];pendingRedo.length=0;onPendingHistoryChange();hover=null;editVertices=false;addingVertex=false;
   commit();refreshAll();toast(zone.name+' creada y guardada');
  }
