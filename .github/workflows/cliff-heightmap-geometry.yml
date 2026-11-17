@@ -5,6 +5,8 @@ on:
     paths:
       - 'cliff-heightmap-geometry.mjs'
       - 'cliff-heightmap-editor.mjs'
+      - 'cliff-color-renderer.mjs'
+      - 'editor-terrain-gpu-layers.mjs'
       - 'cliff-zone-bindings.mjs'
       - 'editor-zones.mjs'
       - 'tests/cliff-zone-classification.test.mjs'
@@ -33,6 +35,8 @@ jobs:
         run: |
           node --check cliff-heightmap-geometry.mjs
           node --check cliff-heightmap-editor.mjs
+          node --check cliff-color-renderer.mjs
+          node --check editor-terrain-gpu-layers.mjs
           node --check cliff-zone-bindings.mjs
           node --check editor-zones.mjs
           node --check editor.mjs

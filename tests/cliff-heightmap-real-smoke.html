@@ -8,7 +8,7 @@ try{
  const draft={version:3,size:630,resolution:n,heights:h,nodes:[],objectGroups:[],holes:[],cuts3d:[],
   zones:[{id:'zone-main',name:'Llanura',biomeId:'plains',points:[{x:-160,z:-160},{x:160,z:-160},{x:160,z:160},{x:-160,z:160}]},
    {id:'zone-cliff',name:'Acantilado',isCliff:true,cliffParentId:'zone-main',points:[{x:-9,z:-60},{x:9,z:-60},{x:9,z:60},{x:-9,z:60}]}],
-  nextId:1,settings:{heightMax:120,biomeTexturesVisible:false}};
+  nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
  const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=1000;frame.height=650;document.body.append(frame);
  const start=Date.now();let counted=0;
@@ -19,14 +19,17 @@ try{
    return;
   }
   const label=d.querySelector('#cliffHeightStatus')?.textContent||'';
-  if(label.includes('vértices desplazados')){
+  if(label.includes('vértices desplazados')&&w.__cliffHeightmapEditor.getState().colorMeshes>=1&&d.querySelector('#textureTarget option[value="cliff:plains"]')){
    const count=Number(label.match(/(\d+) vértices desplazados/)?.[1]||0);
    const marked=[...d.querySelectorAll('#zoneList button')].some(b=>b.textContent.includes('⛰ ✓')&&b.title.includes('Acantilado asociado'));
    const dialog=!!d.getElementById('zoneCliffDialog');
    const images=d.querySelectorAll('#cliffBiomeCards img').length;
-   const repeats=d.querySelectorAll('#cliffBiomeCards input[data-cliff-biome]').length;
-   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===5&&label.includes('zonas marcadas')?'PASS':'FAIL';
-   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · escalas: '+repeats;return;
+   const repeats=d.querySelectorAll('#textureUnifiedRepeats').length;
+   const options=d.querySelectorAll('#textureTarget option').length;
+   const geometryControls=!!d.getElementById('cliffHeightSmoothing')&&!!d.getElementById('cliffHeightFlatten');
+   const colorMeshes=w.__cliffHeightmapEditor.getState().colorMeshes;
+   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&label.includes('zonas ⛰')?'PASS':'FAIL';
+   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes;return;
   }
   if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}
  },250);

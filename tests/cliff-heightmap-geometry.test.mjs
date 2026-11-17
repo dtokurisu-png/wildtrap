@@ -18,6 +18,20 @@ for(let i=0;i<wall.positions.length;i++)
  assert.equal(result.positions[i],wall.positions[i],'Original boundary/seam vertex must remain fixed');
 assert.ok([...result.positions].some((v,i)=>i%3===2&&Math.abs(v)>.01),
  'The heightmap must change real wall Z coordinates, not just material pixels');
+const smoothed=buildCliffHeightmapGeometry(wall,{...options,smoothing:.95,peakFlatten:0});
+const smoothedFlat=buildCliffHeightmapGeometry(wall,{...options,smoothing:.95,peakFlatten:.9});
+assert.ok(smoothed&&smoothedFlat,'The smoothing passes must preserve the generated cliff');
+assert.deepEqual([...smoothed.indices],[...result.indices],'Smoothing must preserve all triangle topology');
+for(let i=0;i<wall.positions.length;i++)
+ assert.equal(smoothedFlat.positions[i],wall.positions[i],'Protected seam vertices stay fixed after smoothing');
+const maximum=(shape)=>Math.max(...Array.from({length:shape.stats.vertices-shape.stats.originalVertices},(_,i)=>
+ Math.abs(shape.positions[(shape.stats.originalVertices+i)*3+2])));
+assert.ok(maximum(smoothed)<=maximum(result)+.001,
+ 'Smoothing should not create a sharper spike than the original displacement');
+const maximumPositive=(shape)=>Math.max(...Array.from({length:shape.stats.vertices-shape.stats.originalVertices},(_,i)=>
+ shape.positions[(shape.stats.originalVertices+i)*3+2]));
+assert.ok(maximumPositive(smoothedFlat)<=maximumPositive(smoothed)+.001,
+ 'Peak flattening must not increase highest positive point');
 const plain={...wall,positions:Float32Array.from([-12,0,-12,12,0,-12,-12,0,12,12,0,12])};
 assert.equal(buildCliffHeightmapGeometry(plain,options),null,
  'Flat soil must never be displaced as a cliff');
