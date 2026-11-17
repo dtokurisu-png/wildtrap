@@ -23,18 +23,9 @@ export function createTextureScalePreview({onApply,toast,getTextureAssetUrl=url=
   const tile=label();
   if(plane){
    plane.scale.set(tile,tile,1);
-   if(active?.slot==='cliff'){
-    // A cliff is an upright X/Y measurement wall. The plane geometry is
-    // centered, so position its center at half the tile height: foot at Y=0.
-    // Keep the explorer on the camera side of the wall for scale comparison.
-    plane.rotation.set(0,0,0);
-    plane.position.set(0,tile*.5,-.65);
-   }else{
-    plane.rotation.set(-Math.PI/2,0,0);
-    plane.position.set(0,-.008,0);
+   plane.rotation.set(-Math.PI/2,0,0);plane.position.set(0,-.008,0);
    }
-  }
-  // Keep the explorer anchored at tile center. Camera distance is a
+   // Keep the explorer anchored at tile center. Camera distance is a
   // visual choice; changing tile size never alters character dimensions.
   if(camera&&renderer){
    const height=Math.max(tile*1.25,3.4);
@@ -69,14 +60,8 @@ export function createTextureScalePreview({onApply,toast,getTextureAssetUrl=url=
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));
   camera=new THREE.OrthographicCamera(-5,5,5,-5,.02,3000);
-  if(isCliffSlot(item.slot)){
-   camera.position.set(3,3.2,11);
-   camera.lookAt(0,.5,0);
-  }else{
-   camera.position.set(7,10,13);
-   camera.lookAt(0,0,0);
-  }
-  orbit=new OrbitControls(camera,canvas);orbit.enableDamping=true;
+  camera.position.set(7,10,13);camera.lookAt(0,0,0);
+   orbit=new OrbitControls(camera,canvas);orbit.enableDamping=true;
   orbit.target.set(0,0,0);orbit.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.ROTATE};
   update();
   const draw=()=>{
@@ -123,9 +108,7 @@ export function createTextureScalePreview({onApply,toast,getTextureAssetUrl=url=
   }
   status.textContent=settled[0].status==='rejected'?'No se pudo cargar la imagen.':
    settled[1].status==='rejected'?'Textura lista; no se pudo cargar Explorador 1 WT.':
-   (isCliffSlot(item.slot)?
-    'Acantilado · plano vertical XY desde Y=0 · Explorador 1 WT (0.9 unidades)':
-    'Suelo · plano horizontal XZ · Explorador 1 WT (0.9 unidades)');
+   'Suelo · plano horizontal XZ · Explorador 1 WT (0.9 unidades)';
  }
  function onDown(e){
   if(e.button!==0||!e.shiftKey)return;

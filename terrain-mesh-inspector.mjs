@@ -35,7 +35,7 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
   for(const {object} of visuals){
    const kind=object.userData.terrainLayer;
    object.visible=kind==='faces'?$('terrainFaces').checked:
-    (kind==='edges'||kind==='cliffEdges')?$('terrainEdges').checked:
+    (kind==='edges')?$('terrainEdges').checked:
     kind==='vertices'?$('terrainVertices').checked:true;
    const materials=Array.isArray(object.material)?object.material:[object.material];
    for(const material of materials)if(material){
@@ -92,26 +92,6 @@ export function createTerrainMeshInspector({scene,camera,view,terrain,$,isSelect
    depthTest:false,depthWrite:false});
   const points=own(new THREE.Points(dotGeometry,dotMaterial),dotGeometry,dotMaterial);
   points.userData.terrainLayer='vertices';points.renderOrder=11;points.frustumCulled=false;
-  // The user's original grid stays unchanged: the actual generated cliff
-  // subdivisions live in a SEPARATE mesh. Display those triangles alongside
-  // the original mesh, otherwise the inspector misleadingly looks unchanged.
-  const cliffRoot=getCliffOverlay();
-  let cliffFaces=0,cliffSource=0,cliffMeshes=0;
-  for(const mesh of cliffRoot?.children||[]){
-   if(!mesh.isMesh||!mesh.geometry?.getAttribute('position'))continue;
-   const tri=mesh.geometry.index?
-    mesh.geometry.index.count/3:mesh.geometry.getAttribute('position').count/3;
-   cliffFaces+=tri;
-   cliffSource+=Number(mesh.userData.sourceTriangles)||0;
-   cliffMeshes++;
-   const lines=new THREE.WireframeGeometry(mesh.geometry);
-   const mat=new THREE.LineBasicMaterial({
-    color:0xffba66,transparent:true,opacity:.75,depthTest:false,depthWrite:false
-   });
-   const viewLines=own(new THREE.LineSegments(lines,mat),lines,mat);
-   viewLines.userData.terrainLayer='cliffEdges';
-   viewLines.renderOrder=12;viewLines.frustumCulled=false;
-  }
   statistics={triangles:indices.length/3,vertices:position.count,activeVertices:total,
    drawnVertices:dots.length/3};
 
