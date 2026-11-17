@@ -181,10 +181,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <section id="cliffHeightPanel" style="margin:12px 0;padding:10px;border:1px solid #548574;border-radius:9px">
  <h3 style="margin:0 0 8px">Relieve geométrico de acantilados · Fase 1</h3>
  <p class="hint">Primero subdivide uniformemente la pared marcada con ⛰; después desplaza los nuevos vértices según el heightmap. Los contrastes de imagen nunca controlan la subdivisión.</p>
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:9px 0">
- <figure style="margin:0"><img alt="Imagen real del mapa de alturas del acantilado de llanura" src="./assets/terrain/texturas/Textura%20de%20Acantilado%20llanura%20CUERPO-HEIGTH.png" style="width:100%;height:105px;object-fit:contain;background:#192921;border-radius:7px"><figcaption style="font-size:11px;opacity:.8">Heightmap · geometría activa</figcaption></figure>
- <figure style="margin:0"><img alt="Imagen original de color del acantilado de llanura" src="./assets/terrain/texturas/Textura%20de%20Acantilado%20llanura%20CUERPO.png" style="width:100%;height:105px;object-fit:contain;background:#192921;border-radius:7px"><figcaption style="font-size:11px;opacity:.8">Color · referencia, no aplicado</figcaption></figure>
- </div>
+ <div id="cliffBiomeCards" aria-label="Imágenes y escalas de los cinco biomas de acantilados"></div>
  <button type="button" id="cliffHeightPick" style="width:100%" hidden>Selección directa desactivada: usar Creador de zonas</button>
  <div class="grid2" style="margin-top:7px">
   <label>Radio (unidades)<input id="cliffHeightRadius" type="number" min="4" max="150" step="1" value="32"></label>
@@ -393,7 +390,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
-<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.121
+<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.122
  <span id="editorSaveState" style="font-weight:400;display:block;opacity:.8">Guardado local</span></div>
 <div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
@@ -434,5 +431,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.121').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.122').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>

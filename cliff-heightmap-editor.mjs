@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.120';
-import {registeredCliffZones} from './cliff-zone-bindings.mjs?v=0.9.119';
+import {registeredCliffZones,CLIFF_ASSETS,cliffRepeatCount} from './cliff-zone-bindings.mjs?v=0.9.122';
 const texturePath=file=>'./assets/terrain/texturas/'+encodeURIComponent(file);
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl=url=>url,onGeometryChanged=()=>{}}){
@@ -12,6 +12,9 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
  if(radius)radius.closest('label').hidden=true;
  if(pick)pick.hidden=true;
  if(remove)remove.hidden=true;
+ if(repeats)repeats.closest('label').hidden=true;
+ if(period)period.closest('label').hidden=true;
+ const cards=$('cliffBiomeCards');
  let timer=0,ticket=0,derived=[],source=null,disposed=false;
  const imageCache=new Map();
  const settings=()=>{
@@ -19,6 +22,7 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
   return live.cliffHeightSettings;
  };
  function parameters(){
+  renderBiomeCards();
   const c=settings();enabled.checked=c.enabled!==false;
   strength.value=c.strength??3;period.value=c.period??24;
   if(repeats)repeats.value=String(Math.round((630/(Number(c.period)||24))*100)/100);
@@ -29,8 +33,62 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
    marked.length+' zonas marcadas como acantilado · '+ready.length+' con heightmap disponible'+
    (pending?' · '+pending+' sin región principal':'')+
    (missing?' · '+missing+' pendientes de mapa de alturas':'')+
-   ' · '+(630/(Number(c.period)||24)).toFixed(2)+' repeticiones por 630 unidades':
+   ' · escalas por bioma disponibles en los controles de imágenes':
    'No hay zonas marcadas como acantilado. Usa el botón ⛰ del Creador de zonas y asóciala a su región principal.';
+ }
+ function renderBiomeCards(){
+  if(!cards)return;
+  cards.replaceChildren();
+  const zones=registeredCliffZones(live);
+  for(const asset of CLIFF_ASSETS){
+   const count=zones.filter(z=>z.biome===asset.biome).length;
+   const reps=cliffRepeatCount(live,asset.biome);
+   const card=document.createElement('section');
+   card.style.cssText='border:1px solid #487666;border-radius:8px;padding:9px;margin:8px 0;background:#19392d';
+   const header=document.createElement('strong');header.textContent=asset.label+' · '+count+' zonas de acantilado';
+   card.append(header);
+   const gallery=document.createElement('div');
+   gallery.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0';
+   function image(file,label){
+    const figure=document.createElement('figure');figure.style.margin='0';
+    if(file){
+     const img=document.createElement('img');img.src=getTextureAssetUrl(texturePath(file));img.alt=label+' · '+asset.label;
+     img.loading='lazy';img.style.cssText='width:100%;height:105px;object-fit:contain;background:#0f261d;border-radius:6px';figure.append(img);
+    }else{
+     const placeholder=document.createElement('div');
+     placeholder.style.cssText='height:105px;display:flex;align-items:center;justify-content:center;text-align:center;padding:7px;font-size:11px;border:1px dashed #688b7e;border-radius:6px';
+     placeholder.textContent='Heightmap pendiente';figure.append(placeholder);
+    }
+    const caption=document.createElement('figcaption');
+    caption.style.cssText='font-size:11px;opacity:.85';caption.textContent=label;figure.append(caption);gallery.append(figure);
+   }
+   image(asset.color,'Color · referencia sin aplicar');
+   image(asset.height,asset.height?'Heightmap · relieve activo':'Heightmap · todavía no disponible');
+   card.append(gallery);
+   const label=document.createElement('label');
+   label.style.cssText='font-size:12px;display:block';
+   label.textContent='Repeticiones compartidas de color y heightmap (mapa de 630 unidades)';
+   const input=document.createElement('input');
+   input.type='number';input.min='3.5';input.max='315';input.step='.25';input.value=String(Math.round(reps*100)/100);
+   input.dataset.cliffBiome=asset.biome;
+   input.style.cssText='width:100%';
+   input.onchange=()=>{
+    const value=clamp(Number(input.value)||reps,3.5,315);
+    snapshot();
+    const config=settings();
+    if(!config.biomes||typeof config.biomes!=='object')config.biomes={};
+    config.biomes[asset.biome]={...config.biomes[asset.biome],repeats:value};
+    // Store a single shared value for the color texture reference too.
+    if(!live.textureCatalogScale||typeof live.textureCatalogScale!=='object')live.textureCatalogScale={};
+    live.textureCatalogScale['cliff-'+asset.biome+'-color']=value;
+    persist();schedule();renderBiomeCards();
+   };
+   label.append(input);card.append(label);
+   const measurement=document.createElement('small');
+   measurement.textContent=(630/reps).toFixed(2)+' unidades por repetición · '+(asset.height?'Color y relieve sincronizados':'Solo vista/escala de color; no hay relieve todavía');
+   card.append(measurement);
+   cards.append(card);
+  }
  }
  function disposeDerived(){
   if(derived.length){
@@ -99,7 +157,7 @@ export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snaps
     const radius=Math.max(3,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...zs)-Math.min(...zs)));
     const output=buildCliffHeightmapGeometry(geometryData(working),{
      point,normalXZ:[1,0],zonePoints:zone.points,radius,
-     strength:clamp(Number(c.strength??3),0,12),period:clamp(Number(c.period??24),2,180),
+     strength:clamp(Number(c.strength??3),0,12),period:630/cliffRepeatCount(live,map.biome),
      steps:clamp(Number(c.steps??2),1,3),sample
     });
     if(output){
