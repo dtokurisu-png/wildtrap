@@ -144,7 +144,7 @@ const restoredHeight=ensureBiomeTextureDefaults({plains:{slots:{
 assert.equal(restoredHeight.plains.slots.cliffBodyHeight.image,PLAINS_CLIFF_MAPS.bodyHeight,
  'Do not leave a deleted grassy heightmap assigned in persisted projects');
 assert.equal(restoredHeight.plains.slots.cliffBodyHeight.scale,450,
- 'Migrating the height PNG must retain the user's own scale');
+ 'Migrating the height PNG must retain the saved scale');
 assert.equal(restoredHeight.plains.slots.cliffBodyHeight.name,
  'Textura de Acantilado llanura CUERPO-HEIGTH.png');
 
