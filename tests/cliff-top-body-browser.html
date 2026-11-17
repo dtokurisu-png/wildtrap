@@ -75,7 +75,7 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.111'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.112'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
@@ -137,9 +137,10 @@
   generate.click();
   const stats=await wait(()=>painter.getPlainsCliffStats().zones>=1&&
     painter.getPlainsCliffStats().moved>0?painter.getPlainsCliffStats():null,'heightmaps');
-  assert(stats.bodyTriangles>=stats.sourceTriangles*6,'La malla no está subdividida al menos 6 veces');
-  assert(stats.subdivisionRatio>=6,'No se está aplicando subdivisión suficiente');
-  assert(stats.maxOffset>0&&stats.maxOffset<=2.001,'Desplazamiento fuera del control de Relieve');
+  assert(stats.subdividedTriangles>stats.sourceTriangles,
+   'El heightmap no produjo más triángulos solo en los sectores deformados');
+  assert(stats.shapeRange>.16,'El mapa no alteró la forma del acantilado');
+  assert(stats.maxOffset>0&&stats.maxOffset<8,'El desplazamiento de crestas excedió el control');
   assert(stats.heightmapZones>=1,'El PNG CUERPO-HEIGTH no se está muestreando');
   const heightStatus=d.getElementById('plainsCliffStatus')?.textContent||'';
   assert(heightStatus.includes('heightmap aplicado'),
@@ -156,16 +157,22 @@
   assert(physical.activeFaces>=physical.replacedFaces*6,
    'La superficie física no contiene al menos seis veces más triángulos');
   assert(physical.sourceUnchanged,'Los vértices originales del escenario fueron modificados');
-  assert(parts.length>=1,'No se generó ninguna malla Body');
-  assert(parts.every(m=>m.userData.cliffPart==='Body'),'No debe existir Top ni material adicional');
-  assert(parts.every(m=>m.material.depthWrite===true),
+  assert(parts.length>=1,'No se generó ninguna malla de acantilado');
+  const appliedParts=parts.filter(m=>m.userData.heightmapApplied===true);
+  assert(appliedParts.length>0,'La textura cambió pero ninguna malla recibió relieve real');
+  assert(appliedParts.every(m=>m.userData.cliffPart==='Body'),
+   'Solo la malla deformada puede ser parte Body');
+  assert(appliedParts.every(m=>m.material.depthWrite===true),
    'La malla de relieve debe tener profundidad real; no ser textura superpuesta');
-  assert(parts.every(m=>decodeURIComponent(m.userData.cliffImage).includes('Textura de Acantilado llanura CUERPO.png')),
+  assert(appliedParts.every(m=>decodeURIComponent(m.userData.cliffImage).includes('Textura de Acantilado llanura CUERPO.png')),
    'El material generado no está usando el único archivo color CUERPO.png');
-  assert(parts.every(m=>m.userData.repetition===450),'La repetición visible 450 no coincide con la malla');
-  assert(parts.every(m=>m.userData.refinedTriangles>=6*m.userData.sourceTriangles),
-   'Hay bloques de acantilado con subdivisión inferior a 6x');
-  const body=parts[0];
+  assert(appliedParts.every(m=>m.userData.repetition===450),'La repetición visible 450 no coincide con la malla');
+  assert(appliedParts.every(m=>m.userData.refinedTriangles>m.userData.sourceTriangles),
+   'Una malla marcada como relieve no fue subdividida');
+  assert(parts.filter(m=>!m.userData.heightmapApplied).every(m=>
+   m.userData.refinedTriangles===m.userData.sourceTriangles),
+   'Una zona sin relieve fue subdividida innecesariamente');
+  const body=appliedParts[0];
   assert(body.material.map.wrapS===1000&&body.material.map.wrapT===1000,
    'CUERPO.png debe repetirse en X/Y como material de acantilado vertical');
   assert(body.material.map?.image?.width>0,
@@ -181,17 +188,17 @@
   const inspector=w.__terrainMeshInspector;
   assert(inspector&&typeof inspector.getState==='function','El inspector de malla no funciona');
   const fallback=root.children.filter(m=>m.userData.cliffZoneId==='cliff-unassigned');
-  assert(fallback.length>0,'El acantilado sin material no recibió subdivisión');
-  assert(fallback.every(m=>m.userData.refinedTriangles>=m.userData.sourceTriangles*6),
-   'El acantilado sin bioma conserva triángulos demasiado grandes');
+  assert(fallback.length>0,'La zona sin bioma debe conservar su superficie');
+  assert(fallback.every(m=>m.userData.refinedTriangles===m.userData.sourceTriangles),
+   'El acantilado sin heightmap NO debe sufrir subdivisión');
   inspector.setActive(true);
   const inspectorStats=inspector.getState();
   assert(inspectorStats.cliffTriangles===root.children.reduce((n,m)=>n+m.userData.refinedTriangles,0),
    'La vista de malla no enseña los triángulos subdivididos reales');
   inspector.setActive(false);
   const cliffStats=painter.getCliffSubdivisionStats();
-  assert(cliffStats.refinedTriangles>=cliffStats.sourceTriangles*6,
-   'Los triángulos reales del acantilado no se multiplicaron 6x');
+  assert(cliffStats.refinedTriangles>cliffStats.sourceTriangles,
+   'La malla no se refinó donde el heightmap sí aplicó geometría');
   assert(root.visible,'El grupo de acantilados no es visible');
   stage='collision';
   const script=d.createElement('script');script.type='module';
@@ -270,7 +277,7 @@
   assert(JSON.stringify(afterRefresh.biomeMaterials)===JSON.stringify(saved.biomeMaterials),
    'Actualizar imágenes cambió las texturas guardadas');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · v0.9.111 CUERPO + HEIGTH cargados, relieve XYZ, UV, refresco GPU y costuras intactas';
+  document.getElementById('result').textContent='PASS · v0.9.112 relieve real condicionado a forma del heightmap; color UV independiente; malla sin heightmap no subdividida';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>
