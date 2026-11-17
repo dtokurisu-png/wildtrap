@@ -6,6 +6,8 @@ on:
       - 'cliff-heightmap-geometry.mjs'
       - 'cliff-heightmap-editor.mjs'
       - 'tests/cliff-heightmap-geometry.test.mjs'
+      - 'tests/cliff-heightmap-real-smoke.html'
+      - 'tests/browser-cliff-heightmap.mjs'
       - 'editor.mjs'
       - '.github/workflows/cliff-heightmap-geometry.yml'
   workflow_dispatch:
@@ -25,3 +27,11 @@ jobs:
           node --check editor.mjs
       - name: Comprobar desplazamiento real y continuidad
         run: node tests/cliff-heightmap-geometry.test.mjs
+      - name: Iniciar servidor local de la revisión
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wildtrap-heightmap-http.log 2>&1 &
+          sleep 2
+      - name: Comprobar displacement con PNG real y Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-cliff-heightmap.mjs

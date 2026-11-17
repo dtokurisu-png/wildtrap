@@ -1,0 +1,11 @@
+import {spawnSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+const chrome=['google-chrome','google-chrome-stable','chromium'].find(c=>spawnSync('which',[c],{encoding:'utf8'}).status===0);
+assert.ok(chrome);
+const root=process.env.WILDTRAP_SMOKE_URL||'http://127.0.0.1:8123/';
+const result=spawnSync(chrome,['--headless','--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader','--disable-extensions','--virtual-time-budget=34000','--dump-dom',root+'tests/cliff-heightmap-real-smoke.html'],{encoding:'utf8',timeout:85000,maxBuffer:8e6});
+const status=result.stdout?.match(/<body[^>]*data-result="([^"]+)"/)?.[1];
+const message=result.stdout?.match(/<div id="result">([^<]*)/)?.[1]||'';
+console.log('Chrome:',result.status,status,message);
+assert.equal(result.status,0);
+assert.equal(status,'PASS',message);

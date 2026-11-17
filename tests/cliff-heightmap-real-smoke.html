@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Heightmap real smoke</title></head>
+<body data-result="PENDING"><div id="result">Analizando desplazamiento real</div>
+<script>
+const fail=(x)=>{document.body.dataset.result='FAIL';document.querySelector('#result').textContent=String(x)};
+try{
+ const n=129,h=Array(n*n).fill(0);
+ for(let z=0;z<n;z++)for(let x=0;x<n;x++)h[z*n+x]=x<64?45:0;
+ const draft={version:3,size:630,resolution:n,heights:h,nodes:[],objectGroups:[],holes:[],cuts3d:[],zones:[],
+  cliffHeightmaps:[{id:'plains-body',point:{x:0,z:0},normalXZ:[1,0],radius:72,strength:7,period:24,steps:2,enabled:true}],
+  nextId:1,settings:{heightMax:120,biomeTexturesVisible:false}};
+ localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
+ const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=1000;frame.height=650;document.body.append(frame);
+ const start=Date.now();let counted=0;
+ const interval=setInterval(()=>{
+  const d=frame.contentDocument,w=frame.contentWindow;
+  if(!d?.querySelector('#boot[hidden]')||!w.__cliffHeightmapEditor)return;
+  const label=d.querySelector('#cliffHeightStatus')?.textContent||'';
+  if(label.includes('Malla real:')){
+   const count=Number(label.match(/Malla real: (\d+)/)?.[1]||0);
+   clearInterval(interval);document.body.dataset.result=count>0?'PASS':'FAIL';
+   document.querySelector('#result').textContent=label;return;
+  }
+  if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}
+ },250);
+}catch(e){fail(e.stack||e)}
+</script></body></html>
