@@ -141,6 +141,7 @@ export const REPO_TEXTURES=[
   }
 ];
 
+export const textureUrl=texture=>'./assets/terrain/texturas/'+encodeURIComponent(texture.file);
 // GitHub assets may be replaced, removed or added without a JS commit.
 // Keep the running catalog in sync with the repository tree. This catalogue
 // only lists images; it NEVER changes the current world's saved selections.

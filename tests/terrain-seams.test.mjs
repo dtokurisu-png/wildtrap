@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import {addTerrainSeam,seamVertexIds,seamAnchors,restoreTerrainSeams,updateManualTerrainSeamAnchors,removeTerrainSeam,buildTerrainVertexGraph,shortestTerrainVertexPath} from '../terrain-seams.mjs';
-import {straightenCliffZone} from '../editor-cliff-alignment.mjs';
 import {readFileSync} from 'node:fs';
 
 const n=11,size=100,cell=size/(n-1),count=n*n;
@@ -48,25 +47,6 @@ restoreTerrainSeams(serialized,{size,resolution:n});
 assert.equal(serialized.heights[anchor],44,'Seam anchors survive export/import');
 assert.deepEqual(serialized.terrainVertexOffsets[anchor],[3,-7]);
 
-// The procedural cliff regularization must skip seam vertices and may update unprotected neighbors.
-const nn=21,ss=100,step=ss/(nn-1),hh=Array(nn*nn).fill(0),off={};
-for(let z=0;z<nn;z++)for(let x=0;x<nn;x++){
- const zz=z*step-ss/2,i=z*nn+x;
- hh[i]=zz<=-20?30:zz===-15?30+(x%2?4:-4):zz===-10?(x%2?2:-2):0;
- if(x>=4&&x<=16&&(zz===-15||zz===-10))off[i]=[0,x%2?1:-1];
-}
-const cliffLive={heights:hh,terrainVertexOffsets:off,terrainSeams:[]};
-const protectedId=7*nn+8;
-const anchorPos=[(protectedId%nn)*step-ss/2+2,hh[protectedId],Math.floor(protectedId/nn)*step-ss/2-3];
-addTerrainSeam(cliffLive,[protectedId,protectedId+1],i=>
- i===protectedId?anchorPos:[((i%nn)*step-ss/2),hh[i],Math.floor(i/nn)*step-ss/2],[protectedId,protectedId+1]);
-restoreTerrainSeams(cliffLive,{size:ss,resolution:nn});
-const saved=cliffLive.heights[protectedId],savedOffset=[...cliffLive.terrainVertexOffsets[protectedId]];
-const zone={isCliff:true,points:[{x:-35,z:-15},{x:35,z:-15},{x:35,z:15},{x:-35,z:15}]};
-straightenCliffZone(cliffLive,zone,{size:ss,resolution:nn});
-assert.equal(cliffLive.heights[protectedId],saved,'Cliff autoalignment cannot alter seam height');
-assert.deepEqual(cliffLive.terrainVertexOffsets[protectedId],savedOffset,'Cliff autoalignment cannot alter seam XZ');
-
 assert.ok(removeTerrainSeam(live,seam.id),'Seams can be removed individually');
 assert.equal(seamVertexIds(live).size,0,'Removal unlocks without moving geometry');
 assert.equal(live.heights[anchor],44,'Removing seam does not modify mesh');
@@ -82,4 +62,4 @@ assert.match(vertex,/updateManualTerrainSeamAnchors\(live,movedSeamAnchors\)/,'M
 assert.match(holes,/cutTouchesSeam\(pending\)/,'Knife refuses cutting protected seams');
 for(const id of ['terrainCreateSeam','terrainClearVertexSelection','terrainSeamCount','terrainSeamList'])
  assert.ok(html.includes('id="'+id+'"'),'Sculpt panel missing '+id);
-console.log('PASS: seam path, XYZ locks, manual move, JSON persistence, procedural protection, cut protection, UI');
+console.log('PASS: seam path, XYZ locks, manual move, JSON persistence, cut protection, UI');

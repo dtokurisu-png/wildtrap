@@ -24,10 +24,10 @@ assert.match(gpu,/detailMesh\.renderOrder=3\+i\*\.01/,'Details render over base'
 assert.match(gpu,/noDetails/,'User can disable details without changing saved scene data');
 assert.match(gpu,/entry\.mesh\.geometry=terrain\.geometry/,'Layers follow terrain cuts');
 assert.doesNotMatch(gpu,/editorOnly\s*=\s*true/,'Materials remain visible during play');
-assert.match(renderer,/\['ground','detail1','detail2','detail3','cliff'\]/,'Loader includes all 5 texture slots');
-assert.match(renderer,/buildCliffs\(\);apply\(\)/,'Cliff generator remains active');
+assert.match(renderer,/\['ground','detail1','detail2','detail3'\]/,'Loader includes the four terrain texture slots');
+assert.doesNotMatch(renderer,/buildCliffs|maskTerrainCliffFaces|heightmapPlains/,'Removed cliff generator cannot be reintroduced');
 assert.doesNotMatch(renderer,/surfaceMap\.needsUpdate=true/,'Do not reintroduce the downsampled baked base texture');
 assert.doesNotMatch(gpu,/float angle=|float c=cos\(angle\)/,'Complementary patches must not rotate');
 assert.doesNotMatch(gpu,/float angle=|mat2\(cos/,'Complementary patch orientation stays aligned');
 assert.equal(200*200*.60,24000,'Example density: 200 repeats -> 24,000 expected patches per complement');
-console.log('PASS: Independent randomized soft-edge complement layers preserve working base and cliffs');
+console.log('PASS: Independent randomized soft-edge complement layers preserve working base terrain');
