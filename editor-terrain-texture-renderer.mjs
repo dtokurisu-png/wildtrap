@@ -318,7 +318,7 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
   // Replace original faces in the displayed terrain with subdivided and
   // height-displaced triangles. No permanent vertex, seam, save or cut edits.
   // This avoids the original cliff wall hiding the new shape underneath.
-  const replaced=maskTerrainCliffFaces(originalSurface,removedSourceFaces);
+  const replaced=maskTerrainCliffFaces(originalSurface,removedSourceFaces,THREE);
   if(replaced){
    sourceCutGeometry=originalSurface;
    maskedCliffGeometry=replaced;
