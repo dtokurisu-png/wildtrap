@@ -1,4 +1,4 @@
-import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES,PLAINS_CLIFF_MAPS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.109';
+import {REPO_TEXTURES,textureUrl,TEXTURE_KINDS,PLAINS_CLIFF_TEXTURE_FILES,PLAINS_CLIFF_MAPS,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.110';
 // Biblioteca de materiales de bioma, fase 3.
 // Sin pintar la malla: la aplicación procedural corresponde a la fase 4.
 export const BIOMES=[
@@ -24,15 +24,14 @@ const defaults=()=>{
   slots:Object.fromEntries(SLOTS.map(s=>[s.id,{name:'',image:'',scale:8,opacity:s.id==='ground'||s.id==='cliff'?1:.5}])),
   noise:{scale:20,seed:1},edgeBlend:4
  }]));
- // The four repository assets are visible immediately in Llanura,
- // including in scenes saved before the heightmap generator existed.
+ // The two existing Llanura PNGs supply the base, Body Color and Body Height slots.
  for(const file of PLAINS_CLIFF_TEXTURE_FILES){
   const target=data.plains.slots[file.role];
   target.image=textureUrl(file);target.name=file.file;target.scale=8;target.opacity=1;
  }
  const cliff=data.plains.slots.cliff;
  cliff.image=PLAINS_CLIFF_MAPS.base;
- cliff.name='Textura de Acantilado llanura  CUERPO.png';
+ cliff.name='Textura de Acantilado llanura CUERPO.png';
  cliff.scale=8;cliff.opacity=1;
  return data;
 };
@@ -54,6 +53,27 @@ export function ensureBiomeTextureDefaults(raw){
  }
  return out;
 }
+// Migrate only known obsolete Llanura filename variants. Keep independently
+// chosen custom/other-biome materials and every saved scale unchanged.
+export function normalizePlainsCliffImage(image,role){
+ if(typeof image!=='string'||!image.startsWith('./assets/terrain/texturas/'))return image;
+ let filename;
+ try{filename=decodeURIComponent(image.slice('./assets/terrain/texturas/'.length).split(/[?#]/)[0])}
+ catch(_){return image}
+ const oldBase=[
+  'Textura de Acantilado llanura  CUERPO.png',
+  'Textura de Acantilado llanura Cubierto de Hierba.png'
+ ];
+ const oldColor=[
+  'Textura de Acantilado llanura  CUERPO- COLOR.png',
+  'Textura de Acantilado llanura CUERPO- COLOR.png',
+  'Textura de Acantilado llanura Cubierto de Hierba- COLOR.png'
+ ];
+ if((role==='cliff'&&oldBase.includes(filename))||
+    (role==='cliffBodyColor'&&oldColor.includes(filename)))
+  return PLAINS_CLIFF_MAPS.base;
+ return image;
+}
 export function normalizeBiomeMaterials(raw){
  const out=defaults();
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return out;
@@ -65,7 +85,12 @@ export function normalizeBiomeMaterials(raw){
    const target=dest.slots[slot.id];
    target.name=typeof v.name==='string'?v.name.slice(0,130):'';
    // Only user-uploaded images, never externally supplied script/URLs.
-   const imageSource=typeof v.image==='string'?v.image:'';
+   const originalSource=typeof v.image==='string'?v.image:'';
+   const imageSource=biome.id==='plains'?
+    normalizePlainsCliffImage(originalSource,slot.id):originalSource;
+   if(imageSource!==originalSource){
+    target.name='Textura de Acantilado llanura CUERPO.png';
+   }
    // Preserve old same-origin PNG paths when files have been removed:
    // show a missing warning rather than silently rewriting the user's map.
    target.image=(REPO_TEXTURES.some(t=>textureUrl(t)===imageSource)||
@@ -223,7 +248,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
   $('textureTransitionValue').textContent=String(data.edgeBlend);
   const plainCards=[];
   const plainCliffAssets=[
-   {id:'tx16',file:'Textura de Acantilado llanura  CUERPO.png',
+   {id:'tx16',file:'Textura de Acantilado llanura CUERPO.png',
     biome:'plains',kind:'cliff',role:'cliff'},
    ...PLAINS_CLIFF_TEXTURE_FILES
   ];
