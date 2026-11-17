@@ -75,7 +75,7 @@
   const generate=d.getElementById('plainsCliffGenerate'),strength=d.getElementById('plainsCliffStrength');
   assert(generate&&strength&&!generate.disabled,'Generar debe estar visible y listo');
   const version=d.getElementById('editorVersionTag');
-  assert(version&&version.textContent.includes('v0.9.110'),'Versión visible inexistente o incorrecta');
+  assert(version&&version.textContent.includes('v0.9.111'),'Versión visible inexistente o incorrecta');
   const showMaps=d.getElementById('plainsCliffViewMaps');
   assert(showMaps,'No hay acceso directo a imágenes de Llanura');
   await wait(()=>d.getElementById('textureBiome')?.options?.length>1,'biblioteca materiales');
@@ -145,8 +145,21 @@
   assert(heightStatus.includes('heightmap aplicado'),
    'El editor no confirma que se haya aplicado el PNG de alturas');
   const root=painter.collisionRoot(),parts=root.children.filter(x=>x.userData.cliffZoneId==='cliff1');
+  // A texture swap alone is insufficient. These triangles must physically
+  // REPLACE base terrain triangles, not just overlap them as a decal.
+  const physical=painter.getPhysicalSurfaceStats();
+  assert(root.userData.isPhysicalReplacement===true,
+   'El acantilado sigue siendo una capa visual; la malla real no cambió');
+  assert(physical.replacedFaces>0,'No se retiraron las caras originales bajo el acantilado');
+  assert(physical.remainingFaces===physical.originalFaces-physical.replacedFaces,
+   'La malla principal sigue incluyendo las caras que deberían ser reemplazadas');
+  assert(physical.activeFaces>=physical.replacedFaces*6,
+   'La superficie física no contiene al menos seis veces más triángulos');
+  assert(physical.sourceUnchanged,'Los vértices originales del escenario fueron modificados');
   assert(parts.length>=1,'No se generó ninguna malla Body');
   assert(parts.every(m=>m.userData.cliffPart==='Body'),'No debe existir Top ni material adicional');
+  assert(parts.every(m=>m.material.depthWrite===true),
+   'La malla de relieve debe tener profundidad real; no ser textura superpuesta');
   assert(parts.every(m=>decodeURIComponent(m.userData.cliffImage).includes('Textura de Acantilado llanura CUERPO.png')),
    'El material generado no está usando el único archivo color CUERPO.png');
   assert(parts.every(m=>m.userData.repetition===450),'La repetición visible 450 no coincide con la malla');
@@ -257,7 +270,7 @@
   assert(JSON.stringify(afterRefresh.biomeMaterials)===JSON.stringify(saved.biomeMaterials),
    'Actualizar imágenes cambió las texturas guardadas');
   document.body.dataset.result='PASS';
-  document.getElementById('result').textContent='PASS · v0.9.110 CUERPO + HEIGTH cargados, relieve XYZ, UV, refresco GPU y costuras intactas';
+  document.getElementById('result').textContent='PASS · v0.9.111 CUERPO + HEIGTH cargados, relieve XYZ, UV, refresco GPU y costuras intactas';
  }catch(e){fail(stage,e)}
 })();
 </script></body></html>
