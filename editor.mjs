@@ -890,7 +890,11 @@ const rect=view.getBoundingClientRect();
 mouse.x=((event.clientX-rect.left)/rect.width)*2-1;mouse.y=-((event.clientY-rect.top)/rect.height)*2+1;
 ray.setFromCamera(mouse,camera);
 if(mode==='holePaint')return holesEditor?.pick(ray)||null;
-const hits=ray.intersectObject(terrain);
+// When a cliff was replaced by its real refined surface, the source
+// terrain has NO face there. Include the new cliff mesh in terrain picking,
+// preserving sculpting, placement and zone editing on those faces.
+const cliffMeshes=terrainPainter?.collisionRoot()?.children||[];
+const hits=ray.intersectObjects([terrain,...cliffMeshes],false);
 if(hits.length)return{x:hits[0].point.x,z:hits[0].point.z,y:hits[0].point.y};
 return ray.ray.intersectPlane(plane,temp)?{x:temp.x,z:temp.z,y:heightAt(temp.x,temp.z)}:null;
 }
