@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {sampleCliffHeight} from '../editor-cliff-top-body.mjs';
 import {buildCliffBodyHeightmapBuffers,cliffWallProjection,cliffHeightmapTone,
- hasMeaningfulCliffRelief} from '../editor-cliff-body-heightmap.mjs';
+ hasMeaningfulCliffRelief,createCliffZoneProtection} from '../editor-cliff-body-heightmap.mjs';
 import {PLAINS_CLIFF_TEXTURE_FILES,PLAINS_CLIFF_MAPS,REPO_TEXTURES,textureUrl} from '../editor-texture-catalog.mjs';
 import {ensureBiomeTextureDefaults,normalizePlainsCliffImage} from '../editor-biome-textures.mjs';
 
@@ -81,6 +81,23 @@ assert.equal(buildCliffBodyHeightmapBuffers(refined,{
 assert.equal(buildCliffBodyHeightmapBuffers(refined,{
  heightmap,strength:0,wallProjection:projection}),null,
  'Relief OFF/strength=0 must never subdivide or displace');
+// The old protection-field calculation was done per 160-face batch and
+// treated these artificial cuts as cliff boundaries. The true outer wall
+// perimeter is the only automatic protected boundary.
+const wallTiles=[];
+for(let y=0;y<24;y++)for(let x=0;x<24;x++){
+ wallTiles.push([[x,y,0],[x+1,y,0],[x,y+1,0]]);
+ wallTiles.push([[x+1,y,0],[x+1,y+1,0],[x,y+1,0]]);
+}
+const globalProtect=createCliffZoneProtection(wallTiles,[],1.5);
+assert(globalProtect([12,12,.085])>.95,
+ 'Internal batch boundaries must not suppress heightmap displacement');
+assert.equal(globalProtect([0,12,.085]),0,
+ 'The real outer rim is protected against heightmap cracks');
+const protectedWall=createCliffZoneProtection(wallTiles,[[[12,0,0],[12,24,0]]],1.5);
+assert.equal(protectedWall([12,12,.085]),0,
+ 'Explicit manual seam remains pinned by the global protection field');
+
 const inferred=cliffWallProjection([[[0,0,0],[24,0,0],[0,24,0]],
  [[24,0,0],[24,24,0],[0,24,0]]]);
 assert.deepEqual(inferred,projection);
@@ -118,6 +135,19 @@ assert.equal(normalizePlainsCliffImage(textureUrl({file:oldDouble}),'cliff'),
  PLAINS_CLIFF_MAPS.base,'Two-space legacy CUERPO path must normalize');
 assert.equal(normalizePlainsCliffImage(textureUrl({file:oldBody}),'cliffBodyColor'),
  PLAINS_CLIFF_MAPS.base,'Missing -COLOR path must normalize to current CUERPO.png');
+const retiredHeight='Textura de Acantilado llanura Cubierto de Hierba- HEIGTH SIN HIERBA .png';
+assert.equal(normalizePlainsCliffImage(textureUrl({file:retiredHeight}),'cliffBodyHeight'),
+ PLAINS_CLIFF_MAPS.bodyHeight,'Old saved HEIGHT filename must map to the real CUERPO-HEIGTH.png');
+const restoredHeight=ensureBiomeTextureDefaults({plains:{slots:{
+ cliffBodyHeight:{image:textureUrl({file:retiredHeight}),name:retiredHeight,scale:450}
+}}});
+assert.equal(restoredHeight.plains.slots.cliffBodyHeight.image,PLAINS_CLIFF_MAPS.bodyHeight,
+ 'Do not leave a deleted grassy heightmap assigned in persisted projects');
+assert.equal(restoredHeight.plains.slots.cliffBodyHeight.scale,450,
+ 'Migrating the height PNG must retain the user's own scale');
+assert.equal(restoredHeight.plains.slots.cliffBodyHeight.name,
+ 'Textura de Acantilado llanura CUERPO-HEIGTH.png');
+
 const oldMap=ensureBiomeTextureDefaults({plains:{slots:{
  cliff:{image:textureUrl({file:oldDouble}),name:oldDouble,scale:100},
  cliffBodyColor:{image:textureUrl({file:oldBody}),name:oldBody,scale:450},
