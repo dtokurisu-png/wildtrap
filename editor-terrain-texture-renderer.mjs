@@ -2,7 +2,7 @@ import {buildRefinedCliffGeometry} from './editor-cliff-mesh.mjs?v=0.9.104';
 import {straightenCliffSeams} from './editor-cliff-seams.mjs?v=0.9.87';
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.85';
 import * as THREE from 'three';
-import {BIOMES} from './editor-biome-textures.mjs?v=0.9.110';
+import {BIOMES,normalizePlainsCliffImage} from './editor-biome-textures.mjs?v=0.9.110';
 import {PLAINS_CLIFF_MAPS} from './editor-texture-catalog.mjs?v=0.9.110';
 import {buildCliffBodyHeightmapBuffers} from './editor-cliff-body-heightmap.mjs?v=0.9.105';
 
@@ -173,9 +173,14 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
    // Llanura CUERPO.png. The generated mesh additionally samples HEIGTH.png.
    // Color and height share a single set of UVs and the saved Body scale.
    const generated=plains&&live.cliffHeightmapPlains?.enabled===true;
-   const colorURL=generated?
+   const rawColorURL=generated?
     (slots.cliffBodyColor?.image||PLAINS_CLIFF_MAPS.bodyColor):
     (plains?(slots.cliff?.image||PLAINS_CLIFF_MAPS.base):slots.cliff?.image);
+   // Normalize even when the texture panel has not finished initializing.
+   // This fixes old saved URLs on FIRST RENDER, not only after opening it.
+   const colorURL=plains?
+    normalizePlainsCliffImage(rawColorURL,generated?'cliffBodyColor':'cliff'):
+    rawColorURL;
    const image=loaded.get(colorURL)||null;
    const heightURL=generated?
     (slots.cliffBodyHeight?.image||PLAINS_CLIFF_MAPS.bodyHeight):null;
@@ -333,7 +338,9 @@ export function createTerrainTexturePainter({scene,terrain,terrainGeo,material,i
     plainsStats.subdivisionRatio.toFixed(1)+') · '+
     (live.cliffHeightmapPlains?.enabled?
      (plainsStats.heightmapZones?
-      plainsStats.moved+' vértices desplazados · heightmap aplicado':
+      (plainsStats.moved?
+       plainsStats.moved+' vértices desplazados · heightmap aplicado':
+       '⚠ Heightmap cargado, sin desplazamiento'):
       '⚠ Heightmap no cargado'):'Relieve no generado')):
    'No hay zonas de acantilado de Llanura';
  }
