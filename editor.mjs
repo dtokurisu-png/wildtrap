@@ -63,7 +63,7 @@ function followPlaytestShadow(focus){
    c.updateProjectionMatrix();
    shadowFocus.set(Infinity,Infinity,Infinity);
   }
-  if(shadowFocus.distanceToSquared(focus)>1.44){
+  if(shadowFocus.distanceToSquared(focus)>0.04){
    shadowFocus.copy(focus);
    const x=Math.round(focus.x*2)/2,z=Math.round(focus.z*2)/2;
    light.target.position.set(x,focus.y,z);
