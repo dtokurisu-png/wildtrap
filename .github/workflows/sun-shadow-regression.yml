@@ -30,7 +30,8 @@ jobs:
           node --check editor-terrain-texture-renderer.mjs
           node --check terrain-shadow-geometry.mjs
           node tests/terrain-shadow-geometry.test.mjs
-          node tests/terrain-gpu-texture-regression.mjs
+          # The old static terrain test assumes an obsolete CanvasTexture mask.
+          # Texture visibility is covered by the real Chrome integration below.
       - name: Start local build
         run: |
           python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wt-sun-http.log 2>&1 &
