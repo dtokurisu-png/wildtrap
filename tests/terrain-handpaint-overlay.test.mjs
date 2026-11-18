@@ -12,7 +12,9 @@ for(let x=0;x<=1;x+=0.1){
  assert.equal(hardLightChannel(x,0),0);
  assert.equal(hardLightChannel(x,1),1);
 }
-assert.deepEqual(hardLightRGB([.2,.6,.9],[.5,.5,.5]),[.2,.6,.9]);
+hardLightRGB([.2,.6,.9],[.5,.5,.5]).forEach((v,i)=>{
+ assert.ok(Math.abs(v-[.2,.6,.9][i])<1e-12,'Neutral gray retains original RGB');
+});
 const green=hardLightRGB([.2,.5,.8],[.9,.1,.6]);
 assert.ok(green[0]>.2&&green[1]<.5&&green[2]>.8);
 assert.match(moduleCode,/abs\(gl_FragCoord\.z-visibleDepth\)>0\.00006/,'No paint over closer GLB meshes');
