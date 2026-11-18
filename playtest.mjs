@@ -160,7 +160,12 @@ const hiddenDebugMarkers=[];
     visual.rotation.y=Math.PI;
     player.add(visual);
     gltf.scene.traverse(object=>{
-      if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
+      if(object.isMesh){
+       object.frustumCulled=false;
+       object.castShadow=true; // Explorer uses the independent tiny shadow map.
+       object.receiveShadow=true;
+       object.layers.set(1);
+      }
     });
     imported=gltf;
     // WT animation slots are 1-based for the designer:
@@ -239,12 +244,17 @@ const hiddenDebugMarkers=[];
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
+    // Heightmap walls use a steep-face-only shadow proxy. Do not turn full
+    // terrain casting back on, or ground stripes and stutter will return.
+    terrain.castShadow=false;
+    renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
     collider.refresh();
     resetPosition();
     if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
     hiddenDebugMarkers.length=0;
     scene.traverse(object=>{if(object.userData.editorOnly&&object.visible){hiddenDebugMarkers.push(object);object.visible=false}});
     scene.add(player);
+    camera.layers.enable(1); // Actual Explorer GLB meshes are on layer 1.
     orbit.enabled=false;
     active=true;busy=false;
     document.body.classList.add('testing');
@@ -351,5 +361,5 @@ const hiddenDebugMarkers=[];
    mixer=null;idle=null;walk=null;walkWanted=false;
    $('testModelStatus').textContent='Personaje propio: '+file.name+' · pulsa Probar';
  }
- return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError}};
+ return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError},get shadowFocus(){return active?player.position:null}};
 }
