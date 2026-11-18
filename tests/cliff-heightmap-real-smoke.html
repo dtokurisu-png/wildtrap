@@ -10,7 +10,7 @@ try{
    {id:'zone-cliff',name:'Acantilado',isCliff:true,cliffParentId:'zone-main',points:[{x:-9,z:-60},{x:9,z:-60},{x:9,z:60},{x:-9,z:60}]}],
   nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
- const frame=document.createElement('iframe');frame.src='../?safe=1&noShadows=1';frame.width=1000;frame.height=650;document.body.append(frame);
+ const frame=document.createElement('iframe');frame.src='../?safe=1&noShadows=1';frame.width=640;frame.height=420;document.body.append(frame);
  const start=Date.now();let counted=0;
  const interval=setInterval(()=>{
   const d=frame.contentDocument,w=frame.contentWindow;

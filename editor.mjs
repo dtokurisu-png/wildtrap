@@ -2049,7 +2049,7 @@ function updateMemoryDisplay(){
 function animate(){
  // Software-rendered diagnostic mode must not flood the GPU with 60 fps;
  // actual editor and play mode continue to use native requestAnimationFrame.
- if(new URLSearchParams(location.search).has('noShadows'))setTimeout(animate,100);
+ if(new URLSearchParams(location.search).has('noShadows'))setTimeout(animate,500);
  else requestAnimationFrame(animate);
  if(!preview.active)orbit.update();
  // Equalize perceived haze between distant orthographic edit and near-ground play.
