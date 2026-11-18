@@ -43,7 +43,8 @@ try{
       sun.shadow.autoUpdate===false&&terrain.castShadow===false&&
       heroSun.shadow.autoUpdate===false&&
       (w.__wildtrapDiagnostics.heroShadowRefreshes||0)>0&&
-      handpaint?.ready&&handpaint?.frames>0){
+      handpaint?.ready&&handpaint?.frames>0&&
+      handpaint.loadedSource.includes('terreno_handpaint_4K.webp')){
     clearInterval(check);document.body.dataset.result='PASS';
     document.querySelector('#result').textContent='PASS: '+cliffFaces+'/'+totalFaces+
      ' cliff faces; world cached in play; '+avatarShadowMeshes+' independent avatar shadow casters';return;
