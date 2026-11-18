@@ -90,8 +90,8 @@ function syncPlaytestSun(focus){
   characterSun.castShadow=active;
   light.intensity=active?1.8:2.25;
   light.shadow.autoUpdate=!active;
-  // The terrain stops CASTING in play mode. Rebuild the world map once with
-  // that configuration before caching it, or old terrain self-shadows survive.
+  // Keep cliff/terrain casting in both modes. Rebuild the global map once at
+  // each editor/play switch before caching it (never re-render it per frame).
   light.shadow.needsUpdate=true;
   heroShadowLastPosition.set(Infinity,Infinity,Infinity);
  }
@@ -1080,7 +1080,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.136').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.138').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
    resizeEditor:resize,persist,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
