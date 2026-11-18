@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {cliffShadowFaceIndices} from './terrain-shadow-geometry.mjs';
 // El editor de zonas se carga después del motor principal; un módulo opcional no bloquea la apertura.
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
 import {putDraft,getDraft} from './editor-draft-storage.mjs?v=0.9.59';
@@ -29,12 +30,79 @@ let flattenDirection='max';
 const scene=new THREE.Scene();
 const atmosphericColor=new THREE.Color(0xb9c9c1);
 scene.background=atmosphericColor;
-scene.fog=new THREE.FogExp2(atmosphericColor,0.00125); // Subtle distance haze; no extra geometry or postprocessing.
+scene.fog=new THREE.FogExp2(atmosphericColor,0.00052);
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));renderer.setSize(innerWidth-340,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
-scene.add(new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85));
-const light=new THREE.DirectionalLight(0xffeddb,2.15);light.position.set(-160,280,120);scene.add(light);
+if(new URLSearchParams(location.search).has('safe'))
+ window.__wildtrapDiagnostics={renderer,scene,getCamera:()=>camera,makeTarget:(w,h)=>new THREE.WebGLRenderTarget(w,h)};
+renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const skyLight=new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85);
+skyLight.layers.enable(1);scene.add(skyLight);
+// The validated global sun direction/frustum covers the whole 630-unit map.
+const light=new THREE.DirectionalLight(0xffe8cf,2.25);
+light.position.set(-480,840,360);
+light.castShadow=renderer.shadowMap.enabled;
+light.shadow.mapSize.set(1024,1024);
+const WORLD_SHADOW_HALF_EXTENT=SIZE*.92;
+light.shadow.camera.left=-WORLD_SHADOW_HALF_EXTENT;
+light.shadow.camera.right=WORLD_SHADOW_HALF_EXTENT;
+light.shadow.camera.top=WORLD_SHADOW_HALF_EXTENT;
+light.shadow.camera.bottom=-WORLD_SHADOW_HALF_EXTENT;
+light.shadow.camera.near=100;
+light.shadow.camera.far=1850;
+light.shadow.camera.updateProjectionMatrix();
+light.shadow.bias=-0.00009;
+light.shadow.normalBias=0.025;
+light.shadow.radius=2.2;
+light.shadow.camera.layers.set(0); // World geometry only; the Explorer uses another light.
+scene.add(light,light.target);
+// High-definition 10-unit Explorer silhouette is independent of the static world.
+// Only this small 1024 map updates during play; the world map stays cached.
+const HERO_SHADOW_HALF_WIDTH=5;
+const characterSun=new THREE.DirectionalLight(0xffe8cf,0);
+characterSun.layers.enable(1);
+characterSun.castShadow=false;
+characterSun.visible=false;
+characterSun.shadow.mapSize.set(1024,1024);
+characterSun.shadow.camera.left=-HERO_SHADOW_HALF_WIDTH;
+characterSun.shadow.camera.right=HERO_SHADOW_HALF_WIDTH;
+characterSun.shadow.camera.top=HERO_SHADOW_HALF_WIDTH;
+characterSun.shadow.camera.bottom=-HERO_SHADOW_HALF_WIDTH;
+characterSun.shadow.camera.near=.5;
+characterSun.shadow.camera.far=120;
+characterSun.shadow.camera.layers.set(1); // Only animated Explorer meshes.
+characterSun.shadow.bias=-.00015;
+characterSun.shadow.normalBias=.008;
+characterSun.shadow.radius=1.4;
+characterSun.position.set(-16,28,12);
+scene.add(characterSun,characterSun.target);
+const heroShadowLastPosition=new THREE.Vector3(Infinity,Infinity,Infinity);
+let heroShadowWasActive=false,heroShadowReceiver=null;
+function syncPlaytestSun(focus){
+ const active=Boolean(focus)&&renderer.shadowMap.enabled;
+ if(heroShadowWasActive!==active){
+  heroShadowWasActive=active;
+  characterSun.intensity=active?.45:0;
+  characterSun.visible=active;
+  characterSun.castShadow=active;
+  light.intensity=active?1.8:2.25;
+  light.shadow.autoUpdate=!active; // No full-world shadow rerender per play frame.
+  light.shadow.needsUpdate=true; // One complete map when switching modes.
+  heroShadowLastPosition.set(Infinity,Infinity,Infinity);
+ }
+ if(!heroShadowReceiver||!heroShadowReceiver.parent)
+  heroShadowReceiver=scene.getObjectByName('TerrainSoftSunShadows');
+ if(heroShadowReceiver?.material)heroShadowReceiver.material.opacity=.55;
+ if(active&&heroShadowLastPosition.distanceToSquared(focus)>.01){
+  heroShadowLastPosition.copy(focus);
+  const x=Math.round(focus.x*10)/10,y=Math.round(focus.y*10)/10,z=Math.round(focus.z*10)/10;
+  characterSun.target.position.set(x,y,z);
+  characterSun.position.set(x-16,y+28,z+12);
+  characterSun.target.updateMatrixWorld();characterSun.updateMatrixWorld();
+ }
+}
 const view=$('viewport');
 const camera=new THREE.OrthographicCamera(-SIZE*.65,SIZE*.65,SIZE*.65,-SIZE*.65,.1,2600);
 const orbit=new OrbitControls(camera,view);orbit.enableDamping=true;orbit.screenSpacePanning=true;
@@ -46,7 +114,47 @@ intangibleTerrainMaterial.transparent=true;
 intangibleTerrainMaterial.opacity=.24;
 intangibleTerrainMaterial.depthTest=true;
 intangibleTerrainMaterial.depthWrite=false;
-const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';scene.add(terrain);
+const terrain=new THREE.Mesh(terrainGeo,material);
+terrain.name='heightmap terrain';
+terrain.receiveShadow=true;
+terrain.castShadow=false; // Never project horizontal terrain triangles onto themselves.
+scene.add(terrain);
+// Shadow-only geometric proxy: steep REAL terrain/cliff faces cast, ground does not.
+// Completely invisible in the color/depth pass. It retains proper holes and
+// heightmapped cliff geometry because it follows terrain.geometry.
+const cliffShadowCaster=new THREE.Mesh(new THREE.BufferGeometry(),
+ new THREE.MeshBasicMaterial({color:0xffffff,colorWrite:false,depthWrite:false,
+  depthTest:false,side:THREE.DoubleSide}));
+cliffShadowCaster.name='TerrainCliffShadowCaster';
+cliffShadowCaster.userData.noCollision=true;
+cliffShadowCaster.castShadow=renderer.shadowMap.enabled;
+cliffShadowCaster.receiveShadow=false;
+cliffShadowCaster.frustumCulled=false;
+cliffShadowCaster.layers.set(0);
+scene.add(cliffShadowCaster);
+let previousCasterGeometry=null,previousCasterPositionVersion=-1,
+ previousCasterIndexVersion=-1,cliffCasterFaceCount=0;
+function syncCliffShadowCaster(){
+ if(!renderer.shadowMap.enabled){cliffShadowCaster.visible=false;return}
+ const geo=terrain.geometry,position=geo?.getAttribute('position'),indices=geo?.getIndex();
+ if(!position){cliffShadowCaster.visible=false;return}
+ const indexVersion=indices?.version??-1;
+ if(geo!==previousCasterGeometry||position.version!==previousCasterPositionVersion||
+    indexVersion!==previousCasterIndexVersion){
+  const faces=cliffShadowFaceIndices(position.array,indices?.array);
+  const next=new THREE.BufferGeometry();
+  next.setAttribute('position',position.clone());
+  next.setIndex(faces);
+  cliffShadowCaster.geometry.dispose();
+  cliffShadowCaster.geometry=next;
+  cliffCasterFaceCount=faces.length/3;
+  previousCasterGeometry=geo;
+  previousCasterPositionVersion=position.version;
+  previousCasterIndexVersion=indexVersion;
+  light.shadow.needsUpdate=true; // Rebuild once after any sculpt, cut or heightmap edit.
+ }
+ cliffShadowCaster.visible=terrain.visible&&cliffCasterFaceCount>0;
+}
 const surface=new THREE.Group();scene.add(surface);
 const interiors=new THREE.Group();scene.add(interiors);
 const cavePiecesLayer=new THREE.Group();scene.add(cavePiecesLayer);
@@ -1007,7 +1115,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.101').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.143').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
@@ -1984,8 +2092,12 @@ function updateMemoryDisplay(){
 function animate(){
  requestAnimationFrame(animate);
  if(!preview.active)orbit.update();
+ if(scene.fog)scene.fog.density=preview.active?.00215:.00052;
+ const renderCamera=preview.frame()||camera; // Update player before its small shadow.
+ syncCliffShadowCaster();
+ syncPlaytestSun(preview.active?preview.shadowFocus:null);
  if(++axisTick%5===0)refreshAxisGizmo();
- renderer.render(scene,preview.frame()||camera);
+ renderer.render(scene,renderCamera);
  const now=performance.now();
  if(now-lastMemoryUpdate>1800){lastMemoryUpdate=now;updateMemoryDisplay();}
 }
