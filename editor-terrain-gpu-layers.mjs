@@ -172,6 +172,7 @@ export function createTerrainGPULayers({scene,terrain}){
    texture.needsUpdate=true;
    const shader=new THREE.ShaderMaterial({
     uniforms:{
+     ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
      baseTexture:{value:texture},
      regionMask:{value:mask},
      repeats:{value:limit(Number(slot.scale)||8,.25,1000)},
@@ -209,6 +210,7 @@ export function createTerrainGPULayers({scene,terrain}){
     detailTexture.needsUpdate=true;
     const detailMaterial=new THREE.ShaderMaterial({
      uniforms:{
+      ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
       regionMask:{value:mask},
       detailTexture:{value:detailTexture},
       repeats:{value:limit(Number(detailSlot.scale)||8,.25,1000)},
