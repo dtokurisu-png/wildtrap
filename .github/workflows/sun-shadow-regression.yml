@@ -1,7 +1,7 @@
 name: Validate new isolated sun shadows (pre-release)
 on:
   push:
-    branches: [integracion-sombras-sin-rayas-v0.9.143]
+    branches: [main, integracion-sombras-sin-rayas-v0.9.143]
     paths:
       - 'editor.mjs'
       - 'playtest.mjs'
