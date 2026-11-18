@@ -27,7 +27,6 @@ uniform sampler2D baseTexture;
 uniform sampler2D regionMask;
 uniform float repeats;
 uniform float intensity;
-uniform float debugPlainGround;
 varying vec2 vTerrainXZ;
 varying vec3 vTerrainWorld;
 varying vec3 vTerrainNormal;
@@ -39,9 +38,7 @@ void main(){
  float wallMix=smoothstep(.27,.78,steep);
  vec2 sourceUV=vTerrainXZ/630.0*repeats;
  vec2 wallUV=vec2(abs(vTerrainNormal.x)>abs(vTerrainNormal.z)?vTerrainWorld.z:vTerrainWorld.x,vTerrainWorld.y)/630.0*repeats;
- // Diagnostic only: replace the walkable ground PNG with flat pigment, while
- // retaining the actual sun shadows, geometric relief and cliff textures.
- vec3 ground=debugPlainGround>0.5?vec3(.55):texture2D(baseTexture,sourceUV).rgb;
+ vec3 ground=texture2D(baseTexture,sourceUV).rgb;
  vec3 wallGround=texture2D(baseTexture,wallUV).rgb;
  vec3 normalDirection=normalize(vTerrainNormal);
  float sun=max(dot(normalDirection,normalize(vec3(-.46,.80,.34))),0.0);
@@ -182,7 +179,6 @@ export function createTerrainGPULayers({scene,terrain}){
      baseTexture:{value:texture},
      regionMask:{value:mask},
      repeats:{value:limit(Number(slot.scale)||8,.25,1000)},
-     debugPlainGround:{value:new URLSearchParams(window.location.search).has('plainGround')?1:0},
       intensity:{value:limit(Number.isFinite(Number(slot.opacity))?Number(slot.opacity):1,0,1)}
     },
     vertexShader:VERTEX,fragmentShader:FRAGMENT,fog:true,
@@ -199,8 +195,7 @@ export function createTerrainGPULayers({scene,terrain}){
    // Add three separate, optional complementary layers on top of the base.
    // Their shaders use the SAME zone mask and terrain geometry, but never
    // modify the base material. ?noDetails=1 is an instant safe fallback.
-   const query=new URLSearchParams(window.location.search);
-   const detailsEnabled=!query.has('noDetails')&&!query.has('plainGround');
+   const detailsEnabled=!new URLSearchParams(window.location.search).has('noDetails');
    if(!detailsEnabled)continue;
    for(let i=1;i<=3;i++){
     const detailSlot=materials[biome].slots['detail'+i];
@@ -242,22 +237,8 @@ export function createTerrainGPULayers({scene,terrain}){
    // One transparent shadow-catching pass AFTER the painted biome and cliff layers.
    // Unlike the original unlit shader, ShadowMaterial receives real sun shadows.
    shadowMaterial=new THREE.ShadowMaterial({color:0x1a231e,opacity:.55,side:THREE.DoubleSide});
-   // Keep the real ground AND cliff shadow receiver unchanged by default.
-   // Opt-in diagnostic: ?noGroundShadowOverlay=1 hides only the shadow-catching
-   // pass on walkable ground, NEVER on walls. Compare this with normal mode
-   // to distinguish shadow-map stripes from stripes in the source PNG/UVs.
-   if(new URLSearchParams(window.location.search).has('noGroundShadowOverlay')){
-    shadowMaterial.onBeforeCompile=shader=>{
-     shader.vertexShader=shader.vertexShader.replace(
-      'void main() {',
-      'varying float vGroundFacing;\nvoid main() {\n vGroundFacing=abs(normal.y);'
-     );
-     shader.fragmentShader=shader.fragmentShader.replace(
-      'void main() {',
-      'varying float vGroundFacing;\nvoid main() {\n if(vGroundFacing>0.85)discard;'
-     );
-    };
-   }
+   // Receive the same real sunlight shadows on walkable ground AND cliff walls.
+   // Do not discard steep normals: it makes vertical terrain unnaturally shadowless.
    shadowMaterial.polygonOffset=true;
    shadowMaterial.polygonOffsetFactor=-10;
    shadowMaterial.polygonOffsetUnits=-10;
