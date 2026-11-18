@@ -55,7 +55,7 @@ const HERO_SHADOW_HALF_WIDTH=5.0; // requested fixed area
 const HERO_SHADOW_OPACITY=.55, HERO_SHADOW_SOFTNESS=1.40;
 const characterSun=new THREE.DirectionalLight(0xffe8cf,0);
 characterSun.layers.enable(1); // illuminate the player (layer 1) AND the ground (layer 0)
-characterSun.castShadow=true;
+characterSun.castShadow=false; // Off entirely in edit mode; activated only while playtesting.
 characterSun.shadow.mapSize.set(1024,1024);
 characterSun.shadow.camera.left=-HERO_SHADOW_HALF_WIDTH;
 characterSun.shadow.camera.right=HERO_SHADOW_HALF_WIDTH;
