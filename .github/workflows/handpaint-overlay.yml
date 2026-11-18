@@ -1,7 +1,7 @@
 name: Validar capa global handpaint 10K · Luz intensa
 on:
   push:
-    branches: [handpaint-global-hardlight-20261118, main]
+    branches: [handpaint-global-hardlight-20261118, handpaint-safe-startup-v0.9.146, main]
     paths:
       - 'terrain-handpaint-overlay.mjs'
       - 'terrain-handpaint-settings.mjs'
