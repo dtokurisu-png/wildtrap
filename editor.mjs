@@ -49,25 +49,35 @@ light.shadow.normalBias=0.025; // Avoid offsetting a 0.9-unit player shadow by a
 light.shadow.radius=2.2;
 scene.add(light);scene.add(light.target);
 const SUN_ORIGIN=new THREE.Vector3(-160,280,120);
-const PLAY_SHADOW_RADIUS=24;
 const shadowFocus=new THREE.Vector3();
-let playShadowActive=false;
+let playShadowActive=false,playShadowRadius=0;
+const shadowClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function followPlaytestShadow(focus){
- // Preserve daytime lighting but concentrate shadow texels near the small Explorer.
+ const config=live?.settings?.playerShadow||{};
+ const receiver=scene.getObjectByName('TerrainSoftSunShadows');
+ if(receiver?.material&&receiver.material.opacity!==undefined)
+  receiver.material.opacity=shadowClamp(Number(config.opacity??.55),0,1);
  if(focus){
-  if(!playShadowActive){
-   playShadowActive=true;
+  const radius=shadowClamp(Number(config.size??10),5,26);
+  if(!playShadowActive||Math.abs(radius-playShadowRadius)>.01){
+   playShadowActive=true;playShadowRadius=radius;
    const c=light.shadow.camera;
-   c.left=-PLAY_SHADOW_RADIUS;c.right=PLAY_SHADOW_RADIUS;
-   c.top=PLAY_SHADOW_RADIUS;c.bottom=-PLAY_SHADOW_RADIUS;
+   c.left=-radius;c.right=radius;c.top=radius;c.bottom=-radius;
    c.updateProjectionMatrix();
    shadowFocus.set(Infinity,Infinity,Infinity);
   }
-  if(shadowFocus.distanceToSquared(focus)>0.04){
+  light.shadow.radius=shadowClamp(Number(config.softness??1.4),.5,4);
+  const offsetX=shadowClamp(Number(config.offsetX??0),-2,2);
+  const offsetZ=shadowClamp(Number(config.offsetZ??0),-2,2);
+  if(shadowFocus.distanceToSquared(focus)>.04||
+     light.userData.shadowOffsetX!==offsetX||light.userData.shadowOffsetZ!==offsetZ){
    shadowFocus.copy(focus);
+   light.userData.shadowOffsetX=offsetX;light.userData.shadowOffsetZ=offsetZ;
    const x=Math.round(focus.x*2)/2,z=Math.round(focus.z*2)/2;
    light.target.position.set(x,focus.y,z);
    light.position.copy(SUN_ORIGIN).add(light.target.position);
+   // Small angular adjustments let users align the projected silhouette.
+   light.position.x+=offsetX*16;light.position.z+=offsetZ*16;
    light.target.updateMatrixWorld();light.updateMatrixWorld();
   }
  }else if(playShadowActive){
@@ -75,6 +85,7 @@ function followPlaytestShadow(focus){
   const c=light.shadow.camera;
   c.left=-355;c.right=355;c.top=355;c.bottom=-355;
   c.updateProjectionMatrix();
+  light.shadow.radius=2.2;
   light.position.copy(SUN_ORIGIN);
   light.target.position.set(0,0,0);
   light.target.updateMatrixWorld();light.updateMatrixWorld();
@@ -1053,7 +1064,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.133').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.134').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
    resizeEditor:resize,persist,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
@@ -2032,8 +2043,8 @@ function animate(){
  if(!preview.active)orbit.update();
  // Equalize perceived haze between distant orthographic edit and near-ground play.
  if(scene.fog)scene.fog.density=preview.active?0.00215:0.00052;
- // World shadow tracking is disabled in play: the avatar uses a lightweight, local contact shadow.
- followPlaytestShadow(null);
+ // Restore the actual sun-lit, animated player silhouette in play mode.
+ followPlaytestShadow(preview.active?preview.shadowFocus:null);
  if(++axisTick%5===0)refreshAxisGizmo();
  renderer.render(scene,preview.frame()||camera);
  const now=performance.now();

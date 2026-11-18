@@ -408,7 +408,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <span>Clic: X · Y · Z</span>
 </div>
 <div id="modelHoverIndicator" aria-hidden="true"></div><div id="interactionHelp" aria-hidden="true"></div>
-<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.133
+<div id="editorVersionTag" aria-label="Versión actual del editor" title="Versión cargada en este navegador" style="position:fixed;top:12px;right:14px;z-index:8;background:#102c25e8;color:#bdfbe5;border:1px solid #568c77;border-radius:7px;padding:5px 9px;font:600 11px/1.3 sans-serif;pointer-events:none">WILDTRAP · v0.9.134
  <span id="editorSaveState" style="font-weight:400;display:block;opacity:.8">Guardado local</span></div>
 <div id="overlay"><b id="viewType">Vista 3D</b> · <span id="coords">X 0 · Z 0 · altura 0</span><div id="status">Editor listo</div><div id="memoryStatus" style="font-size:11px;opacity:.9" aria-label="Uso de memoria del editor">Memoria: preparando medición…</div></div>
 <div id="brushGestureHint" hidden aria-live="off"></div>
@@ -420,13 +420,13 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
   </div>
   <button id="stopTest">Volver al editor · Esc</button>
   <details id="playShadowControls">
-    <summary>Sombra del personaje <span title="Sombra local ligera: no se dibuja sobre acantilados ni utiliza mapas de sombras globales.">ⓘ</span></summary>
+    <summary>Sombra real del personaje <span title="Silueta animada proyectada por la luz solar. El tamaño define el área cubierta por el mapa de sombras, no dibuja un círculo.">ⓘ</span></summary>
     <label><span>Activar</span><input id="shadowEnabled" type="checkbox" checked></label>
     <label>Intensidad<input id="shadowOpacity" type="range" min="0" max="1" step=".05" value=".55"><output id="shadowOpacityValue">0.55</output></label>
-    <label>Tamaño<input id="shadowSize" type="range" min=".35" max="3" step=".05" value="1.10"><output id="shadowSizeValue">1.10</output></label>
-    <label>Suavidad<input id="shadowSoftness" type="range" min=".05" max="1" step=".05" value=".65"><output id="shadowSoftnessValue">0.65</output></label>
-    <label>Desplazamiento X<input id="shadowOffsetX" type="range" min="-2" max="2" step=".05" value=".22"><output id="shadowOffsetXValue">0.22</output></label>
-    <label>Desplazamiento Z<input id="shadowOffsetZ" type="range" min="-2" max="2" step=".05" value="-.16"><output id="shadowOffsetZValue">-0.16</output></label>
+    <label>Área de sombra<input id="shadowSize" type="range" min="5" max="26" step="1" value="10"><output id="shadowSizeValue">10.00</output></label>
+    <label>Suavidad<input id="shadowSoftness" type="range" min=".5" max="4" step=".1" value="1.4"><output id="shadowSoftnessValue">1.40</output></label>
+    <label>Desplazamiento X<input id="shadowOffsetX" type="range" min="-2" max="2" step=".05" value="0"><output id="shadowOffsetXValue">0.00</output></label>
+    <label>Desplazamiento Z<input id="shadowOffsetZ" type="range" min="-2" max="2" step=".05" value="0"><output id="shadowOffsetZValue">0.00</output></label>
   </details>
   <div id="playReticle" aria-hidden="true"></div>
   <div id="playBottom">Explorador 1 WT · cámara en tercera persona · W sigue la dirección de la cámara</div>
@@ -458,5 +458,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.133').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.134').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>

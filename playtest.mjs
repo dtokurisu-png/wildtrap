@@ -2,9 +2,8 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {loadCorrectedExplorerRun} from './explorer-run-corrected.mjs?v=0.9.80';
 import {inPlaceClip} from './playtest-animation.mjs?v=0.9.36';
-import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.133';
+import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.134';
 import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.33';
-import {createPlaytestContactShadow} from './playtest-contact-shadow.mjs?v=0.9.133';
 // The user's own WT GLB and animation files will be supplied separately.
 // No R.O.K. model or animation is loaded.
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -21,32 +20,29 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  const clock=new THREE.Clock();
  const collider=createPlaytestCollider({THREE,terrain,roots:collisionRoots});
  if(!live.settings||typeof live.settings!=='object')live.settings={};
- if(!live.settings.playerShadow)live.settings.playerShadow={};
- const contactShadow=createPlaytestContactShadow({
-  scene,settings:live.settings.playerShadow,
-  groundAt:(x,z,y)=>collider.floorAt(x,z,y,{stepUp:.6,searchDepth:3,footprint:0})
- });
- const SHADOW_FIELDS={
-  shadowOpacity:'opacity',shadowSize:'size',shadowSoftness:'softness',
-  shadowOffsetX:'offsetX',shadowOffsetZ:'offsetZ'
- };
+ if(!live.settings.playerShadow||typeof live.settings.playerShadow!=='object')live.settings.playerShadow={};
+ function applyCharacterShadow(){
+  const enabled=shadows().enabled!==false;
+  imported?.scene?.traverse(o=>{if(o.isMesh)o.castShadow=enabled});
+ }
+ const SHADOW_FIELDS={shadowOpacity:'opacity',shadowSize:'size',shadowSoftness:'softness',
+  shadowOffsetX:'offsetX',shadowOffsetZ:'offsetZ'};
+ const shadows=()=>live.settings.playerShadow;
  function configureShadowControls(){
+  const values={opacity:.55,size:10,softness:1.4,offsetX:0,offsetZ:0,...shadows()};
   for(const [id,key] of Object.entries(SHADOW_FIELDS)){
    const input=$(id);if(!input)continue;
-   input.value=String(contactShadow.config[key]);
-   input.oninput=()=>{
-    const value=Number(input.value);
-    live.settings.playerShadow[key]=value;
-    contactShadow.updateSettings({[key]:value});
-    persist();
-    const label=$(id+'Value');if(label)label.textContent=value.toFixed(2);
-   };
+   input.value=String(values[key]);
    const label=$(id+'Value');if(label)label.textContent=Number(input.value).toFixed(2);
+   input.oninput=()=>{
+    shadows()[key]=Number(input.value);persist();
+    if(label)label.textContent=Number(input.value).toFixed(2);
+   };
   }
   const toggle=$('shadowEnabled');
   if(toggle){
-   toggle.checked=contactShadow.config.enabled;
-   toggle.onchange=()=>{live.settings.playerShadow.enabled=toggle.checked;contactShadow.updateSettings({enabled:toggle.checked});persist()};
+   toggle.checked=shadows().enabled!==false;
+   toggle.onchange=()=>{shadows().enabled=toggle.checked;applyCharacterShadow();persist()};
   }
  }
  configureShadowControls();
@@ -56,9 +52,8 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  const IDLE_CLIP_INDEX=2,RUN_CLIP_INDEX=4;
- let oldShow=null,oldShadow=null,oldShadowMap=null,oldTerrainCast=null;
+ let oldShow=null,oldShadow=null,oldTerrainCast=null;
 const hiddenDebugMarkers=[];
- const shadowReceiverStates=[];
  const keys=new Set();
  let modelURL=EXPLORER_URL;
  let localURL=null,loadingPromise=null,sourceError='';
@@ -129,7 +124,7 @@ const hiddenDebugMarkers=[];
       if(!positions.count)return;
       meshes++;vertices+=positions.count;
       obj.frustumCulled=false;
-      obj.castShadow=false;obj.receiveShadow=true;
+      obj.castShadow=true;obj.receiveShadow=true;
       obj.geometry.computeBoundingBox();
       const bound=obj.geometry.boundingBox;
       if(bound&& !bound.isEmpty()){
@@ -193,9 +188,10 @@ const hiddenDebugMarkers=[];
     visual.rotation.y=Math.PI;
     player.add(visual);
     gltf.scene.traverse(object=>{
-      if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
+      if(object.isMesh){object.frustumCulled=false;object.castShadow=true;object.receiveShadow=true}
     });
     imported=gltf;
+    applyCharacterShadow();
     // WT animation slots are 1-based for the designer:
     // clip 3 = stationary, clip 5 = moving forward with W.
     const clips=gltf.animations||[];
@@ -272,20 +268,12 @@ const hiddenDebugMarkers=[];
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
-    // Play uses a cheap local contact shadow, never terrain-wide real-time shadows.
-    oldShadowMap=renderer.shadowMap.enabled;
+    // Restore the real skinned silhouette and the sun shadow renderer.
+    // Terrain may receive shadows but must not cast giant cliff self-shadows.
     oldTerrainCast=terrain.castShadow;
-    renderer.shadowMap.enabled=false;
     terrain.castShadow=false;
-    shadowReceiverStates.length=0;
-    scene.traverse(object=>{
-     if(object.name==='TerrainSoftSunShadows'){
-      shadowReceiverStates.push([object,object.visible]);
-      object.visible=false;
-     }
-    });
-    contactShadow.updateSettings(live.settings.playerShadow||{});
     configureShadowControls();
+    applyCharacterShadow();
     collider.refresh();
     resetPosition();
     if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
@@ -373,7 +361,6 @@ const hiddenDebugMarkers=[];
     else player.position.y=nextY;
   }
   // Same in-place running clip for W/A/S/D and diagonals, only while moving.
-  contactShadow.update(player.position,player.position.y);
    setMovingAnimation(moved);
   if(mixer)mixer.update(dt);
   // Classic Farolera-style chase: camera BEHIND and ABOVE the player,
