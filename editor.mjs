@@ -78,11 +78,17 @@ characterSun.shadow.camera.layers.set(1); // Only animated Explorer meshes.
 characterSun.shadow.bias=-.00015;
 characterSun.shadow.normalBias=.008;
 characterSun.shadow.radius=1.4;
+// The Explorer's 1024x1024 depth pass was being rendered EVERY frame even
+// when idle. Keep full resolution, but refresh on animation/movement cadence.
+characterSun.shadow.autoUpdate=false;
 characterSun.position.set(-16,28,12);
 scene.add(characterSun,characterSun.target);
 const heroShadowLastPosition=new THREE.Vector3(Infinity,Infinity,Infinity);
+const HERO_SHADOW_MOVING_INTERVAL_MS=34; // approx. 30 updates/s, gameplay stays at display FPS
+const HERO_SHADOW_IDLE_INTERVAL_MS=75;   // slow idle animation doesn't need 60 shadow passes/s
 let heroShadowWasActive=false,heroShadowReceiver=null;
-function syncPlaytestSun(focus){
+let heroShadowLastUpdate=-Infinity;
+function syncPlaytestSun(focus,moving=false){
  const active=Boolean(focus)&&renderer.shadowMap.enabled;
  if(heroShadowWasActive!==active){
   heroShadowWasActive=active;
@@ -93,16 +99,30 @@ function syncPlaytestSun(focus){
   light.shadow.autoUpdate=false; // Never redraw the whole arena every frame.
   light.shadow.needsUpdate=true; // One complete map when switching modes.
   heroShadowLastPosition.set(Infinity,Infinity,Infinity);
+  heroShadowLastUpdate=-Infinity; // Force the Explorer map on the first play frame.
  }
  if(!heroShadowReceiver||!heroShadowReceiver.parent)
   heroShadowReceiver=scene.getObjectByName('TerrainSoftSunShadows');
- if(heroShadowReceiver?.material)heroShadowReceiver.material.opacity=.55;
- if(active&&heroShadowLastPosition.distanceToSquared(focus)>.01){
-  heroShadowLastPosition.copy(focus);
-  const x=Math.round(focus.x*10)/10,y=Math.round(focus.y*10)/10,z=Math.round(focus.z*10)/10;
-  characterSun.target.position.set(x,y,z);
-  characterSun.position.set(x-16,y+28,z+12);
-  characterSun.target.updateMatrixWorld();characterSun.updateMatrixWorld();
+ if(heroShadowReceiver?.material&&heroShadowReceiver.material.opacity!==.55)
+  heroShadowReceiver.material.opacity=.55;
+ if(active){
+  const now=performance.now();
+  const interval=moving?HERO_SHADOW_MOVING_INTERVAL_MS:HERO_SHADOW_IDLE_INTERVAL_MS;
+  if(now-heroShadowLastUpdate>=interval){
+   if(heroShadowLastPosition.distanceToSquared(focus)>.01){
+    heroShadowLastPosition.copy(focus);
+    const x=Math.round(focus.x*10)/10,y=Math.round(focus.y*10)/10,z=Math.round(focus.z*10)/10;
+    characterSun.target.position.set(x,y,z);
+    characterSun.position.set(x-16,y+28,z+12);
+    characterSun.target.updateMatrixWorld();characterSun.updateMatrixWorld();
+   }
+   // Re-render the moving/animated silhouette only on this frame. No changes
+   // to the world sun's 1024 map, penumbra, terrain materials or cliff proxies.
+   characterSun.shadow.needsUpdate=true;
+   heroShadowLastUpdate=now;
+   if(window.__wildtrapDiagnostics)
+    window.__wildtrapDiagnostics.heroShadowRefreshes=(window.__wildtrapDiagnostics.heroShadowRefreshes||0)+1;
+  }
  }
 }
 const view=$('viewport');
@@ -2107,7 +2127,7 @@ function animate(){
  if(scene.fog)scene.fog.density=preview.active?.00215:.00052;
  const renderCamera=preview.frame()||camera; // Update player before its small shadow.
  syncCliffShadowCaster();
- syncPlaytestSun(preview.active?preview.shadowFocus:null);
+ syncPlaytestSun(preview.active?preview.shadowFocus:null,preview.active&&preview.shadowMoving);
  if(++axisTick%5===0)refreshAxisGizmo();
  renderer.render(scene,renderCamera);
  const now=performance.now();
