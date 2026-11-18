@@ -1,20 +1,12 @@
 import * as THREE from 'three';
+import {HANDPAINT_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE}
+ from './terrain-handpaint-settings.mjs';
+export {HANDPAINT_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE}
+ from './terrain-handpaint-settings.mjs';
 
-// A single non-tiled canvas-wide painting projected across the complete
-// 630x630 world. In Photoshop 35% TRANSPARENCY = 65% OPACITY.
-// Keep the original 10K PNG in the repo; upload a 4096px GPU copy only.
-export const HANDPAINT_SOURCE='./assets/terrain/texturas/terreno_handpaint_10K.png';
-export const HANDPAINT_OPACITY=0.65;
-export const HANDPAINT_GPU_MAX_SIZE=4096;
+// Non-tiled global painting covering the 630x630 terrain.
+// Keep the 10K source intact; send a 4096px downsampled copy to the GPU.
 const WORLD_SIZE=630;
-
-export function hardLightChannel(base,source){
- return source<=0.5?2*base*source:1-2*(1-base)*(1-source);
-}
-export function hardLightRGB(base,paint,opacity=HANDPAINT_OPACITY){
- const weight=Math.max(0,Math.min(1,opacity));
- return base.map((channel,i)=>channel*(1-weight)+hardLightChannel(channel,paint[i])*weight);
-}
 
 // Render terrain + props ONCE to the normal-resolution target, then compose
 // the art on top of just the actually visible terrain fragments.
