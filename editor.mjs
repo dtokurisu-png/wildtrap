@@ -39,13 +39,19 @@ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const skyLight=new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85);
 skyLight.layers.enable(1);scene.add(skyLight);
 const light=new THREE.DirectionalLight(0xffe8cf,2.25);
-light.position.set(-160,280,120);
+// Keep the established sunlight direction but move the shadow camera behind
+// the entire 630-unit terrain. Its old position clipped elevated far corners.
+light.position.set(-480,840,360);
 light.castShadow=true;
-light.shadow.mapSize.set(1024,1024);
-light.shadow.camera.left=-355;light.shadow.camera.right=355;
-light.shadow.camera.top=355;light.shadow.camera.bottom=-355;
-light.shadow.camera.near=1;light.shadow.camera.far=1000;
-light.shadow.bias=-0.00015;
+light.shadow.mapSize.set(1024,1024); // Preserve GPU cost: no 2K/4K shadow map.
+const WORLD_SHADOW_HALF_EXTENT=SIZE*.92; // Includes projected diagonal corners and cliffs.
+light.shadow.camera.left=-WORLD_SHADOW_HALF_EXTENT;
+light.shadow.camera.right=WORLD_SHADOW_HALF_EXTENT;
+light.shadow.camera.top=WORLD_SHADOW_HALF_EXTENT;
+light.shadow.camera.bottom=-WORLD_SHADOW_HALF_EXTENT;
+light.shadow.camera.near=100;light.shadow.camera.far=1850;
+light.shadow.camera.updateProjectionMatrix();
+light.shadow.bias=-0.00009; // Comparable world-space depth bias after increasing far range.
 light.shadow.normalBias=0.025; // Avoid offsetting a 0.9-unit player shadow by almost its own height.
 light.shadow.radius=2.2;
 scene.add(light);scene.add(light.target);
@@ -84,7 +90,9 @@ function syncPlaytestSun(focus){
   characterSun.castShadow=active;
   light.intensity=active?1.8:2.25;
   light.shadow.autoUpdate=!active;
-  if(!active)light.shadow.needsUpdate=true;
+  // The terrain stops CASTING in play mode. Rebuild the world map once with
+  // that configuration before caching it, or old terrain self-shadows survive.
+  light.shadow.needsUpdate=true;
   heroShadowLastPosition.set(Infinity,Infinity,Infinity);
  }
  if(!heroShadowReceiver||!heroShadowReceiver.parent)
