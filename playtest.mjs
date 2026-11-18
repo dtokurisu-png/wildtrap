@@ -10,7 +10,7 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const forwardOf=yaw=>new THREE.Vector3(Math.sin(yaw),0,-Math.cos(yaw));
 const EXPLORER_URL='./assets/explorador%201%20wt.glb';
 
-export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,collisionRoots=[],$,resizeEditor,persist=()=>{},onStop=()=>{}}){
+export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,collisionRoots=[],$,resizeEditor,onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const cameraFocus=new THREE.Vector3();
  const CAMERA_DISTANCE=2.55,CAMERA_HEIGHT=1.15;
@@ -19,50 +19,13 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  // due to an intersecting terrain wall.
  const clock=new THREE.Clock();
  const collider=createPlaytestCollider({THREE,terrain,roots:collisionRoots});
- if(!live.settings||typeof live.settings!=='object')live.settings={};
- if(!live.settings.playerShadow||typeof live.settings.playerShadow!=='object')live.settings.playerShadow={};
- // The old 0.35–3 'size' and offset values belonged to the discarded fake circle.
- // Reset only those obsolete settings, retaining the user's opacity preference.
- if(live.settings.playerShadow.mode!=='real'){
-  const old=live.settings.playerShadow;
-  live.settings.playerShadow={
-   mode:'real',enabled:old.enabled!==false,
-   opacity:Number.isFinite(Number(old.opacity))?Math.max(0,Math.min(1,Number(old.opacity))):.55,
-   size:10,softness:1.4,offsetX:0,offsetZ:0
-  };
- }
- function applyCharacterShadow(){
-  const enabled=shadows().enabled!==false;
-  imported?.scene?.traverse(o=>{if(o.isMesh)o.castShadow=enabled});
- }
- const SHADOW_FIELDS={shadowOpacity:'opacity',shadowSize:'size',shadowSoftness:'softness',
-  shadowOffsetX:'offsetX',shadowOffsetZ:'offsetZ'};
- const shadows=()=>live.settings.playerShadow;
- function configureShadowControls(){
-  const values={opacity:.55,size:10,softness:1.4,offsetX:0,offsetZ:0,...shadows()};
-  for(const [id,key] of Object.entries(SHADOW_FIELDS)){
-   const input=$(id);if(!input)continue;
-   input.value=String(values[key]);
-   const label=$(id+'Value');if(label)label.textContent=Number(input.value).toFixed(2);
-   input.oninput=()=>{
-    shadows()[key]=Number(input.value);persist();
-    if(label)label.textContent=Number(input.value).toFixed(2);
-   };
-  }
-  const toggle=$('shadowEnabled');
-  if(toggle){
-   toggle.checked=shadows().enabled!==false;
-   toggle.onchange=()=>{shadows().enabled=toggle.checked;applyCharacterShadow();persist()};
-  }
- }
- configureShadowControls();
  let verticalSpeed=0;
  const player=new THREE.Group();
  player.name='WILDTRAPPlayer1';
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  const IDLE_CLIP_INDEX=2,RUN_CLIP_INDEX=4;
- let oldShow=null,oldShadow=null,oldTerrainCast=null;
+ let oldShow=null,oldShadow=null;
 const hiddenDebugMarkers=[];
  const keys=new Set();
  let modelURL=EXPLORER_URL;
@@ -134,7 +97,7 @@ const hiddenDebugMarkers=[];
       if(!positions.count)return;
       meshes++;vertices+=positions.count;
       obj.frustumCulled=false;
-      obj.castShadow=true;obj.receiveShadow=true;
+      obj.castShadow=true;obj.receiveShadow=true;obj.layers.set(1);
       obj.geometry.computeBoundingBox();
       const bound=obj.geometry.boundingBox;
       if(bound&& !bound.isEmpty()){
@@ -198,10 +161,9 @@ const hiddenDebugMarkers=[];
     visual.rotation.y=Math.PI;
     player.add(visual);
     gltf.scene.traverse(object=>{
-      if(object.isMesh){object.frustumCulled=false;object.castShadow=true;object.receiveShadow=true}
+      if(object.isMesh){object.frustumCulled=false;object.castShadow=true;object.receiveShadow=true;object.layers.set(1)}
     });
     imported=gltf;
-    applyCharacterShadow();
     // WT animation slots are 1-based for the designer:
     // clip 3 = stationary, clip 5 = moving forward with W.
     const clips=gltf.animations||[];
@@ -278,19 +240,18 @@ const hiddenDebugMarkers=[];
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
-    // Restore the real skinned silhouette and the sun shadow renderer.
-    // Terrain may receive shadows but must not cast giant cliff self-shadows.
-    oldTerrainCast=terrain.castShadow;
-    terrain.castShadow=false;
-    configureShadowControls();
-    applyCharacterShadow();
+    // Do not modify the working arena sunlight or disable world-shadow casting.
+    // The editor caches the arena map and renders only the avatar in a focused map.
+    renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
+
     collider.refresh();
     resetPosition();
     if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
     hiddenDebugMarkers.length=0;
     scene.traverse(object=>{if(object.userData.editorOnly&&object.visible){hiddenDebugMarkers.push(object);object.visible=false}});
     scene.add(player);
-    orbit.enabled=false;
+    camera.layers.enable(1); // actual GLB silhouette lives on the avatar shadow layer
+   orbit.enabled=false;
     active=true;busy=false;
     document.body.classList.add('testing');
     keys.clear();

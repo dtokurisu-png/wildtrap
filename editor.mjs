@@ -36,7 +36,8 @@ renderer.outputColorSpace=THREE.SRGBColorSpace;
 if(new URLSearchParams(location.search).has('safe'))window.__wildtrapDiagnostics={renderer,scene,getCamera:()=>camera,makeTarget:(w,h)=>new THREE.WebGLRenderTarget(w,h)};
 renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-scene.add(new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85));
+const skyLight=new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85);
+skyLight.layers.enable(1);scene.add(skyLight);
 const light=new THREE.DirectionalLight(0xffe8cf,2.25);
 light.position.set(-160,280,120);
 light.castShadow=true;
@@ -48,51 +49,55 @@ light.shadow.bias=-0.00015;
 light.shadow.normalBias=0.025; // Avoid offsetting a 0.9-unit player shadow by almost its own height.
 light.shadow.radius=2.2;
 scene.add(light);scene.add(light.target);
-const SUN_ORIGIN=new THREE.Vector3(-160,280,120);
-const shadowFocus=new THREE.Vector3();
-let playShadowActive=false,playShadowRadius=0,shadowReceiverCache=null;
-const shadowClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-function followPlaytestShadow(focus){
- const config=live?.settings?.playerShadow||{};
- if(!shadowReceiverCache||!shadowReceiverCache.parent)shadowReceiverCache=scene.getObjectByName('TerrainSoftSunShadows');
- const receiver=shadowReceiverCache;
- if(receiver?.material&&receiver.material.opacity!==undefined)
-  receiver.material.opacity=shadowClamp(Number(config.opacity??.55),0,1);
- if(focus){
-  const radius=shadowClamp(Number(config.size??10),5,26);
-  if(!playShadowActive||Math.abs(radius-playShadowRadius)>.01){
-   playShadowActive=true;playShadowRadius=radius;
-   const c=light.shadow.camera;
-   c.left=-radius;c.right=radius;c.top=radius;c.bottom=-radius;
-   c.updateProjectionMatrix();
-   shadowFocus.set(Infinity,Infinity,Infinity);
-  }
-  light.shadow.radius=shadowClamp(Number(config.softness??1.4),.5,4);
-  const offsetX=shadowClamp(Number(config.offsetX??0),-2,2);
-  const offsetZ=shadowClamp(Number(config.offsetZ??0),-2,2);
-  if(shadowFocus.distanceToSquared(focus)>.04||
-     light.userData.shadowOffsetX!==offsetX||light.userData.shadowOffsetZ!==offsetZ){
-   shadowFocus.copy(focus);
-   light.userData.shadowOffsetX=offsetX;light.userData.shadowOffsetZ=offsetZ;
-   const x=Math.round(focus.x*2)/2,z=Math.round(focus.z*2)/2;
-   light.target.position.set(x,focus.y,z);
-   light.position.copy(SUN_ORIGIN).add(light.target.position);
-   // Small angular adjustments let users align the projected silhouette.
-   light.position.x+=offsetX*16;light.position.z+=offsetZ*16;
-   light.target.updateMatrixWorld();light.updateMatrixWorld();
-  }
- }else if(playShadowActive){
-  playShadowActive=false;
-  const c=light.shadow.camera;
-  c.left=-355;c.right=355;c.top=355;c.bottom=-355;
-  c.updateProjectionMatrix();
-  light.shadow.radius=2.2;
-  light.position.copy(SUN_ORIGIN);
-  light.target.position.set(0,0,0);
-  light.target.updateMatrixWorld();light.updateMatrixWorld();
+// One permanent arena sun, plus a small high-definition shadow map for the Explorer.
+// The arena shadow map is cached during play; only the animated character is re-rendered.
+const HERO_SHADOW_HALF_WIDTH=5.0; // requested fixed area
+const HERO_SHADOW_OPACITY=.55, HERO_SHADOW_SOFTNESS=1.40;
+const characterSun=new THREE.DirectionalLight(0xffe8cf,0);
+characterSun.layers.enable(1); // illuminate the player (layer 1) AND the ground (layer 0)
+characterSun.castShadow=true;
+characterSun.shadow.mapSize.set(1024,1024);
+characterSun.shadow.camera.left=-HERO_SHADOW_HALF_WIDTH;
+characterSun.shadow.camera.right=HERO_SHADOW_HALF_WIDTH;
+characterSun.shadow.camera.top=HERO_SHADOW_HALF_WIDTH;
+characterSun.shadow.camera.bottom=-HERO_SHADOW_HALF_WIDTH;
+characterSun.shadow.camera.near=.5;
+characterSun.shadow.camera.far=120;
+characterSun.shadow.camera.layers.set(1); // avatar only: never re-render 3D cliff meshes
+characterSun.shadow.bias=-.00015;
+characterSun.shadow.normalBias=.008;
+characterSun.shadow.radius=HERO_SHADOW_SOFTNESS;
+characterSun.shadow.autoUpdate=true;
+characterSun.target.position.set(0,0,0);
+characterSun.position.set(-16,28,12);
+scene.add(characterSun,characterSun.target);
+light.shadow.camera.layers.set(0); // world shadow only; the character uses its own map
+const heroShadowLastPosition=new THREE.Vector3(Infinity,Infinity,Infinity);
+let heroShadowWasActive=false,heroShadowReceiver=null;
+function syncPlaytestSun(focus){
+ const active=Boolean(focus);
+ if(heroShadowWasActive!==active){
+  heroShadowWasActive=active;
+  characterSun.intensity=active?.45:0;
+  characterSun.castShadow=active;
+  light.intensity=active?1.8:2.25;
+  light.shadow.autoUpdate=!active;
+  if(!active)light.shadow.needsUpdate=true;
+  heroShadowLastPosition.set(Infinity,Infinity,Infinity);
+ }
+ if(!heroShadowReceiver||!heroShadowReceiver.parent)
+  heroShadowReceiver=scene.getObjectByName('TerrainSoftSunShadows');
+ if(heroShadowReceiver?.material)
+  heroShadowReceiver.material.opacity=HERO_SHADOW_OPACITY;
+ if(active&&heroShadowLastPosition.distanceToSquared(focus)>.01){
+  // Quantized movement is enough for a ten-unit shadow frustum and avoids jitter.
+  heroShadowLastPosition.copy(focus);
+  const x=Math.round(focus.x*10)/10,y=Math.round(focus.y*10)/10,z=Math.round(focus.z*10)/10;
+  characterSun.target.position.set(x,y,z);
+  characterSun.position.set(x-16,y+28,z+12);
+  characterSun.target.updateMatrixWorld();characterSun.updateMatrixWorld();
  }
 }
-
 const view=$('viewport');
 const camera=new THREE.OrthographicCamera(-SIZE*.65,SIZE*.65,SIZE*.65,-SIZE*.65,.1,2600);
 const orbit=new OrbitControls(camera,view);orbit.enableDamping=true;orbit.screenSpacePanning=true;
@@ -1065,7 +1070,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.134').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.135').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
    resizeEditor:resize,persist,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
@@ -2044,8 +2049,8 @@ function animate(){
  if(!preview.active)orbit.update();
  // Equalize perceived haze between distant orthographic edit and near-ground play.
  if(scene.fog)scene.fog.density=preview.active?0.00215:0.00052;
- // Restore the actual sun-lit, animated player silhouette in play mode.
- followPlaytestShadow(preview.active?preview.shadowFocus:null);
+ // Update only the avatar's high-definition shadow; reuse arena shadows unchanged.
+ syncPlaytestSun(preview.active?preview.shadowFocus:null);
  if(++axisTick%5===0)refreshAxisGizmo();
  renderer.render(scene,preview.frame()||camera);
  const now=performance.now();
@@ -2126,7 +2131,7 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.131');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.135');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});

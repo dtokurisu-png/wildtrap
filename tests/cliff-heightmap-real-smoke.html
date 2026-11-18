@@ -36,6 +36,7 @@ try{
    const bad=programs.filter(p=>p.program&&gl&&!gl.getProgramParameter(p.program,gl.LINK_STATUS)).map(p=>p.diagnostics?.programLog||p.cacheKey);
    const active=programs.length;
    const textureObjects=diagnostic?.scene.children.filter(obj=>obj.name.startsWith('BiomeGroundSafe')).length||0;
+   const shadowReceiverCount=diagnostic?.scene.children.filter(obj=>obj.name==='TerrainSoftSunShadows').length||0;
    const layers=diagnostic.scene.children.filter(obj=>/^(BiomeGroundSafe|CliffColor|BiomeComplement)/.test(obj.name));
    const rt=diagnostic.makeTarget(32,32);
    function samplePixels(){
@@ -58,8 +59,8 @@ try{
     for(let i=0;i<withLayers.length;i+=4)pixelDelta+=Math.abs(withLayers[i]-withoutLayers[i])+Math.abs(withLayers[i+1]-withoutLayers[i+1])+Math.abs(withLayers[i+2]-withoutLayers[i+2]);
    }catch(error){pixelDelta='ERROR '+(error.stack||error.message).replaceAll('<','[').replaceAll('> ','] ').replaceAll('\n',' || ').slice(0,850)}
    rt.dispose();
-   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&groundLayers>0&&textureObjects>0&&bad.length===0&&typeof pixelDelta==='number'&&pixelDelta>1000&&label.includes('zonas ⛰')?'PASS':'FAIL';
-   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes+' · texturas suelo: '+groundLayers+' · WebGL programs: '+active+' · bad: '+JSON.stringify(bad)+' · ground meshes: '+textureObjects+' · pixel delta: '+pixelDelta;return;
+   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&groundLayers>0&&textureObjects>0&&shadowReceiverCount===1&&bad.length===0&&typeof pixelDelta==='number'&&pixelDelta>1000&&label.includes('zonas ⛰')?'PASS':'FAIL';
+   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes+' · texturas suelo: '+groundLayers+' · WebGL programs: '+active+' · bad: '+JSON.stringify(bad)+' · ground meshes: '+textureObjects+' · shadow receivers: '+shadowReceiverCount+' · pixel delta: '+pixelDelta;return;
   }
   if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}
  },250);

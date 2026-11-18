@@ -129,6 +129,9 @@ function fullResolutionSource(image){
 export function createTerrainGPULayers({scene,terrain}){
  let records=[],shadowMesh=null,shadowMaterial=null;
  function clear(){
+  // Prevent accumulated invisible duplicate shadow receivers after biome rebakes.
+  if(shadowMesh){scene.remove(shadowMesh);shadowMesh=null}
+  if(shadowMaterial){shadowMaterial.dispose();shadowMaterial=null}
   const releasedMasks=new Set();
   for(const entry of records){
    scene.remove(entry.mesh);
