@@ -1,0 +1,41 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Real sun shadow geometry regression</title>
+<body data-result="PENDING"><div id="result">Comprobando el sol y los acantilados</div>
+<script>
+const fail=message=>{document.body.dataset.result='FAIL';document.querySelector('#result').textContent=String(message)};
+try{
+ const N=129,H=Array(N*N).fill(0);
+ for(let z=0;z<N;z++)for(let x=0;x<N;x++)H[z*N+x]=x<64?45:0;
+ const draft={version:3,size:630,resolution:N,heights:H,nodes:[],holes:[],cuts3d:[],
+  zones:[{id:'plains',name:'Llanura',biomeId:'plains',points:[{x:-300,z:-300},{x:300,z:-300},{x:300,z:300},{x:-300,z:300}]}],
+  objectGroups:[],nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
+ localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
+ const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=840;frame.height=540;document.body.append(frame);
+ const started=Date.now();
+ const check=setInterval(()=>{
+  const d=frame.contentDocument,w=frame.contentWindow;
+  if(!d?.querySelector('#boot[hidden]')||!w?.__wildtrapDiagnostics){
+   if(Date.now()-started>45000){clearInterval(check);fail('Editor no inició: '+(d?.querySelector('#bootMsg')?.textContent||'sin datos'))}
+   return;
+  }
+  const {renderer,scene}=w.__wildtrapDiagnostics;
+  const terrain=scene.getObjectByName('heightmap terrain');
+  const caster=scene.getObjectByName('TerrainCliffShadowCaster');
+  const receiver=scene.getObjectByName('TerrainSoftSunShadows');
+  const sun=scene.children.find(o=>o.isDirectionalLight&&o.intensity>1);
+  const totalFaces=terrain?.geometry?.index?.count/3||0;
+  const cliffFaces=caster?.geometry?.index?.count/3||0;
+  const ok=Boolean(renderer.shadowMap.enabled&&terrain&&!terrain.castShadow&&terrain.receiveShadow&&
+   caster?.castShadow&&cliffFaces>0&&cliffFaces<totalFaces&&
+   sun?.castShadow&&sun.shadow.mapSize.x===1024&&
+   sun.shadow.camera.left< -570&&sun.shadow.camera.right>570&&
+   receiver?.receiveShadow&&!receiver.castShadow);
+  if(ok){clearInterval(check);document.body.dataset.result='PASS';
+   document.querySelector('#result').textContent='PASS: '+cliffFaces+'/'+totalFaces+' cliff caster faces, world shadows covered, PNG receiver active';return;}
+  if(Date.now()-started>45000){clearInterval(check);fail(JSON.stringify({
+   shadowMap:renderer.shadowMap.enabled,terrain:!!terrain,terrainCasts:terrain?.castShadow,
+   caster:!!caster,cliffFaces,totalFaces,sun:!!sun,receiver:!!receiver,
+   textureStatus:d.querySelector('#textureRenderStatus')?.textContent
+  }))}
+ },250);
+}catch(e){fail(e.stack||e)}
+</script></body></html>
