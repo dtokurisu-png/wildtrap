@@ -240,10 +240,9 @@ const hiddenDebugMarkers=[];
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
-    // The sculpted heightmap contains the cliff walls themselves. Keep them
-    // casting as well as receiving shadows in play, exactly as in the editor.
-    // The corrected solar frustum covers the entire map without clipped stripes.
-    terrain.castShadow=true;
+    // The shadow-only cliff proxy carries steep faces in both editor and play.
+    // Keep horizontal terrain out of the shadow depth pass to avoid floor acne.
+    terrain.castShadow=false;
     renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
 
     collider.refresh();
