@@ -42,7 +42,11 @@ void main(){
  vec3 wallGround=texture2D(baseTexture,wallUV).rgb;
  vec3 normalDirection=normalize(vTerrainNormal);
  float sun=max(dot(normalDirection,normalize(vec3(-.46,.80,.34))),0.0);
- float illumination=.77+.32*sun;
+ // The texture used to contain a SECOND, normal-dependent sunlight gradient.
+ // Keep wall relief shading, but keep walkable ground neutrally illuminated:
+ // real cast shadows are composed later by TerrainSoftSunShadows.
+ float reliefLight=.77+.32*sun;
+ float illumination=mix(1.02,reliefLight,wallMix);
  gl_FragColor=vec4(mix(ground,wallGround,wallMix)*illumination,alpha*intensity);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
@@ -108,8 +112,12 @@ void main(){
   }
  }
  if(combinedAlpha<.002)discard;
+ float steep=1.0-abs(normalize(vTerrainNormal).y);
+ float wallMix=smoothstep(.27,.78,steep);
  float sun=max(dot(normalize(vTerrainNormal),normalize(vec3(-.46,.80,.34))),0.0);
- gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001)*(.77+.32*sun),combinedAlpha);
+ // Match the base ground: decorative patches must not bake another solar shadow.
+ float illumination=mix(1.02,.77+.32*sun,wallMix);
+ gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001)*illumination,combinedAlpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -237,8 +245,22 @@ export function createTerrainGPULayers({scene,terrain}){
    // One transparent shadow-catching pass AFTER the painted biome and cliff layers.
    // Unlike the original unlit shader, ShadowMaterial receives real sun shadows.
    shadowMaterial=new THREE.ShadowMaterial({color:0x1a231e,opacity:.55,side:THREE.DoubleSide});
-   // Receive the same real sunlight shadows on walkable ground AND cliff walls.
-   // Do not discard steep normals: it makes vertical terrain unnaturally shadowless.
+   // Keep the real ground AND cliff shadow receiver unchanged by default.
+   // Opt-in diagnostic: ?noGroundShadowOverlay=1 hides only the shadow-catching
+   // pass on walkable ground, NEVER on walls. Compare this with normal mode
+   // to distinguish shadow-map stripes from stripes in the source PNG/UVs.
+   if(new URLSearchParams(window.location.search).has('noGroundShadowOverlay')){
+    shadowMaterial.onBeforeCompile=shader=>{
+     shader.vertexShader=shader.vertexShader.replace(
+      'void main() {',
+      'varying float vGroundFacing;\nvoid main() {\n vGroundFacing=abs(normal.y);'
+     );
+     shader.fragmentShader=shader.fragmentShader.replace(
+      'void main() {',
+      'varying float vGroundFacing;\nvoid main() {\n if(vGroundFacing>0.85)discard;'
+     );
+    };
+   }
    shadowMaterial.polygonOffset=true;
    shadowMaterial.polygonOffsetFactor=-10;
    shadowMaterial.polygonOffsetUnits=-10;
