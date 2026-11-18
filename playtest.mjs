@@ -361,5 +361,5 @@ const hiddenDebugMarkers=[];
    mixer=null;idle=null;walk=null;walkWanted=false;
    $('testModelStatus').textContent='Personaje propio: '+file.name+' · pulsa Probar';
  }
- return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError},get shadowFocus(){return active?player.position:null}};
+ return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError},get shadowFocus(){return active?player.position:null},get shadowMoving(){return active&&walkWanted}};
 }
