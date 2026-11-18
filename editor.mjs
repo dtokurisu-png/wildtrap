@@ -2047,7 +2047,10 @@ function updateMemoryDisplay(){
  output.title='Memoria del heap JavaScript si el navegador lo permite. Los recursos WebGL son cantidades, no megabytes. La RAM total del proceso y la VRAM no pueden medirse de forma fiable desde esta página.';
 }
 function animate(){
- requestAnimationFrame(animate);
+ // Software-rendered diagnostic mode must not flood the GPU with 60 fps;
+ // actual editor and play mode continue to use native requestAnimationFrame.
+ if(new URLSearchParams(location.search).has('noShadows'))setTimeout(animate,100);
+ else requestAnimationFrame(animate);
  if(!preview.active)orbit.update();
  // Equalize perceived haze between distant orthographic edit and near-ground play.
  if(scene.fog)scene.fog.density=preview.active?0.00215:0.00052;
