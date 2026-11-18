@@ -161,7 +161,7 @@ const hiddenDebugMarkers=[];
     visual.rotation.y=Math.PI;
     player.add(visual);
     gltf.scene.traverse(object=>{
-      if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
+      if(object.isMesh){object.frustumCulled=false;object.castShadow=true;object.receiveShadow=true}
     });
     imported=gltf;
     // WT animation slots are 1-based for the designer:

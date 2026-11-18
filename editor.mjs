@@ -31,7 +31,7 @@ const atmosphericColor=new THREE.Color(0xb9c9c1);
 scene.background=atmosphericColor;
 scene.fog=new THREE.FogExp2(atmosphericColor,0.00052); // Distance-adapted in animate() for edit and play cameras.
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));renderer.setSize(innerWidth-340,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -39,7 +39,7 @@ scene.add(new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85));
 const light=new THREE.DirectionalLight(0xffe8cf,2.25);
 light.position.set(-160,280,120);
 light.castShadow=true;
-light.shadow.mapSize.set(2048,2048);
+light.shadow.mapSize.set(1024,1024);
 light.shadow.camera.left=-355;light.shadow.camera.right=355;
 light.shadow.camera.top=355;light.shadow.camera.bottom=-355;
 light.shadow.camera.near=1;light.shadow.camera.far=1000;
@@ -1019,7 +1019,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.128').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.129').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
