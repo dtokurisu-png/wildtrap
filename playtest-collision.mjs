@@ -64,6 +64,8 @@ export function createPlaytestCollider({THREE,terrain,roots=[]}){
     }
     break; // nearest walkable surface for this ray; never snap through cave ceilings
    }
+   // The center ray succeeds on almost all frames: only probe neighboring feet at gaps.
+   if(best&&ox===0&&oz===0)return best;
   }
   return best;
  }

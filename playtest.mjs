@@ -346,7 +346,7 @@ const hiddenDebugMarkers=[];
     // Probe the width and height of the Explorer, not a solid heightmap cell.
     if(!collider.blocked(player.position.x,player.position.y,player.position.z,dx,dz,{radius:.21,height:.875})){
       const futureGround=collider.floorAt(nx,nz,player.position.y);
-      const currentGround=collider.floorAt(player.position.x,player.position.z,player.position.y);
+      const currentGround=!futureGround?collider.floorAt(player.position.x,player.position.z,player.position.y):null;
       // Reject a spurious missed triangle on an otherwise continuous platform,
       // never blocking intentionally cut openings.
       const unintendedGap=!futureGround&&currentGround&&
