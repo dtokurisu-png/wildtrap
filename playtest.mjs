@@ -97,6 +97,7 @@ const hiddenDebugMarkers=[];
       if(!positions.count)return;
       meshes++;vertices+=positions.count;
       obj.frustumCulled=false;
+      obj.castShadow=true;obj.receiveShadow=true;
       obj.geometry.computeBoundingBox();
       const bound=obj.geometry.boundingBox;
       if(bound&& !bound.isEmpty()){
