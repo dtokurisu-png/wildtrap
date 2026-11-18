@@ -9,7 +9,7 @@ try{
   zones:[{id:'plains',name:'Llanura',biomeId:'plains',points:[{x:-300,z:-300},{x:300,z:-300},{x:300,z:300},{x:-300,z:300}]}],
   objectGroups:[],nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
- const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=840;frame.height=540;document.body.append(frame);
+ const frame=document.createElement('iframe');frame.src='../?safe=1&handpaint=1';frame.width=840;frame.height=540;document.body.append(frame);
  const started=Date.now();
  const check=setInterval(()=>{
   const d=frame.contentDocument,w=frame.contentWindow;
