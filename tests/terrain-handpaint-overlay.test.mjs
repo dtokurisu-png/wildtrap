@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {HANDPAINT_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE,hardLightChannel,hardLightRGB}
+import {HANDPAINT_SOURCE,HANDPAINT_GPU_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE,hardLightChannel,hardLightRGB}
  from '../terrain-handpaint-settings.mjs';
 const moduleCode=readFileSync(new URL('../terrain-handpaint-overlay.mjs',import.meta.url),'utf8');
 const rendererCode=readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
 assert.equal(HANDPAINT_SOURCE,'./assets/terrain/texturas/terreno_handpaint_10K.png');
+assert.equal(HANDPAINT_GPU_SOURCE,'./assets/terrain/texturas/terreno_handpaint_4K.webp');
 assert.equal(HANDPAINT_OPACITY,0.65,'35% transparency must equal 65% opacity');
 assert.equal(HANDPAINT_GPU_MAX_SIZE,4096,'Do not upload 10K raw texture to VRAM');
 for(let x=0;x<=1;x+=0.1){
