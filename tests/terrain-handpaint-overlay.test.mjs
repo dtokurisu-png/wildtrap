@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {HANDPAINT_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE,hardLightChannel,hardLightRGB}
- from '../terrain-handpaint-overlay.mjs';
+ from '../terrain-handpaint-settings.mjs';
 const moduleCode=readFileSync(new URL('../terrain-handpaint-overlay.mjs',import.meta.url),'utf8');
 const rendererCode=readFileSync(new URL('../editor.mjs',import.meta.url),'utf8');
 assert.equal(HANDPAINT_SOURCE,'./assets/terrain/texturas/terreno_handpaint_10K.png');
