@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="UTF-8">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
+</head><body data-result="PENDING"><div id="result">Probando transiciones</div>
+<script type="module">
+import {createFeatheredZoneMask} from '../terrain-zone-feather.mjs';
+try{
+ const area=[{points:[{x:-60,z:-60},{x:60,z:-60},{x:60,z:60},{x:-60,z:60}]}];
+ const map=createFeatheredZoneMask(area,{featherWorld:18,expandWorld:5});
+ const ctx=map.image.getContext('2d');
+ function alpha(x,z){
+  const pixelX=Math.round((x/630+.5)*map.image.width),pixelZ=Math.round((z/630+.5)*map.image.height);
+  return ctx.getImageData(pixelX,pixelZ,1,1).data[3];
+ }
+ const center=alpha(0,0),border=alpha(65,0),outside=alpha(80,0),distant=alpha(160,0);
+ const success=center>230&&border>0&&border<255&&outside>0&&outside<border&&distant===0;
+ document.body.dataset.result=success?'PASS':'FAIL';
+ document.querySelector('#result').textContent='Máscara: centro '+center+' · borde '+border+' · extensión '+outside+' · lejos '+distant;
+ map.dispose();
+}catch(err){document.body.dataset.result='FAIL';document.querySelector('#result').textContent=err.stack||err.message}
+</script></body></html>
