@@ -88,7 +88,8 @@ export function createCliffColorRenderer({scene,terrain,live,getTextureAssetUrl=
    const mask=createFeatheredZoneMask(zones,{featherWorld:10,expandWorld:7});
    const settings=live.cliffHeightSettings?.biomes?.[biome]||{};
    const material=new THREE.ShaderMaterial({
-    uniforms:{cliffTexture:{value:texture},cliffMask:{value:mask},
+    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+     cliffTexture:{value:texture},cliffMask:{value:mask},
      cliffRepeats:{value:cliffRepeatCount(live,biome)},
      intensity:{value:CLAMP(Number.isFinite(Number(settings.intensity))?Number(settings.intensity):1,0,1)},
      heightmapAligned:{value:CLIFF_ASSETS.some(a=>a.biome===biome&&a.height)?1:0}},
