@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {cliffShadowFaceIndices} from './terrain-shadow-geometry.mjs';
+import {explorerShadowDue} from './explorer-shadow-cadence.mjs';
 // El editor de zonas se carga después del motor principal; un módulo opcional no bloquea la apertura.
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
 import {putDraft,getDraft} from './editor-draft-storage.mjs?v=0.9.59';
@@ -84,8 +85,6 @@ characterSun.shadow.autoUpdate=false;
 characterSun.position.set(-16,28,12);
 scene.add(characterSun,characterSun.target);
 const heroShadowLastPosition=new THREE.Vector3(Infinity,Infinity,Infinity);
-const HERO_SHADOW_MOVING_INTERVAL_MS=34; // approx. 30 updates/s, gameplay stays at display FPS
-const HERO_SHADOW_IDLE_INTERVAL_MS=75;   // slow idle animation doesn't need 60 shadow passes/s
 let heroShadowWasActive=false,heroShadowReceiver=null;
 let heroShadowLastUpdate=-Infinity;
 function syncPlaytestSun(focus,moving=false){
@@ -107,8 +106,7 @@ function syncPlaytestSun(focus,moving=false){
   heroShadowReceiver.material.opacity=.55;
  if(active){
   const now=performance.now();
-  const interval=moving?HERO_SHADOW_MOVING_INTERVAL_MS:HERO_SHADOW_IDLE_INTERVAL_MS;
-  if(now-heroShadowLastUpdate>=interval){
+  if(explorerShadowDue(now,heroShadowLastUpdate,moving)){
    if(heroShadowLastPosition.distanceToSquared(focus)>.01){
     heroShadowLastPosition.copy(focus);
     const x=Math.round(focus.x*10)/10,y=Math.round(focus.y*10)/10,z=Math.round(focus.z*10)/10;
