@@ -45,9 +45,42 @@ light.shadow.camera.left=-355;light.shadow.camera.right=355;
 light.shadow.camera.top=355;light.shadow.camera.bottom=-355;
 light.shadow.camera.near=1;light.shadow.camera.far=1000;
 light.shadow.bias=-0.00015;
-light.shadow.normalBias=0.7;
+light.shadow.normalBias=0.025; // Avoid offsetting a 0.9-unit player shadow by almost its own height.
 light.shadow.radius=2.2;
 scene.add(light);scene.add(light.target);
+const SUN_ORIGIN=new THREE.Vector3(-160,280,120);
+const PLAY_SHADOW_RADIUS=24;
+const shadowFocus=new THREE.Vector3();
+let playShadowActive=false;
+function followPlaytestShadow(focus){
+ // Preserve daytime lighting but concentrate shadow texels near the small Explorer.
+ if(focus){
+  if(!playShadowActive){
+   playShadowActive=true;
+   const c=light.shadow.camera;
+   c.left=-PLAY_SHADOW_RADIUS;c.right=PLAY_SHADOW_RADIUS;
+   c.top=PLAY_SHADOW_RADIUS;c.bottom=-PLAY_SHADOW_RADIUS;
+   c.updateProjectionMatrix();
+   shadowFocus.set(Infinity,Infinity,Infinity);
+  }
+  if(shadowFocus.distanceToSquared(focus)>1.44){
+   shadowFocus.copy(focus);
+   const x=Math.round(focus.x*2)/2,z=Math.round(focus.z*2)/2;
+   light.target.position.set(x,focus.y,z);
+   light.position.copy(SUN_ORIGIN).add(light.target.position);
+   light.target.updateMatrixWorld();light.updateMatrixWorld();
+  }
+ }else if(playShadowActive){
+  playShadowActive=false;
+  const c=light.shadow.camera;
+  c.left=-355;c.right=355;c.top=355;c.bottom=-355;
+  c.updateProjectionMatrix();
+  light.position.copy(SUN_ORIGIN);
+  light.target.position.set(0,0,0);
+  light.target.updateMatrixWorld();light.updateMatrixWorld();
+ }
+}
+
 const view=$('viewport');
 const camera=new THREE.OrthographicCamera(-SIZE*.65,SIZE*.65,SIZE*.65,-SIZE*.65,.1,2600);
 const orbit=new OrbitControls(camera,view);orbit.enableDamping=true;orbit.screenSpacePanning=true;
@@ -1020,7 +1053,7 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.129').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.132').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
    resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
@@ -1999,6 +2032,7 @@ function animate(){
  if(!preview.active)orbit.update();
  // Equalize perceived haze between distant orthographic edit and near-ground play.
  if(scene.fog)scene.fog.density=preview.active?0.00215:0.00052;
+ followPlaytestShadow(preview.active?preview.shadowFocus:null);
  if(++axisTick%5===0)refreshAxisGizmo();
  renderer.render(scene,preview.frame()||camera);
  const now=performance.now();
