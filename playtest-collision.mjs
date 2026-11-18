@@ -46,17 +46,26 @@ export function createPlaytestCollider({THREE,terrain,roots=[]}){
  }
  // Ground queries use the actual post-cut render meshes only.
  // A cave roof over the avatar must never snap the player onto its top.
- function floorAt(x,z,feetY,{stepUp=.65,searchDepth=18}={}){
+ function floorAt(x,z,feetY,{stepUp=.65,searchDepth=18,footprint=.13}={}){
   const above=feetY+stepUp;
-  const intersections=hits(x,above,z,down,stepUp+searchDepth);
-  for(const hit of intersections){
-   if(hit.point.y>above+1e-4)continue;
-   const n=worldNormal(hit);
-   if(n&&Math.abs(n.y)<.58)continue; // wall or steep slope
-   // Double-sided cave floors can have inward-facing triangle normals.
-   return {y:hit.point.y,object:hit.object};
+  // Five closely spaced rays avoid narrow cracks and triangulation seams that
+  // made a moving Explorer drop through otherwise continuous walkable surfaces.
+  // Deliberate cut openings remain open when there is no triangle below ANY ray.
+  const offsets=footprint>0?[[0,0],[footprint,0],[-footprint,0],[0,footprint],[0,-footprint]]:[[0,0]];
+  let best=null;
+  for(const [ox,oz] of offsets){
+   const intersections=hits(x+ox,above,z+oz,down,stepUp+searchDepth);
+   for(const hit of intersections){
+    if(hit.point.y>above+1e-4)continue;
+    const n=worldNormal(hit);
+    if(n&&Math.abs(n.y)<.50)continue;
+    if(!best||hit.point.y>best.y){
+     best={y:hit.point.y,object:hit.object,normal:n?n.clone():new THREE.Vector3(0,1,0)};
+    }
+    break; // nearest walkable surface for this ray; never snap through cave ceilings
+   }
   }
-  return null;
+  return best;
  }
  // Capsule-like side probes at hips and chest, with radius on both sides.
  // Horizontal geometry removed by the knife cannot block this sweep.

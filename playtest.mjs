@@ -2,15 +2,16 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {loadCorrectedExplorerRun} from './explorer-run-corrected.mjs?v=0.9.80';
 import {inPlaceClip} from './playtest-animation.mjs?v=0.9.36';
-import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.101';
+import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.133';
 import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.33';
+import {createPlaytestContactShadow} from './playtest-contact-shadow.mjs?v=0.9.133';
 // The user's own WT GLB and animation files will be supplied separately.
 // No R.O.K. model or animation is loaded.
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const forwardOf=yaw=>new THREE.Vector3(Math.sin(yaw),0,-Math.cos(yaw));
 const EXPLORER_URL='./assets/explorador%201%20wt.glb';
 
-export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,collisionRoots=[],$,resizeEditor,onStop=()=>{}}){
+export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,isHoleAt=()=>false,collisionRoots=[],$,resizeEditor,persist=()=>{},onStop=()=>{}}){
  const camera=new THREE.PerspectiveCamera(68,1,.12,1400);
  const cameraFocus=new THREE.Vector3();
  const CAMERA_DISTANCE=2.55,CAMERA_HEIGHT=1.15;
@@ -19,14 +20,45 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  // due to an intersecting terrain wall.
  const clock=new THREE.Clock();
  const collider=createPlaytestCollider({THREE,terrain,roots:collisionRoots});
+ if(!live.settings||typeof live.settings!=='object')live.settings={};
+ if(!live.settings.playerShadow)live.settings.playerShadow={};
+ const contactShadow=createPlaytestContactShadow({
+  scene,settings:live.settings.playerShadow,
+  groundAt:(x,z,y)=>collider.floorAt(x,z,y,{stepUp:.6,searchDepth:3,footprint:0})
+ });
+ const SHADOW_FIELDS={
+  shadowOpacity:'opacity',shadowSize:'size',shadowSoftness:'softness',
+  shadowOffsetX:'offsetX',shadowOffsetZ:'offsetZ'
+ };
+ function configureShadowControls(){
+  for(const [id,key] of Object.entries(SHADOW_FIELDS)){
+   const input=$(id);if(!input)continue;
+   input.value=String(contactShadow.config[key]);
+   input.oninput=()=>{
+    const value=Number(input.value);
+    live.settings.playerShadow[key]=value;
+    contactShadow.updateSettings({[key]:value});
+    persist();
+    const label=$(id+'Value');if(label)label.textContent=value.toFixed(2);
+   };
+   const label=$(id+'Value');if(label)label.textContent=Number(input.value).toFixed(2);
+  }
+  const toggle=$('shadowEnabled');
+  if(toggle){
+   toggle.checked=contactShadow.config.enabled;
+   toggle.onchange=()=>{live.settings.playerShadow.enabled=toggle.checked;contactShadow.updateSettings({enabled:toggle.checked});persist()};
+  }
+ }
+ configureShadowControls();
  let verticalSpeed=0;
  const player=new THREE.Group();
  player.name='WILDTRAPPlayer1';
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  const IDLE_CLIP_INDEX=2,RUN_CLIP_INDEX=4;
- let oldShow=null,oldShadow=null;
+ let oldShow=null,oldShadow=null,oldShadowMap=null,oldTerrainCast=null;
 const hiddenDebugMarkers=[];
+ const shadowReceiverStates=[];
  const keys=new Set();
  let modelURL=EXPLORER_URL;
  let localURL=null,loadingPromise=null,sourceError='';
@@ -97,7 +129,7 @@ const hiddenDebugMarkers=[];
       if(!positions.count)return;
       meshes++;vertices+=positions.count;
       obj.frustumCulled=false;
-      obj.castShadow=true;obj.receiveShadow=true;
+      obj.castShadow=false;obj.receiveShadow=true;
       obj.geometry.computeBoundingBox();
       const bound=obj.geometry.boundingBox;
       if(bound&& !bound.isEmpty()){
@@ -161,7 +193,7 @@ const hiddenDebugMarkers=[];
     visual.rotation.y=Math.PI;
     player.add(visual);
     gltf.scene.traverse(object=>{
-      if(object.isMesh){object.frustumCulled=false;object.castShadow=true;object.receiveShadow=true}
+      if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
     });
     imported=gltf;
     // WT animation slots are 1-based for the designer:
@@ -240,6 +272,20 @@ const hiddenDebugMarkers=[];
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
+    // Play uses a cheap local contact shadow, never terrain-wide real-time shadows.
+    oldShadowMap=renderer.shadowMap.enabled;
+    oldTerrainCast=terrain.castShadow;
+    renderer.shadowMap.enabled=false;
+    terrain.castShadow=false;
+    shadowReceiverStates.length=0;
+    scene.traverse(object=>{
+     if(object.name==='TerrainSoftSunShadows'){
+      shadowReceiverStates.push([object,object.visible]);
+      object.visible=false;
+     }
+    });
+    contactShadow.updateSettings(live.settings.playerShadow||{});
+    configureShadowControls();
     collider.refresh();
     resetPosition();
     if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
@@ -300,8 +346,14 @@ const hiddenDebugMarkers=[];
     // Probe the width and height of the Explorer, not a solid heightmap cell.
     if(!collider.blocked(player.position.x,player.position.y,player.position.z,dx,dz,{radius:.21,height:.875})){
       const futureGround=collider.floorAt(nx,nz,player.position.y);
+      const currentGround=collider.floorAt(player.position.x,player.position.z,player.position.y);
+      // Reject a spurious missed triangle on an otherwise continuous platform,
+      // never blocking intentionally cut openings.
+      const unintendedGap=!futureGround&&currentGround&&
+       Math.abs(heightAt(nx,nz)-currentGround.y)<1.2&&
+       !isHoleAt(nx,player.position.y,nz);
       // Don't climb an abrupt vertical ledge. Descending into a cave is allowed.
-      if(!futureGround||futureGround.y-player.position.y<=.70){
+      if(!unintendedGap&&(!futureGround||futureGround.y-player.position.y<=.70)){
         player.position.x=nx;player.position.z=nz;
         moved=Math.hypot(dx,dz)>1e-6;
         const heading=movementHeading(move.x,move.z);
@@ -321,7 +373,8 @@ const hiddenDebugMarkers=[];
     else player.position.y=nextY;
   }
   // Same in-place running clip for W/A/S/D and diagonals, only while moving.
-  setMovingAnimation(moved);
+  contactShadow.update(player.position,player.position.y);
+   setMovingAnimation(moved);
   if(mixer)mixer.update(dt);
   // Classic Farolera-style chase: camera BEHIND and ABOVE the player,
   // looking slightly ahead. Mouse orbit changes only direction/aim.

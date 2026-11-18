@@ -1053,10 +1053,10 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.132').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.133').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
-   resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
+   resizeEditor:resize,persist,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
    onStop:()=>{testingScene=false;draw();updateMeshInspection();}
   });
   return preview;
@@ -2032,7 +2032,8 @@ function animate(){
  if(!preview.active)orbit.update();
  // Equalize perceived haze between distant orthographic edit and near-ground play.
  if(scene.fog)scene.fog.density=preview.active?0.00215:0.00052;
- followPlaytestShadow(preview.active?preview.shadowFocus:null);
+ // World shadow tracking is disabled in play: the avatar uses a lightweight, local contact shadow.
+ followPlaytestShadow(null);
  if(++axisTick%5===0)refreshAxisGizmo();
  renderer.render(scene,preview.frame()||camera);
  const now=performance.now();
