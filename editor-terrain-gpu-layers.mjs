@@ -27,6 +27,7 @@ uniform sampler2D baseTexture;
 uniform sampler2D regionMask;
 uniform float repeats;
 uniform float intensity;
+uniform float debugPlainGround;
 varying vec2 vTerrainXZ;
 varying vec3 vTerrainWorld;
 varying vec3 vTerrainNormal;
@@ -38,15 +39,13 @@ void main(){
  float wallMix=smoothstep(.27,.78,steep);
  vec2 sourceUV=vTerrainXZ/630.0*repeats;
  vec2 wallUV=vec2(abs(vTerrainNormal.x)>abs(vTerrainNormal.z)?vTerrainWorld.z:vTerrainWorld.x,vTerrainWorld.y)/630.0*repeats;
- vec3 ground=texture2D(baseTexture,sourceUV).rgb;
+ // Diagnostic only: replace the walkable ground PNG with flat pigment, while
+ // retaining the actual sun shadows, geometric relief and cliff textures.
+ vec3 ground=debugPlainGround>0.5?vec3(.55):texture2D(baseTexture,sourceUV).rgb;
  vec3 wallGround=texture2D(baseTexture,wallUV).rgb;
  vec3 normalDirection=normalize(vTerrainNormal);
  float sun=max(dot(normalDirection,normalize(vec3(-.46,.80,.34))),0.0);
- // The texture used to contain a SECOND, normal-dependent sunlight gradient.
- // Keep wall relief shading, but keep walkable ground neutrally illuminated:
- // real cast shadows are composed later by TerrainSoftSunShadows.
- float reliefLight=.77+.32*sun;
- float illumination=mix(1.02,reliefLight,wallMix);
+ float illumination=.77+.32*sun;
  gl_FragColor=vec4(mix(ground,wallGround,wallMix)*illumination,alpha*intensity);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
@@ -112,12 +111,8 @@ void main(){
   }
  }
  if(combinedAlpha<.002)discard;
- float steep=1.0-abs(normalize(vTerrainNormal).y);
- float wallMix=smoothstep(.27,.78,steep);
  float sun=max(dot(normalize(vTerrainNormal),normalize(vec3(-.46,.80,.34))),0.0);
- // Match the base ground: decorative patches must not bake another solar shadow.
- float illumination=mix(1.02,.77+.32*sun,wallMix);
- gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001)*illumination,combinedAlpha);
+ gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001)*(.77+.32*sun),combinedAlpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -187,6 +182,7 @@ export function createTerrainGPULayers({scene,terrain}){
      baseTexture:{value:texture},
      regionMask:{value:mask},
      repeats:{value:limit(Number(slot.scale)||8,.25,1000)},
+     debugPlainGround:{value:new URLSearchParams(window.location.search).has('plainGround')?1:0},
       intensity:{value:limit(Number.isFinite(Number(slot.opacity))?Number(slot.opacity):1,0,1)}
     },
     vertexShader:VERTEX,fragmentShader:FRAGMENT,fog:true,
@@ -203,7 +199,8 @@ export function createTerrainGPULayers({scene,terrain}){
    // Add three separate, optional complementary layers on top of the base.
    // Their shaders use the SAME zone mask and terrain geometry, but never
    // modify the base material. ?noDetails=1 is an instant safe fallback.
-   const detailsEnabled=!new URLSearchParams(window.location.search).has('noDetails');
+   const query=new URLSearchParams(window.location.search);
+   const detailsEnabled=!query.has('noDetails')&&!query.has('plainGround');
    if(!detailsEnabled)continue;
    for(let i=1;i<=3;i++){
     const detailSlot=materials[biome].slots['detail'+i];
