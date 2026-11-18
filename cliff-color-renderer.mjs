@@ -5,15 +5,19 @@ const WORLD=630,RES=768;
 const path=file=>'./assets/terrain/texturas/'+encodeURIComponent(file);
 const CLAMP=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vertexShader=`
+#include <fog_pars_vertex>
 varying vec3 worldPosition;
 varying vec3 worldNormal;
 void main(){
  vec4 wp=modelMatrix*vec4(position,1.0);
  worldPosition=wp.xyz;
  worldNormal=normalize(mat3(modelMatrix)*normal);
- gl_Position=projectionMatrix*viewMatrix*wp;
+ vec4 mvPosition=viewMatrix*wp;
+ gl_Position=projectionMatrix*mvPosition;
+ #include <fog_vertex>
 }`;
 const fragmentShader=`
+#include <fog_pars_fragment>
 uniform sampler2D cliffTexture;
 uniform sampler2D cliffMask;
 uniform float cliffRepeats;
@@ -37,6 +41,7 @@ void main(){
  gl_FragColor=vec4(color.rgb,alpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
+ #include <fog_fragment>
 }`;
 export function createCliffColorRenderer({scene,terrain,live,getTextureAssetUrl=u=>u}){
  const textures=new Map();let records=[],ticket=0,disposed=false,visible=true;
@@ -87,7 +92,7 @@ export function createCliffColorRenderer({scene,terrain,live,getTextureAssetUrl=
      cliffRepeats:{value:cliffRepeatCount(live,biome)},
      intensity:{value:CLAMP(Number.isFinite(Number(settings.intensity))?Number(settings.intensity):1,0,1)},
      heightmapAligned:{value:CLIFF_ASSETS.some(a=>a.biome===biome&&a.height)?1:0}},
-    vertexShader,fragmentShader,side:THREE.DoubleSide,
+    vertexShader,fragmentShader,fog:true,side:THREE.DoubleSide,
     transparent:true,depthWrite:false,depthTest:true,
     polygonOffset:true,polygonOffsetFactor:-9,polygonOffsetUnits:-9
    });

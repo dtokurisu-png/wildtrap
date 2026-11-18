@@ -26,12 +26,15 @@ const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
 const sculptTools={raise:1,lower:1,flatten:1,smooth:1,trim:1,relax:1};
 let flattenDirection='max';
-const scene=new THREE.Scene();scene.background=new THREE.Color(0xb9c9c1);
+const scene=new THREE.Scene();
+const atmosphericColor=new THREE.Color(0xb9c9c1);
+scene.background=atmosphericColor;
+scene.fog=new THREE.FogExp2(atmosphericColor,0.00125); // Subtle distance haze; no extra geometry or postprocessing.
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
-scene.add(new THREE.HemisphereLight(0xffffff,0x68765b,2.4));
-const light=new THREE.DirectionalLight(0xffffff,1.8);light.position.set(-160,280,120);scene.add(light);
+scene.add(new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85));
+const light=new THREE.DirectionalLight(0xffeddb,2.15);light.position.set(-160,280,120);scene.add(light);
 const view=$('viewport');
 const camera=new THREE.OrthographicCamera(-SIZE*.65,SIZE*.65,SIZE*.65,-SIZE*.65,.1,2600);
 const orbit=new OrbitControls(camera,view);orbit.enableDamping=true;orbit.screenSpacePanning=true;
@@ -2049,7 +2052,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeCliffHeightTool(){
  try{
-  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.124');
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.125');
   cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
    onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
   cliffHeightTool.schedule();
@@ -2061,7 +2064,7 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.124');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.125');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});

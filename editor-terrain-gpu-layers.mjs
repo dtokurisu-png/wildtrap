@@ -8,6 +8,7 @@ import {createFeatheredZoneMask} from './terrain-zone-feather.mjs?v=0.9.124';
 const WORLD=630, MASK_RES=768;
 const limit=(x,a,b)=>Math.max(a,Math.min(b,x));
 const VERTEX=`
+#include <fog_pars_vertex>
 varying vec2 vTerrainXZ;
 varying vec3 vTerrainWorld;
 varying vec3 vTerrainNormal;
@@ -16,9 +17,12 @@ void main(){
  vTerrainXZ=worldPoint.xz;
  vTerrainWorld=worldPoint.xyz;
  vTerrainNormal=normalize(mat3(modelMatrix)*normal);
- gl_Position=projectionMatrix*viewMatrix*worldPoint;
+ vec4 mvPosition=viewMatrix*worldPoint;
+ gl_Position=projectionMatrix*mvPosition;
+ #include <fog_vertex>
 }`;
 const FRAGMENT=`
+#include <fog_pars_fragment>
 uniform sampler2D baseTexture;
 uniform sampler2D regionMask;
 uniform float repeats;
@@ -39,11 +43,13 @@ void main(){
  gl_FragColor=vec4(mix(ground,wallGround,wallMix),alpha*intensity);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
+ #include <fog_fragment>
 }`;
 // A separate transparent pass. It cannot affect the base shader or its
 // visibility even if detail artwork fails to load. One sampler per pass keeps
 // the material compatible with WebGL 1 as well as WebGL 2.
 const DETAIL_FRAGMENT=`
+#include <fog_pars_fragment>
 uniform sampler2D detailTexture;
 uniform sampler2D regionMask;
 uniform float repeats;
@@ -101,6 +107,7 @@ void main(){
  gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001),combinedAlpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
+ #include <fog_fragment>
 }`;
 function fullResolutionSource(image){
  if(Math.max(image.width||0,image.height||0)<=4096)return image;
@@ -165,7 +172,7 @@ export function createTerrainGPULayers({scene,terrain}){
      repeats:{value:limit(Number(slot.scale)||8,.25,1000)},
       intensity:{value:limit(Number.isFinite(Number(slot.opacity))?Number(slot.opacity):1,0,1)}
     },
-    vertexShader:VERTEX,fragmentShader:FRAGMENT,
+    vertexShader:VERTEX,fragmentShader:FRAGMENT,fog:true,
     side:THREE.DoubleSide,
     transparent:true,depthWrite:false,depthTest:true,
     polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2
@@ -204,7 +211,7 @@ export function createTerrainGPULayers({scene,terrain}){
       slotNumber:{value:i},
       intensity:{value:opacity}
      },
-     vertexShader:VERTEX,fragmentShader:DETAIL_FRAGMENT,
+     vertexShader:VERTEX,fragmentShader:DETAIL_FRAGMENT,fog:true,
      side:THREE.DoubleSide,transparent:true,depthWrite:false,depthTest:true,
      polygonOffset:true,polygonOffsetFactor:-3-i,polygonOffsetUnits:-3-i
     });
