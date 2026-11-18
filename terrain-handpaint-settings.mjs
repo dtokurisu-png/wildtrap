@@ -1,6 +1,7 @@
 // Shared, dependency-free Hard Light settings and reference math.
 // Photoshop "35% transparency" means 65% layer opacity.
 export const HANDPAINT_SOURCE='./assets/terrain/texturas/terreno_handpaint_10K.png';
+export const HANDPAINT_GPU_SOURCE='./assets/terrain/texturas/terreno_handpaint_4K.webp';
 export const HANDPAINT_OPACITY=0.65;
 export const HANDPAINT_GPU_MAX_SIZE=4096;
 export function hardLightChannel(base,source){
