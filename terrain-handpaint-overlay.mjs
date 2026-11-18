@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import {HANDPAINT_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE}
+import {HANDPAINT_SOURCE,HANDPAINT_GPU_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE}
  from './terrain-handpaint-settings.mjs';
-export {HANDPAINT_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE}
+export {HANDPAINT_SOURCE,HANDPAINT_GPU_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE}
  from './terrain-handpaint-settings.mjs';
 
 // Non-tiled global painting covering the 630x630 terrain.
@@ -59,7 +59,7 @@ void main(){
 export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTextureAssetUrl=url=>url}){
  const flags=new URLSearchParams(location.search);
  let disposed=false,ready=false,sourceWidth=0,sourceHeight=0,uploadedWidth=0,uploadedHeight=0,paintTexture=null;
- let frames=0,loaderError='';
+ let frames=0,loaderError='',loadedSource='';
  const enabled=!flags.has('noHandpaint');
  const drawingSize=new THREE.Vector2();
  const rt=new THREE.WebGLRenderTarget(1,1,{
@@ -107,6 +107,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
   img.onload=()=>{
    if(disposed)return;
    try{
+    loadedSource=img.currentSrc||img.src;
     sourceWidth=img.naturalWidth;sourceHeight=img.naturalHeight;
     const maxSize=Math.min(HANDPAINT_GPU_MAX_SIZE,renderer.capabilities.maxTextureSize||HANDPAINT_GPU_MAX_SIZE);
     const ratio=Math.min(1,maxSize/Math.max(sourceWidth,sourceHeight));
@@ -134,11 +135,18 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
     console.warn('Wildtrap: no se pudo preparar el overlay handpaint:',error);
    }
   };
+  let attemptedOriginal=false;
   img.onerror=()=>{
-   loaderError='No se pudo descargar '+HANDPAINT_SOURCE;
+   if(!attemptedOriginal){
+    attemptedOriginal=true;
+    img.src=getTextureAssetUrl(HANDPAINT_SOURCE);
+    return;
+   }
+   loaderError='No se pudo descargar la capa handpaint: '+HANDPAINT_GPU_SOURCE+' o '+HANDPAINT_SOURCE;
    console.warn('Wildtrap:',loaderError);
   };
-  img.src=getTextureAssetUrl(HANDPAINT_SOURCE);
+  // The 4K derivative loads much faster, with original 10K as safe fallback.
+  img.src=getTextureAssetUrl(HANDPAINT_GPU_SOURCE);
  }
  function render(camera){
   if(!enabled||!ready||!terrain.visible){
@@ -171,7 +179,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
  }
  function getState(){
   return {enabled,ready,mode:'hard-light',transparency:0.35,opacity:HANDPAINT_OPACITY,
-   source:HANDPAINT_SOURCE,sourceWidth,sourceHeight,
+   source:HANDPAINT_SOURCE,loadedSource,sourceWidth,sourceHeight,
    gpuWidth:uploadedWidth,gpuHeight:uploadedHeight,frames,error:loaderError,
    depthOcclusion:true,terrainGeometryLinked:paintingMesh.geometry===terrain.geometry,
    worldMapping:'XZ one-to-one'};
