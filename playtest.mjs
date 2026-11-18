@@ -21,6 +21,16 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  const collider=createPlaytestCollider({THREE,terrain,roots:collisionRoots});
  if(!live.settings||typeof live.settings!=='object')live.settings={};
  if(!live.settings.playerShadow||typeof live.settings.playerShadow!=='object')live.settings.playerShadow={};
+ // The old 0.35–3 'size' and offset values belonged to the discarded fake circle.
+ // Reset only those obsolete settings, retaining the user's opacity preference.
+ if(live.settings.playerShadow.mode!=='real'){
+  const old=live.settings.playerShadow;
+  live.settings.playerShadow={
+   mode:'real',enabled:old.enabled!==false,
+   opacity:Number.isFinite(Number(old.opacity))?Math.max(0,Math.min(1,Number(old.opacity))):.55,
+   size:10,softness:1.4,offsetX:0,offsetZ:0
+  };
+ }
  function applyCharacterShadow(){
   const enabled=shadows().enabled!==false;
   imported?.scene?.traverse(o=>{if(o.isMesh)o.castShadow=enabled});

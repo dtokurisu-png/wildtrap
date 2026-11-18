@@ -50,11 +50,12 @@ light.shadow.radius=2.2;
 scene.add(light);scene.add(light.target);
 const SUN_ORIGIN=new THREE.Vector3(-160,280,120);
 const shadowFocus=new THREE.Vector3();
-let playShadowActive=false,playShadowRadius=0;
+let playShadowActive=false,playShadowRadius=0,shadowReceiverCache=null;
 const shadowClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function followPlaytestShadow(focus){
  const config=live?.settings?.playerShadow||{};
- const receiver=scene.getObjectByName('TerrainSoftSunShadows');
+ if(!shadowReceiverCache||!shadowReceiverCache.parent)shadowReceiverCache=scene.getObjectByName('TerrainSoftSunShadows');
+ const receiver=shadowReceiverCache;
  if(receiver?.material&&receiver.material.opacity!==undefined)
   receiver.material.opacity=shadowClamp(Number(config.opacity??.55),0,1);
  if(focus){
