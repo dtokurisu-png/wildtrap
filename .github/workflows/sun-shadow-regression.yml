@@ -1,0 +1,41 @@
+name: Validate new isolated sun shadows (pre-release)
+on:
+  push:
+    branches: [integracion-sombras-sin-rayas-v0.9.143]
+    paths:
+      - 'editor.mjs'
+      - 'playtest.mjs'
+      - 'editor-terrain-gpu-layers.mjs'
+      - 'editor-terrain-texture-renderer.mjs'
+      - 'terrain-shadow-geometry.mjs'
+      - 'tests/terrain-shadow-geometry.test.mjs'
+      - 'tests/sun-shadow-smoke.html'
+      - 'tests/browser-sun-shadow.mjs'
+      - 'index.html'
+      - '.github/workflows/sun-shadow-regression.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check ES module syntax and geometry selection
+        run: |
+          node --check editor.mjs
+          node --check playtest.mjs
+          node --check editor-terrain-gpu-layers.mjs
+          node --check editor-terrain-texture-renderer.mjs
+          node --check terrain-shadow-geometry.mjs
+          node tests/terrain-shadow-geometry.test.mjs
+          node tests/terrain-gpu-texture-regression.mjs
+      - name: Start local build
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wt-sun-http.log 2>&1 &
+          sleep 2
+      - name: Verify projected sun shadows on real terrain renderer
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-sun-shadow.mjs
