@@ -60,7 +60,8 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
  const flags=new URLSearchParams(location.search);
  let disposed=false,ready=false,sourceWidth=0,sourceHeight=0,uploadedWidth=0,uploadedHeight=0,paintTexture=null;
  let frames=0,loaderError='',loadedSource='';
- const enabled=!flags.has('noHandpaint');
+ // Recovery/safe mode deliberately avoids this extra GPU pass unless opted in.
+ const enabled=!flags.has('noHandpaint')&&(!flags.has('safe')||flags.has('handpaint'));
  const drawingSize=new THREE.Vector2();
  const rt=new THREE.WebGLRenderTarget(1,1,{
   depthBuffer:true,stencilBuffer:false,
