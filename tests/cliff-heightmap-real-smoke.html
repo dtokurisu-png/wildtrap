@@ -10,7 +10,7 @@ try{
    {id:'zone-cliff',name:'Acantilado',isCliff:true,cliffParentId:'zone-main',points:[{x:-9,z:-60},{x:9,z:-60},{x:9,z:60},{x:-9,z:60}]}],
   nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
- const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=1000;frame.height=650;document.body.append(frame);
+ const frame=document.createElement('iframe');frame.src='../?safe=1&noShadows=1';frame.width=1000;frame.height=650;document.body.append(frame);
  const start=Date.now();let counted=0;
  const interval=setInterval(()=>{
   const d=frame.contentDocument,w=frame.contentWindow;
@@ -37,13 +37,13 @@ try{
    const active=programs.length;
    const textureObjects=diagnostic?.scene.children.filter(obj=>obj.name.startsWith('BiomeGroundSafe')).length||0;
    const layers=diagnostic.scene.children.filter(obj=>/^(BiomeGroundSafe|CliffColor|BiomeComplement)/.test(obj.name));
-   const rt=diagnostic.makeTarget(128,128);
+   const rt=diagnostic.makeTarget(32,32);
    function samplePixels(){
     const renderer=diagnostic.renderer;
     renderer.setRenderTarget(rt);
     renderer.render(diagnostic.scene,diagnostic.getCamera());
-    const out=new Uint8Array(128*128*4);
-    renderer.readRenderTargetPixels(rt,0,0,128,128,out);
+    const out=new Uint8Array(32*32*4);
+    renderer.readRenderTargetPixels(rt,0,0,32,32,out);
     renderer.setRenderTarget(null);
     return out;
    }

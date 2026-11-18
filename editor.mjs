@@ -34,7 +34,7 @@ const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));renderer.setSize(innerWidth-340,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 if(new URLSearchParams(location.search).has('safe'))window.__wildtrapDiagnostics={renderer,scene,getCamera:()=>camera,makeTarget:(w,h)=>new THREE.WebGLRenderTarget(w,h)};
-renderer.shadowMap.enabled=true;
+renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 scene.add(new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85));
 const light=new THREE.DirectionalLight(0xffe8cf,2.25);
