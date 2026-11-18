@@ -29,85 +29,12 @@ let flattenDirection='max';
 const scene=new THREE.Scene();
 const atmosphericColor=new THREE.Color(0xb9c9c1);
 scene.background=atmosphericColor;
-scene.fog=new THREE.FogExp2(atmosphericColor,0.00052); // Distance-adapted in animate() for edit and play cameras.
+scene.fog=new THREE.FogExp2(atmosphericColor,0.00125); // Subtle distance haze; no extra geometry or postprocessing.
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));renderer.setSize(innerWidth-340,innerHeight,false);
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
-if(new URLSearchParams(location.search).has('safe'))window.__wildtrapDiagnostics={renderer,scene,getCamera:()=>camera,makeTarget:(w,h)=>new THREE.WebGLRenderTarget(w,h)};
-renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-const skyLight=new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85);
-skyLight.layers.enable(1);scene.add(skyLight);
-const light=new THREE.DirectionalLight(0xffe8cf,2.25);
-// Keep the established sunlight direction but move the shadow camera behind
-// the entire 630-unit terrain. Its old position clipped elevated far corners.
-light.position.set(-480,840,360);
-light.castShadow=true;
-light.shadow.mapSize.set(1024,1024); // Preserve GPU cost: no 2K/4K shadow map.
-const WORLD_SHADOW_HALF_EXTENT=SIZE*.92; // Includes projected diagonal corners and cliffs.
-light.shadow.camera.left=-WORLD_SHADOW_HALF_EXTENT;
-light.shadow.camera.right=WORLD_SHADOW_HALF_EXTENT;
-light.shadow.camera.top=WORLD_SHADOW_HALF_EXTENT;
-light.shadow.camera.bottom=-WORLD_SHADOW_HALF_EXTENT;
-light.shadow.camera.near=100;light.shadow.camera.far=1850;
-light.shadow.camera.updateProjectionMatrix();
-light.shadow.bias=-0.00009; // Comparable world-space depth bias after increasing far range.
-light.shadow.normalBias=0.025; // Avoid offsetting a 0.9-unit player shadow by almost its own height.
-light.shadow.radius=2.2;
-scene.add(light);scene.add(light.target);
-// One permanent arena sun, plus a small high-definition shadow map for the Explorer.
-// The arena shadow map is cached during play; only the animated character is re-rendered.
-const HERO_SHADOW_HALF_WIDTH=5.0; // requested fixed area
-const HERO_SHADOW_OPACITY=.55, HERO_SHADOW_SOFTNESS=1.40;
-const characterSun=new THREE.DirectionalLight(0xffe8cf,0);
-characterSun.layers.enable(1); // illuminate the player (layer 1) AND the ground (layer 0)
-characterSun.castShadow=false; // Off entirely in edit mode; activated only while playtesting.
-characterSun.visible=false;
-characterSun.shadow.mapSize.set(1024,1024);
-characterSun.shadow.camera.left=-HERO_SHADOW_HALF_WIDTH;
-characterSun.shadow.camera.right=HERO_SHADOW_HALF_WIDTH;
-characterSun.shadow.camera.top=HERO_SHADOW_HALF_WIDTH;
-characterSun.shadow.camera.bottom=-HERO_SHADOW_HALF_WIDTH;
-characterSun.shadow.camera.near=.5;
-characterSun.shadow.camera.far=120;
-characterSun.shadow.camera.layers.set(1); // avatar only: never re-render 3D cliff meshes
-characterSun.shadow.bias=-.00015;
-characterSun.shadow.normalBias=.008;
-characterSun.shadow.radius=HERO_SHADOW_SOFTNESS;
-characterSun.shadow.autoUpdate=true;
-characterSun.target.position.set(0,0,0);
-characterSun.position.set(-16,28,12);
-scene.add(characterSun,characterSun.target);
-light.shadow.camera.layers.set(0); // world shadow only; the character uses its own map
-const heroShadowLastPosition=new THREE.Vector3(Infinity,Infinity,Infinity);
-let heroShadowWasActive=false,heroShadowReceiver=null;
-function syncPlaytestSun(focus){
- const active=Boolean(focus);
- if(heroShadowWasActive!==active){
-  heroShadowWasActive=active;
-  characterSun.intensity=active?.45:0;
-  characterSun.visible=active;
-  characterSun.castShadow=active;
-  light.intensity=active?1.8:2.25;
-  light.shadow.autoUpdate=!active;
-  // Keep cliff/terrain casting in both modes. Rebuild the global map once at
-  // each editor/play switch before caching it (never re-render it per frame).
-  light.shadow.needsUpdate=true;
-  heroShadowLastPosition.set(Infinity,Infinity,Infinity);
- }
- if(!heroShadowReceiver||!heroShadowReceiver.parent)
-  heroShadowReceiver=scene.getObjectByName('TerrainSoftSunShadows');
- if(heroShadowReceiver?.material)
-  heroShadowReceiver.material.opacity=HERO_SHADOW_OPACITY;
- if(active&&heroShadowLastPosition.distanceToSquared(focus)>.01){
-  // Quantized movement is enough for a ten-unit shadow frustum and avoids jitter.
-  heroShadowLastPosition.copy(focus);
-  const x=Math.round(focus.x*10)/10,y=Math.round(focus.y*10)/10,z=Math.round(focus.z*10)/10;
-  characterSun.target.position.set(x,y,z);
-  characterSun.position.set(x-16,y+28,z+12);
-  characterSun.target.updateMatrixWorld();characterSun.updateMatrixWorld();
- }
-}
+scene.add(new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85));
+const light=new THREE.DirectionalLight(0xffeddb,2.15);light.position.set(-160,280,120);scene.add(light);
 const view=$('viewport');
 const camera=new THREE.OrthographicCamera(-SIZE*.65,SIZE*.65,SIZE*.65,-SIZE*.65,.1,2600);
 const orbit=new OrbitControls(camera,view);orbit.enableDamping=true;orbit.screenSpacePanning=true;
@@ -119,7 +46,7 @@ intangibleTerrainMaterial.transparent=true;
 intangibleTerrainMaterial.opacity=.24;
 intangibleTerrainMaterial.depthTest=true;
 intangibleTerrainMaterial.depthWrite=false;
-const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';terrain.castShadow=true;terrain.receiveShadow=true;scene.add(terrain);
+const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';scene.add(terrain);
 const surface=new THREE.Group();scene.add(surface);
 const interiors=new THREE.Group();scene.add(interiors);
 const cavePiecesLayer=new THREE.Group();scene.add(cavePiecesLayer);
@@ -1080,10 +1007,10 @@ let preview={
 let previewLoad=null;
 async function ensurePreview(){
  if(previewLoad)return previewLoad;
- previewLoad=import('./playtest.mjs?v=0.9.138').then(({createPlaytest})=>{
+ previewLoad=import('./playtest.mjs?v=0.9.101').then(({createPlaytest})=>{
   preview=createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,heightAt,$,
    collisionRoots:()=>[surface,cavePiecesLayer,interiors,null].filter(Boolean),
-   resizeEditor:resize,persist,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
+   resizeEditor:resize,isHoleAt:(x,y,z)=>holesEditor.isHoleAt(x,z,y),
    onStop:()=>{testingScene=false;draw();updateMeshInspection();}
   });
   return preview;
@@ -2055,15 +1982,8 @@ function updateMemoryDisplay(){
  output.title='Memoria del heap JavaScript si el navegador lo permite. Los recursos WebGL son cantidades, no megabytes. La RAM total del proceso y la VRAM no pueden medirse de forma fiable desde esta página.';
 }
 function animate(){
- // Software-rendered diagnostic mode must not flood the GPU with 60 fps;
- // actual editor and play mode continue to use native requestAnimationFrame.
- if(new URLSearchParams(location.search).has('noShadows'))setTimeout(animate,500);
- else requestAnimationFrame(animate);
+ requestAnimationFrame(animate);
  if(!preview.active)orbit.update();
- // Equalize perceived haze between distant orthographic edit and near-ground play.
- if(scene.fog)scene.fog.density=preview.active?0.00215:0.00052;
- // Update only the avatar's high-definition shadow; reuse arena shadows unchanged.
- syncPlaytestSun(preview.active?preview.shadowFocus:null);
  if(++axisTick%5===0)refreshAxisGizmo();
  renderer.render(scene,preview.frame()||camera);
  const now=performance.now();
@@ -2132,7 +2052,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeCliffHeightTool(){
  try{
-  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.131');
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.125');
   cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
    onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
   cliffHeightTool.schedule();
@@ -2144,7 +2064,7 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.141');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.125');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});

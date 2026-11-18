@@ -38,8 +38,7 @@ void main(){
  vec4 color=texture2D(cliffTexture,colorUV);
  float alpha=inside*wallBlend*color.a*intensity;
  if(alpha<.01)discard;
- float sun=max(dot(n,normalize(vec3(-.46,.80,.34))),0.0);
- gl_FragColor=vec4(color.rgb*(.77+.32*sun),alpha);
+ gl_FragColor=vec4(color.rgb,alpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -89,8 +88,7 @@ export function createCliffColorRenderer({scene,terrain,live,getTextureAssetUrl=
    const mask=createFeatheredZoneMask(zones,{featherWorld:10,expandWorld:7});
    const settings=live.cliffHeightSettings?.biomes?.[biome]||{};
    const material=new THREE.ShaderMaterial({
-    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
-     cliffTexture:{value:texture},cliffMask:{value:mask},
+    uniforms:{cliffTexture:{value:texture},cliffMask:{value:mask},
      cliffRepeats:{value:cliffRepeatCount(live,biome)},
      intensity:{value:CLAMP(Number.isFinite(Number(settings.intensity))?Number(settings.intensity):1,0,1)},
      heightmapAligned:{value:CLIFF_ASSETS.some(a=>a.biome===biome&&a.height)?1:0}},

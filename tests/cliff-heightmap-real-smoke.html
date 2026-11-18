@@ -10,7 +10,7 @@ try{
    {id:'zone-cliff',name:'Acantilado',isCliff:true,cliffParentId:'zone-main',points:[{x:-9,z:-60},{x:9,z:-60},{x:9,z:60},{x:-9,z:60}]}],
   nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
- const frame=document.createElement('iframe');frame.src='../?safe=1&noShadows=1';frame.width=640;frame.height=420;document.body.append(frame);
+ const frame=document.createElement('iframe');frame.src='../?safe=1';frame.width=1000;frame.height=650;document.body.append(frame);
  const start=Date.now();let counted=0;
  const interval=setInterval(()=>{
   const d=frame.contentDocument,w=frame.contentWindow;
@@ -19,8 +19,7 @@ try{
    return;
   }
   const label=d.querySelector('#cliffHeightStatus')?.textContent||'';
-  if(label.includes('vértices desplazados')&&w.__cliffHeightmapEditor.getState().colorMeshes>=1&&
-     w.__terrainTexturePainter?.getState?.().layers>=1&&d.querySelector('#textureTarget option[value="cliff:plains"]')){
+  if(label.includes('vértices desplazados')&&w.__cliffHeightmapEditor.getState().colorMeshes>=1&&d.querySelector('#textureTarget option[value="cliff:plains"]')){
    const count=Number(label.match(/(\d+) vértices desplazados/)?.[1]||0);
    const marked=[...d.querySelectorAll('#zoneList button')].some(b=>b.textContent.includes('⛰ ✓')&&b.title.includes('Acantilado asociado'));
    const dialog=!!d.getElementById('zoneCliffDialog');
@@ -29,38 +28,8 @@ try{
    const options=d.querySelectorAll('#textureTarget option').length;
    const geometryControls=!!d.getElementById('cliffHeightSmoothing')&&!!d.getElementById('cliffHeightFlatten');
    const colorMeshes=w.__cliffHeightmapEditor.getState().colorMeshes;
-   const groundLayers=w.__terrainTexturePainter.getState().layers;
-   const diagnostic=w.__wildtrapDiagnostics;
-   const gl=diagnostic?.renderer.getContext();
-   const programs=diagnostic?.renderer.info.programs||[];
-   const bad=programs.filter(p=>p.program&&gl&&!gl.getProgramParameter(p.program,gl.LINK_STATUS)).map(p=>p.diagnostics?.programLog||p.cacheKey);
-   const active=programs.length;
-   const textureObjects=diagnostic?.scene.children.filter(obj=>obj.name.startsWith('BiomeGroundSafe')).length||0;
-   const shadowReceiverCount=diagnostic?.scene.children.filter(obj=>obj.name==='TerrainSoftSunShadows').length||0;
-   const layers=diagnostic.scene.children.filter(obj=>/^(BiomeGroundSafe|CliffColor|BiomeComplement)/.test(obj.name));
-   const rt=diagnostic.makeTarget(32,32);
-   function samplePixels(){
-    const renderer=diagnostic.renderer;
-    renderer.setRenderTarget(rt);
-    renderer.render(diagnostic.scene,diagnostic.getCamera());
-    const out=new Uint8Array(32*32*4);
-    renderer.readRenderTargetPixels(rt,0,0,32,32,out);
-    renderer.setRenderTarget(null);
-    return out;
-   }
-   let pixelDelta=-1;
-   try{
-    const withLayers=samplePixels();
-    const previous=layers.map(l=>l.visible);
-    layers.forEach(l=>l.visible=false);
-    const withoutLayers=samplePixels();
-    layers.forEach((l,i)=>l.visible=previous[i]);
-    pixelDelta=0;
-    for(let i=0;i<withLayers.length;i+=4)pixelDelta+=Math.abs(withLayers[i]-withoutLayers[i])+Math.abs(withLayers[i+1]-withoutLayers[i+1])+Math.abs(withLayers[i+2]-withoutLayers[i+2]);
-   }catch(error){pixelDelta='ERROR '+(error.stack||error.message).replaceAll('<','[').replaceAll('> ','] ').replaceAll('\n',' || ').slice(0,850)}
-   rt.dispose();
-   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&groundLayers>0&&textureObjects>0&&shadowReceiverCount===1&&bad.length===0&&typeof pixelDelta==='number'&&pixelDelta>1000&&label.includes('zonas ⛰')?'PASS':'FAIL';
-   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes+' · texturas suelo: '+groundLayers+' · WebGL programs: '+active+' · bad: '+JSON.stringify(bad)+' · ground meshes: '+textureObjects+' · shadow receivers: '+shadowReceiverCount+' · pixel delta: '+pixelDelta;return;
+   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&label.includes('zonas ⛰')?'PASS':'FAIL';
+   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes;return;
   }
   if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}
  },250);

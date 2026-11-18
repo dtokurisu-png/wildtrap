@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {loadCorrectedExplorerRun} from './explorer-run-corrected.mjs?v=0.9.80';
 import {inPlaceClip} from './playtest-animation.mjs?v=0.9.36';
-import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.134';
+import {createPlaytestCollider} from './playtest-collision.mjs?v=0.9.101';
 import {movementAxes,movementHeading} from './playtest-movement.mjs?v=0.9.33';
 // The user's own WT GLB and animation files will be supplied separately.
 // No R.O.K. model or animation is loaded.
@@ -97,7 +97,6 @@ const hiddenDebugMarkers=[];
       if(!positions.count)return;
       meshes++;vertices+=positions.count;
       obj.frustumCulled=false;
-      obj.castShadow=true;obj.receiveShadow=true;obj.layers.set(1);
       obj.geometry.computeBoundingBox();
       const bound=obj.geometry.boundingBox;
       if(bound&& !bound.isEmpty()){
@@ -161,7 +160,7 @@ const hiddenDebugMarkers=[];
     visual.rotation.y=Math.PI;
     player.add(visual);
     gltf.scene.traverse(object=>{
-      if(object.isMesh){object.frustumCulled=false;object.castShadow=true;object.receiveShadow=true;object.layers.set(1)}
+      if(object.isMesh){object.frustumCulled=false;object.castShadow=false;object.receiveShadow=true}
     });
     imported=gltf;
     // WT animation slots are 1-based for the designer:
@@ -240,20 +239,13 @@ const hiddenDebugMarkers=[];
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
-    // The sculpted heightmap contains the cliff walls themselves. Keep them
-    // casting as well as receiving shadows in play, exactly as in the editor.
-    // The corrected solar frustum covers the entire map without clipped stripes.
-    terrain.castShadow=true;
-    renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
-
     collider.refresh();
     resetPosition();
     if(mixer){mixer.stopAllAction();idle?.reset().play();walkWanted=false;}
     hiddenDebugMarkers.length=0;
     scene.traverse(object=>{if(object.userData.editorOnly&&object.visible){hiddenDebugMarkers.push(object);object.visible=false}});
     scene.add(player);
-    camera.layers.enable(1); // actual GLB silhouette lives on the avatar shadow layer
-   orbit.enabled=false;
+    orbit.enabled=false;
     active=true;busy=false;
     document.body.classList.add('testing');
     keys.clear();
@@ -307,14 +299,8 @@ const hiddenDebugMarkers=[];
     // Probe the width and height of the Explorer, not a solid heightmap cell.
     if(!collider.blocked(player.position.x,player.position.y,player.position.z,dx,dz,{radius:.21,height:.875})){
       const futureGround=collider.floorAt(nx,nz,player.position.y);
-      const currentGround=!futureGround?collider.floorAt(player.position.x,player.position.z,player.position.y):null;
-      // Reject a spurious missed triangle on an otherwise continuous platform,
-      // never blocking intentionally cut openings.
-      const unintendedGap=!futureGround&&currentGround&&
-       Math.abs(heightAt(nx,nz)-currentGround.y)<1.2&&
-       !isHoleAt(nx,player.position.y,nz);
       // Don't climb an abrupt vertical ledge. Descending into a cave is allowed.
-      if(!unintendedGap&&(!futureGround||futureGround.y-player.position.y<=.70)){
+      if(!futureGround||futureGround.y-player.position.y<=.70){
         player.position.x=nx;player.position.z=nz;
         moved=Math.hypot(dx,dz)>1e-6;
         const heading=movementHeading(move.x,move.z);
@@ -334,7 +320,7 @@ const hiddenDebugMarkers=[];
     else player.position.y=nextY;
   }
   // Same in-place running clip for W/A/S/D and diagonals, only while moving.
-   setMovingAnimation(moved);
+  setMovingAnimation(moved);
   if(mixer)mixer.update(dt);
   // Classic Farolera-style chase: camera BEHIND and ABOVE the player,
   // looking slightly ahead. Mouse orbit changes only direction/aim.
@@ -365,5 +351,5 @@ const hiddenDebugMarkers=[];
    mixer=null;idle=null;walk=null;walkWanted=false;
    $('testModelStatus').textContent='Personaje propio: '+file.name+' · pulsa Probar';
  }
- return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError},get shadowFocus(){return active?player.position:null}};
+ return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError}};
 }
