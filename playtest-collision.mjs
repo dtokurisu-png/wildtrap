@@ -60,7 +60,7 @@ export function createPlaytestCollider({THREE,terrain,roots=[]}){
     const n=worldNormal(hit);
     if(n&&Math.abs(n.y)<.50)continue;
     if(!best||hit.point.y>best.y){
-     best={y:hit.point.y,object:hit.object,normal:n?n.clone():new THREE.Vector3(0,1,0)};
+     best={y:hit.point.y,object:hit.object,normal:n?new THREE.Vector3(n.x,n.y,n.z):new THREE.Vector3(0,1,0)};
     }
     break; // nearest walkable surface for this ray; never snap through cave ceilings
    }
