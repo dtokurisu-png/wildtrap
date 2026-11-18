@@ -30,8 +30,14 @@ try{
    const geometryControls=!!d.getElementById('cliffHeightSmoothing')&&!!d.getElementById('cliffHeightFlatten');
    const colorMeshes=w.__cliffHeightmapEditor.getState().colorMeshes;
    const groundLayers=w.__terrainTexturePainter.getState().layers;
-   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&groundLayers>0&&label.includes('zonas ⛰')?'PASS':'FAIL';
-   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes+' · texturas suelo: '+groundLayers;return;
+   const diagnostic=w.__wildtrapDiagnostics;
+   const gl=diagnostic?.renderer.getContext();
+   const programs=diagnostic?.renderer.info.programs||[];
+   const bad=programs.filter(p=>p.program&&gl&&!gl.getProgramParameter(p.program,gl.LINK_STATUS)).map(p=>p.diagnostics?.programLog||p.cacheKey);
+   const active=programs.length;
+   const textureObjects=diagnostic?.scene.children.filter(obj=>obj.name.startsWith('BiomeGroundSafe')).length||0;
+   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&groundLayers>0&&textureObjects>0&&bad.length===0&&label.includes('zonas ⛰')?'PASS':'FAIL';
+   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes+' · texturas suelo: '+groundLayers+' · WebGL programs: '+active+' · bad: '+JSON.stringify(bad)+' · ground meshes: '+textureObjects;return;
   }
   if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}
  },250);

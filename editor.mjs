@@ -33,6 +33,7 @@ scene.fog=new THREE.FogExp2(atmosphericColor,0.00052); // Distance-adapted in an
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));renderer.setSize(innerWidth-340,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
+if(new URLSearchParams(location.search).has('safe'))window.__wildtrapDiagnostics={renderer,scene};
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 scene.add(new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85));
@@ -2078,7 +2079,7 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.127');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.130');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});
