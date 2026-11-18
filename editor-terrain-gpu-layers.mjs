@@ -237,18 +237,8 @@ export function createTerrainGPULayers({scene,terrain}){
    // One transparent shadow-catching pass AFTER the painted biome and cliff layers.
    // Unlike the original unlit shader, ShadowMaterial receives real sun shadows.
    shadowMaterial=new THREE.ShadowMaterial({color:0x1a231e,opacity:.55,side:THREE.DoubleSide});
-   // Exclude wall-facing triangles from the receiver. The real sun shadow
-   // belongs on walkable ground, never stamped behind cliff color overlays.
-   shadowMaterial.onBeforeCompile=shader=>{
-    shader.vertexShader=shader.vertexShader.replace(
-     'void main() {',
-     'varying float vWalkableShadow;\nvoid main() {\n vWalkableShadow=abs(normal.y);'
-    );
-    shader.fragmentShader=shader.fragmentShader.replace(
-     'void main() {',
-     'varying float vWalkableShadow;\nvoid main() {\n if(vWalkableShadow<0.72) discard;'
-    );
-   };
+   // Receive the same real sunlight shadows on walkable ground AND cliff walls.
+   // Do not discard steep normals: it makes vertical terrain unnaturally shadowless.
    shadowMaterial.polygonOffset=true;
    shadowMaterial.polygonOffsetFactor=-10;
    shadowMaterial.polygonOffsetUnits=-10;
