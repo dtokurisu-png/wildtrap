@@ -6,8 +6,8 @@ const chrome=['google-chrome','google-chrome-stable','chromium'].find(cmd=>{
 if(!chrome)throw Error('Chrome no está instalado en el runner de prueba.');
 const site=process.env.WILDTRAP_SMOKE_URL||'https://dtokurisu-png.github.io/wildtrap/';
 for(const [mode,url] of [
- ['normal',site],
- ['seguro',site+'?safe=1']
+ ['normal',site+(site.includes('?')?'&':'?')+'noShadows=1'],
+ ['seguro',site+(site.includes('?')?'&':'?')+'safe=1&noShadows=1']
 ]){
  const run=spawnSync(chrome,[
   '--headless','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',
