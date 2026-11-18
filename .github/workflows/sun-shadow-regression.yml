@@ -8,6 +8,8 @@ on:
       - 'editor-terrain-gpu-layers.mjs'
       - 'editor-terrain-texture-renderer.mjs'
       - 'terrain-shadow-geometry.mjs'
+      - 'explorer-shadow-cadence.mjs'
+      - 'tests/explorer-shadow-cadence.test.mjs'
       - 'tests/terrain-shadow-geometry.test.mjs'
       - 'tests/sun-shadow-smoke.html'
       - 'tests/browser-sun-shadow.mjs'
@@ -30,6 +32,7 @@ jobs:
           node --check editor-terrain-texture-renderer.mjs
           node --check terrain-shadow-geometry.mjs
           node tests/terrain-shadow-geometry.test.mjs
+          node tests/explorer-shadow-cadence.test.mjs
           # The old static terrain test assumes an obsolete CanvasTexture mask.
           # Texture visibility is covered by the real Chrome integration below.
       - name: Start local build
