@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.123';
 import {registeredCliffZones,CLIFF_ASSETS,cliffRepeatCount} from './cliff-zone-bindings.mjs?v=0.9.123';
-import {createCliffColorRenderer} from './cliff-color-renderer.mjs?v=0.9.125';
+import {createCliffColorRenderer} from './cliff-color-renderer.mjs?v=0.9.126';
 const texturePath=file=>'./assets/terrain/texturas/'+encodeURIComponent(file);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export function createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl=url=>url,onGeometryChanged=()=>{}}){

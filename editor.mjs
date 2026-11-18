@@ -29,12 +29,24 @@ let flattenDirection='max';
 const scene=new THREE.Scene();
 const atmosphericColor=new THREE.Color(0xb9c9c1);
 scene.background=atmosphericColor;
-scene.fog=new THREE.FogExp2(atmosphericColor,0.00125); // Subtle distance haze; no extra geometry or postprocessing.
+scene.fog=new THREE.FogExp2(atmosphericColor,0.00052); // Distance-adapted in animate() for edit and play cameras.
 const renderer=new THREE.WebGLRenderer({canvas:$('viewport'),antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.setSize(innerWidth-340,innerHeight,false);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 scene.add(new THREE.HemisphereLight(0xeef7ff,0x68765b,1.85));
-const light=new THREE.DirectionalLight(0xffeddb,2.15);light.position.set(-160,280,120);scene.add(light);
+const light=new THREE.DirectionalLight(0xffe8cf,2.25);
+light.position.set(-160,280,120);
+light.castShadow=true;
+light.shadow.mapSize.set(2048,2048);
+light.shadow.camera.left=-355;light.shadow.camera.right=355;
+light.shadow.camera.top=355;light.shadow.camera.bottom=-355;
+light.shadow.camera.near=1;light.shadow.camera.far=1000;
+light.shadow.bias=-0.00015;
+light.shadow.normalBias=0.7;
+light.shadow.radius=2.2;
+scene.add(light);scene.add(light.target);
 const view=$('viewport');
 const camera=new THREE.OrthographicCamera(-SIZE*.65,SIZE*.65,SIZE*.65,-SIZE*.65,.1,2600);
 const orbit=new OrbitControls(camera,view);orbit.enableDamping=true;orbit.screenSpacePanning=true;
@@ -46,7 +58,7 @@ intangibleTerrainMaterial.transparent=true;
 intangibleTerrainMaterial.opacity=.24;
 intangibleTerrainMaterial.depthTest=true;
 intangibleTerrainMaterial.depthWrite=false;
-const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';scene.add(terrain);
+const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';terrain.castShadow=true;terrain.receiveShadow=true;scene.add(terrain);
 const surface=new THREE.Group();scene.add(surface);
 const interiors=new THREE.Group();scene.add(interiors);
 const cavePiecesLayer=new THREE.Group();scene.add(cavePiecesLayer);
@@ -1984,6 +1996,8 @@ function updateMemoryDisplay(){
 function animate(){
  requestAnimationFrame(animate);
  if(!preview.active)orbit.update();
+ // Equalize perceived haze between distant orthographic edit and near-ground play.
+ if(scene.fog)scene.fog.density=preview.active?0.00215:0.00052;
  if(++axisTick%5===0)refreshAxisGizmo();
  renderer.render(scene,preview.frame()||camera);
  const now=performance.now();
@@ -2052,7 +2066,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeCliffHeightTool(){
  try{
-  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.125');
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.126');
   cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
    onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
   cliffHeightTool.schedule();
@@ -2064,7 +2078,7 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.125');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.126');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});

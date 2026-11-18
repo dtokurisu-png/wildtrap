@@ -38,7 +38,8 @@ void main(){
  vec4 color=texture2D(cliffTexture,colorUV);
  float alpha=inside*wallBlend*color.a*intensity;
  if(alpha<.01)discard;
- gl_FragColor=vec4(color.rgb,alpha);
+ float sun=max(dot(n,normalize(vec3(-.46,.80,.34))),0.0);
+ gl_FragColor=vec4(color.rgb*(.77+.32*sun),alpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>

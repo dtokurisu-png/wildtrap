@@ -40,7 +40,10 @@ void main(){
  vec2 wallUV=vec2(abs(vTerrainNormal.x)>abs(vTerrainNormal.z)?vTerrainWorld.z:vTerrainWorld.x,vTerrainWorld.y)/630.0*repeats;
  vec3 ground=texture2D(baseTexture,sourceUV).rgb;
  vec3 wallGround=texture2D(baseTexture,wallUV).rgb;
- gl_FragColor=vec4(mix(ground,wallGround,wallMix),alpha*intensity);
+ vec3 normalDirection=normalize(vTerrainNormal);
+ float sun=max(dot(normalDirection,normalize(vec3(-.46,.80,.34))),0.0);
+ float illumination=.77+.32*sun;
+ gl_FragColor=vec4(mix(ground,wallGround,wallMix)*illumination,alpha*intensity);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -57,6 +60,7 @@ uniform float variationSeed;
 uniform float slotNumber;
 uniform float intensity;
 varying vec2 vTerrainXZ;
+varying vec3 vTerrainNormal;
 float rand2(vec2 p){
  return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
 }
@@ -104,7 +108,8 @@ void main(){
   }
  }
  if(combinedAlpha<.002)discard;
- gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001),combinedAlpha);
+ float sun=max(dot(normalize(vTerrainNormal),normalize(vec3(-.46,.80,.34))),0.0);
+ gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001)*(.77+.32*sun),combinedAlpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -122,7 +127,7 @@ function fullResolutionSource(image){
  return canvas;
 }
 export function createTerrainGPULayers({scene,terrain}){
- let records=[];
+ let records=[],shadowMesh=null,shadowMaterial=null;
  function clear(){
   const releasedMasks=new Set();
   for(const entry of records){
@@ -223,8 +228,22 @@ export function createTerrainGPULayers({scene,terrain}){
     records.push({mesh:detailMesh,mask,texture:detailTexture,material:detailMaterial});
    }
   }
+  if(records.length){
+   // One transparent shadow-catching pass AFTER the painted biome and cliff layers.
+   // Unlike the original unlit shader, ShadowMaterial receives real sun shadows.
+   shadowMaterial=new THREE.ShadowMaterial({color:0x263329,opacity:.38,side:THREE.DoubleSide});
+   shadowMaterial.polygonOffset=true;
+   shadowMaterial.polygonOffsetFactor=-10;
+   shadowMaterial.polygonOffsetUnits=-10;
+   shadowMesh=new THREE.Mesh(terrain.geometry,shadowMaterial);
+   shadowMesh.name='TerrainSoftSunShadows';
+   shadowMesh.receiveShadow=true;shadowMesh.castShadow=false;
+   shadowMesh.renderOrder=11;shadowMesh.frustumCulled=false;
+   scene.add(shadowMesh);
+  }
  }
  function sync(visible=true){
+  if(shadowMesh){shadowMesh.geometry=terrain.geometry;shadowMesh.visible=Boolean(visible&&terrain.visible)}
   for(const entry of records){
    entry.mesh.geometry=terrain.geometry;
    entry.mesh.visible=Boolean(visible&&terrain.visible);
