@@ -25,7 +25,7 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  const IDLE_CLIP_INDEX=2,RUN_CLIP_INDEX=4;
- let oldShow=null,oldShadow=null;
+ let oldShow=null,oldShadow=null,oldTerrainCast=null;
 const hiddenDebugMarkers=[];
  const keys=new Set();
  let modelURL=EXPLORER_URL;
@@ -240,8 +240,10 @@ const hiddenDebugMarkers=[];
     oldShow=cursor.visible;
     oldShadow=terrain.visible;
     cursor.visible=false;terrain.visible=true;
-    // Do not modify the working arena sunlight or disable world-shadow casting.
-    // The editor caches the arena map and renders only the avatar in a focused map.
+    // Avoid enormous strip-shaped self-shadows cast by the large heightmap mesh.
+    // Cliff/prefab meshes remain shadow casters; terrain and cliff faces still receive.
+    oldTerrainCast=terrain.castShadow;
+    terrain.castShadow=false;
     renderer.shadowMap.enabled=!new URLSearchParams(location.search).has('noShadows');
 
     collider.refresh();
@@ -265,6 +267,7 @@ const hiddenDebugMarkers=[];
     clock.getDelta();
     say(imported?'Modo Probar WILDTRAP · Jugador 1':'Exploración sin personaje · Spawn del Jugador 1');
   }).catch(err=>{
+    if(oldTerrainCast!==null){terrain.castShadow=oldTerrainCast;oldTerrainCast=null;}
     busy=false;$('test').disabled=false;sourceError=err.message;
     say('Error: '+err.message);
     $('toast').textContent='No se pudo iniciar prueba: '+err.message;
@@ -278,6 +281,7 @@ const hiddenDebugMarkers=[];
   player.removeFromParent();
   cursor.visible=oldShow===null?true:oldShow;
   terrain.visible=oldShadow===null?true:oldShadow;
+  if(oldTerrainCast!==null){terrain.castShadow=oldTerrainCast;oldTerrainCast=null;}
   for(const node of hiddenDebugMarkers)node.visible=true;
   hiddenDebugMarkers.length=0;
   orbit.enabled=true;walkWanted=false;
