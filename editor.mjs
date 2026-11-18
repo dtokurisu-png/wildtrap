@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {terrainCliffShadowIndices} from './terrain-shadow-geometry.mjs';
 // El editor de zonas se carga después del motor principal; un módulo opcional no bloquea la apertura.
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
 import {putDraft,getDraft} from './editor-draft-storage.mjs?v=0.9.59';
@@ -119,7 +120,38 @@ intangibleTerrainMaterial.transparent=true;
 intangibleTerrainMaterial.opacity=.24;
 intangibleTerrainMaterial.depthTest=true;
 intangibleTerrainMaterial.depthWrite=false;
-const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';terrain.castShadow=true;terrain.receiveShadow=true;scene.add(terrain);
+const terrain=new THREE.Mesh(terrainGeo,material);terrain.name='heightmap terrain';
+// The visible terrain receives sunlight but must not cast thousands of nearly
+// coplanar floor triangles onto itself. Only cliff faces cast onto world geometry.
+terrain.castShadow=false;terrain.receiveShadow=true;scene.add(terrain);
+const cliffShadowProxy=new THREE.Mesh(new THREE.BufferGeometry(),
+ new THREE.MeshBasicMaterial({side:THREE.DoubleSide,colorWrite:false,depthWrite:false,depthTest:false}));
+cliffShadowProxy.name='TerrainCliffShadowProxy';
+cliffShadowProxy.userData.noCollision=true;cliffShadowProxy.castShadow=true;
+cliffShadowProxy.receiveShadow=false;cliffShadowProxy.frustumCulled=false;
+scene.add(cliffShadowProxy);
+let lastCliffShadowGeometry=null,lastCliffPositionVersion=-1,lastCliffIndexVersion=-1,lastCliffCasterFaces=0;
+function syncCliffShadowProxy(){
+ const geometry=terrain.geometry;
+ const position=geometry?.getAttribute('position'),index=geometry?.getIndex();
+ if(!position){cliffShadowProxy.visible=false;return}
+ if(geometry!==lastCliffShadowGeometry||position.version!==lastCliffPositionVersion||
+   (index?.version??-1)!==lastCliffIndexVersion){
+  const selected=terrainCliffShadowIndices(position.array,index?.array);
+  const next=new THREE.BufferGeometry();
+  // Own the attribute, do not dispose GPU vertex data shared with the terrain.
+  next.setAttribute('position',position.clone());
+  next.setIndex(selected);
+  cliffShadowProxy.geometry.dispose();
+  cliffShadowProxy.geometry=next;
+  lastCliffShadowGeometry=geometry;
+  lastCliffPositionVersion=position.version;
+  lastCliffIndexVersion=index?.version??-1;
+  lastCliffCasterFaces=selected.length/3;
+  light.shadow.needsUpdate=true;
+ }
+ cliffShadowProxy.visible=terrain.visible&&lastCliffCasterFaces>0;
+}
 const surface=new THREE.Group();scene.add(surface);
 const interiors=new THREE.Group();scene.add(interiors);
 const cavePiecesLayer=new THREE.Group();scene.add(cavePiecesLayer);
@@ -2065,6 +2097,7 @@ function animate(){
  // Update only the avatar's high-definition shadow; reuse arena shadows unchanged.
  syncPlaytestSun(preview.active?preview.shadowFocus:null);
  if(++axisTick%5===0)refreshAxisGizmo();
+ syncCliffShadowProxy();
  renderer.render(scene,preview.frame()||camera);
  const now=performance.now();
  if(now-lastMemoryUpdate>1800){lastMemoryUpdate=now;updateMemoryDisplay();}
