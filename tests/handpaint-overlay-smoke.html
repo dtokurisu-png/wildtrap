@@ -45,7 +45,9 @@ try{
    const ready=tool.getState();
    const pass=ready.mode==='hard-light'&&ready.transparency===.35&&ready.opacity===.65&&
     ready.gpuWidth>0&&ready.gpuWidth<=4096&&ready.gpuHeight>0&&ready.gpuHeight<=4096&&
-    ready.sourceWidth>=4096&&ready.depthOcclusion&&ready.terrainGeometryLinked&&
+    Math.max(ready.sourceWidth,ready.sourceHeight)>=4096&&
+    ready.loadedSource.includes('terreno_handpaint_4K.webp')&&
+    ready.depthOcclusion&&ready.terrainGeometryLinked&&
     ready.frames>0&&delta>20000&&affected>300;
    clearInterval(timer);
    document.body.dataset.result=pass?'PASS':'FAIL';
