@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createFeatheredZoneMask} from './terrain-zone-feather.mjs?v=0.9.124';
 
 // SAFE TERRAIN RENDERER: one full-resolution ground PNG per biome.
 // Complementary decals are intentionally disabled until the base passes
@@ -6,34 +7,15 @@ import * as THREE from 'three';
 // the PNG itself is sampled directly by the GPU at the saved repeat scale.
 const WORLD=630, MASK_RES=768;
 const limit=(x,a,b)=>Math.max(a,Math.min(b,x));
-function zoneMask(zones){
- const canvas=document.createElement('canvas');
- canvas.width=canvas.height=MASK_RES;
- const ctx=canvas.getContext('2d');
- ctx.clearRect(0,0,MASK_RES,MASK_RES);
- ctx.fillStyle='#fff';
- for(const zone of zones){
-  if(!Array.isArray(zone.points)||zone.points.length<3)continue;
-  ctx.beginPath();
-  for(let i=0;i<zone.points.length;i++){
-   const point=zone.points[i];
-   const x=(point.x/WORLD+.5)*MASK_RES;
-   const y=(point.z/WORLD+.5)*MASK_RES;
-   if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-  }
-  ctx.closePath();ctx.fill();
- }
- const mask=new THREE.CanvasTexture(canvas);
- mask.colorSpace=THREE.NoColorSpace;
- mask.minFilter=THREE.LinearFilter;mask.magFilter=THREE.LinearFilter;
- mask.generateMipmaps=false;
- return mask;
-}
 const VERTEX=`
 varying vec2 vTerrainXZ;
+varying vec3 vTerrainWorld;
+varying vec3 vTerrainNormal;
 void main(){
  vec4 worldPoint=modelMatrix*vec4(position,1.0);
  vTerrainXZ=worldPoint.xz;
+ vTerrainWorld=worldPoint.xyz;
+ vTerrainNormal=normalize(mat3(modelMatrix)*normal);
  gl_Position=projectionMatrix*viewMatrix*worldPoint;
 }`;
 const FRAGMENT=`
@@ -42,12 +24,19 @@ uniform sampler2D regionMask;
 uniform float repeats;
 uniform float intensity;
 varying vec2 vTerrainXZ;
+varying vec3 vTerrainWorld;
+varying vec3 vTerrainNormal;
 void main(){
  vec2 maskUV=vec2(vTerrainXZ.x/630.0+.5,.5-vTerrainXZ.y/630.0);
  float alpha=texture2D(regionMask,maskUV).a;
- if(alpha<.01)discard;
+ if(alpha<.004)discard;
+ float steep=1.0-abs(normalize(vTerrainNormal).y);
+ float wallMix=smoothstep(.27,.78,steep);
  vec2 sourceUV=vTerrainXZ/630.0*repeats;
- gl_FragColor=vec4(texture2D(baseTexture,sourceUV).rgb,alpha*intensity);
+ vec2 wallUV=vec2(abs(vTerrainNormal.x)>abs(vTerrainNormal.z)?vTerrainWorld.z:vTerrainWorld.x,vTerrainWorld.y)/630.0*repeats;
+ vec3 ground=texture2D(baseTexture,sourceUV).rgb;
+ vec3 wallGround=texture2D(baseTexture,wallUV).rgb;
+ gl_FragColor=vec4(mix(ground,wallGround,wallMix),alpha*intensity);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`;
@@ -137,11 +126,13 @@ export function createTerrainGPULayers({scene,terrain}){
   }
   records=[];
  }
- function build({zones,materials,loaded,enabled=true}){
+ function build({zones,materials,loaded,enabled=true,transitionWorld=14}){
   clear();
   if(!enabled)return;
   const biomes=new Map();
-  for(const zone of zones||[]){
+  const allZones=Array.isArray(zones)?zones:[];
+  const parents=new Map(allZones.filter(z=>!z.isCliff).map(z=>[z.id,z]));
+  for(const zone of allZones){
    if(zone.isCliff||!zone.biomeId||!Array.isArray(zone.points)||zone.points.length<3)continue;
    const config=materials?.[zone.biomeId];
    const base=config?.slots?.ground;
@@ -149,11 +140,16 @@ export function createTerrainGPULayers({scene,terrain}){
    if(!biomes.has(zone.biomeId))biomes.set(zone.biomeId,[]);
    biomes.get(zone.biomeId).push(zone);
   }
+  for(const cliff of allZones){
+   if(!cliff.isCliff||!Array.isArray(cliff.points)||cliff.points.length<3)continue;
+   const parent=parents.get(cliff.cliffParentId);
+   if(parent?.biomeId&&biomes.has(parent.biomeId))biomes.get(parent.biomeId).push(cliff);
+  }
   for(const [biome,areas] of biomes){
    const slot=materials[biome].slots.ground;
    const image=loaded.get(slot.image);
    if(!image)continue;
-   const mask=zoneMask(areas);
+   const mask=createFeatheredZoneMask(areas,{featherWorld:limit(transitionWorld,10,45),expandWorld:4});
    const texture=new THREE.Texture(fullResolutionSource(image));
    texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
    texture.colorSpace=THREE.SRGBColorSpace;

@@ -1,4 +1,4 @@
-import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.123';
+import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.124';
 import {BIOMES} from './editor-biome-textures.mjs?v=0.9.123';
 export function createTerrainTexturePainter({scene,terrain,material,intangibleMaterial,live,toast,isTesting=()=>false,getTextureAssetUrl=url=>url}){
  const status=document.getElementById('textureRenderStatus'),gpuLayers=createTerrainGPULayers({scene,terrain});
@@ -9,7 +9,9 @@ export function createTerrainTexturePainter({scene,terrain,material,intangibleMa
   const zones=(live.zones||[]).filter(z=>BIOMES.some(b=>b.id===z.biomeId)&&Array.isArray(z.points)&&z.points.length>=3);
   const urls=new Set();for(const z of zones){const slots=live.biomeMaterials?.[z.biomeId]?.slots;for(const key of ['ground','detail1','detail2','detail3'])if(slots?.[key]?.image)urls.add(slots[key].image)}
   await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));if(ticket!==generation)return;
-  gpuLayers.build({zones:live.zones||[],materials:live.biomeMaterials,loaded,enabled});
+  const widths=Object.values(live.biomeMaterials||{}).map(m=>Number(m?.edgeBlend)||0);
+  const transitionWorld=Math.max(16,...widths);
+  gpuLayers.build({zones:live.zones||[],materials:live.biomeMaterials,loaded,enabled,transitionWorld});
   if(status)status.textContent=gpuLayers.count()?'Suelos base intactos · capas complementarias independientes · '+gpuLayers.count()+' capas GPU.':'Sin texturas de terreno para las zonas asignadas.';apply()}
  function apply(){terrain.material=live.settings?.terrainIntangible&&!isTesting()?intangibleMaterial:material;gpuLayers.sync(enabled&&!(live.settings?.terrainIntangible&&!isTesting()))}
  function schedule(){clearTimeout(timer);timer=setTimeout(()=>{void bake().catch(e=>toast('Error al generar texturas: '+e.message))},180)}

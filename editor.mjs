@@ -2049,7 +2049,7 @@ async function initializePlayerSpawnPanel(){
 void initializePlayerSpawnPanel();
 async function initializeCliffHeightTool(){
  try{
-  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.123');
+  const {createCliffHeightmapEditor}=await import('./cliff-heightmap-editor.mjs?v=0.9.124');
   cliffHeightTool=createCliffHeightmapEditor({terrain,scene,view,camera,live,snapshot,persist,toast,getTextureAssetUrl,
    onGeometryChanged:()=>{terrainPainter?.schedule();terrainInspector?.refresh();}});
   cliffHeightTool.schedule();
@@ -2061,7 +2061,7 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.123');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.124');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl});

@@ -1,21 +1,9 @@
 import * as THREE from 'three';
+import {createFeatheredZoneMask} from './terrain-zone-feather.mjs?v=0.9.124';
 import {CLIFF_ASSETS,registeredCliffZones,cliffRepeatCount} from './cliff-zone-bindings.mjs?v=0.9.123';
 const WORLD=630,RES=768;
 const path=file=>'./assets/terrain/texturas/'+encodeURIComponent(file);
 const CLAMP=(v,a,b)=>Math.max(a,Math.min(b,v));
-function maskFor(zones){
- const canvas=document.createElement('canvas');canvas.width=canvas.height=RES;
- const context=canvas.getContext('2d');context.clearRect(0,0,RES,RES);context.fillStyle='#fff';
- for(const area of zones){
-  context.beginPath();
-  area.points.forEach((p,i)=>{const x=(p.x/WORLD+.5)*RES,z=(p.z/WORLD+.5)*RES;
-   if(i===0)context.moveTo(x,z);else context.lineTo(x,z)});
-  context.closePath();context.fill();
- }
- const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.NoColorSpace;
- map.minFilter=map.magFilter=THREE.LinearFilter;map.generateMipmaps=false;
- return map;
-}
 const vertexShader=`
 varying vec3 worldPosition;
 varying vec3 worldNormal;
@@ -35,14 +23,16 @@ varying vec3 worldPosition;
 varying vec3 worldNormal;
 void main(){
  vec3 n=normalize(worldNormal);
- if(abs(n.y)>.72)discard;
+ float verticality=1.0-abs(n.y);
+ float wallBlend=smoothstep(.10,.74,verticality);
+ if(wallBlend<.004)discard;
  vec2 maskUV=vec2(worldPosition.x/630.0+.5,.5-worldPosition.z/630.0);
  float inside=texture2D(cliffMask,maskUV).a;
- if(inside<.01)discard;
+ if(inside<.004)discard;
  float tangent=heightmapAligned>.5?worldPosition.z:(abs(n.x)>=abs(n.z)?worldPosition.z:worldPosition.x);
  vec2 colorUV=vec2(tangent,worldPosition.y)*(cliffRepeats/630.0);
  vec4 color=texture2D(cliffTexture,colorUV);
- float alpha=inside*color.a*intensity;
+ float alpha=inside*wallBlend*color.a*intensity;
  if(alpha<.01)discard;
  gl_FragColor=vec4(color.rgb,alpha);
  #include <tonemapping_fragment>
@@ -90,7 +80,7 @@ export function createCliffColorRenderer({scene,terrain,live,getTextureAssetUrl=
    texture.colorSpace=THREE.SRGBColorSpace;
    texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;
    texture.generateMipmaps=true;texture.anisotropy=8;texture.needsUpdate=true;
-   const mask=maskFor(zones);
+   const mask=createFeatheredZoneMask(zones,{featherWorld:10,expandWorld:7});
    const settings=live.cliffHeightSettings?.biomes?.[biome]||{};
    const material=new THREE.ShaderMaterial({
     uniforms:{cliffTexture:{value:texture},cliffMask:{value:mask},
