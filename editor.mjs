@@ -56,6 +56,8 @@ light.shadow.camera.updateProjectionMatrix();
 light.shadow.bias=-0.00009;
 light.shadow.normalBias=0.025;
 light.shadow.radius=2.2;
+light.shadow.autoUpdate=false; // Always cache the global map, in editor too.
+light.shadow.needsUpdate=true;  // Initial scene build is rendered once.
 light.shadow.camera.layers.set(0); // World geometry only; the Explorer uses another light.
 scene.add(light,light.target);
 // High-definition 10-unit Explorer silhouette is independent of the static world.
@@ -88,7 +90,7 @@ function syncPlaytestSun(focus){
   characterSun.visible=active;
   characterSun.castShadow=active;
   light.intensity=active?1.8:2.25;
-  light.shadow.autoUpdate=!active; // No full-world shadow rerender per play frame.
+  light.shadow.autoUpdate=false; // Never redraw the whole arena every frame.
   light.shadow.needsUpdate=true; // One complete map when switching modes.
   heroShadowLastPosition.set(Infinity,Infinity,Infinity);
  }
@@ -400,7 +402,15 @@ for(let i=0;i<COUNT;i++){
 }
 p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();holesEditor?.syncGeometry();cliffHeightTool?.schedule();terrainInspector?.refresh();terrainVertexEditor?.refresh();zoneTool?.refresh();terrainPainter?.schedule();
 }
-function shape(type,geo,color,x,y,z,group=surface){const m=new THREE.Mesh(geo,solid(color));m.position.set(x,y,z);group.add(m);return m}
+function shape(type,geo,color,x,y,z,group=surface){
+ const m=new THREE.Mesh(geo,solid(color));
+ m.position.set(x,y,z);
+ // Real walls, gates, cave rooms and mountains cast/receive sunlight.
+ // Editor-only marker cones never cast.
+ m.castShadow=type!=='marker';
+ m.receiveShadow=type!=='marker';
+ group.add(m);return m
+}
 function marker(x,z,color,scale=2){const g=new THREE.Group();g.name='EditorOnlyMarker';g.userData.editorOnly=true;g.position.set(x,heightAt(x,z),z);surface.add(g);
 shape('marker',new THREE.ConeGeometry(scale,scale*2,5),color,0,scale+1.5,0,g);
 return g}
@@ -475,7 +485,9 @@ shape('',new THREE.BoxGeometry(5,6,2.2),0x10131c,radius*.25,height+3.5,1.5,group
 function resolvePoint(p){const a=p?.anchorId&&live.nodes.find(n=>n.id===p.anchorId&&n.kind==='anchor');return a?{x:a.x,z:a.z}:{x:p.x,z:p.z}}
 function snapPoint(x,z){let near=null,best=10;for(const n of live.nodes){if(n.kind!=='anchor')continue;const d=Math.hypot(n.x-x,n.z-z);if(d<best){best=d;near=n}}return near?{x:near.x,z:near.z,anchorId:near.id}:{x,z}}
 function draw(){
-zoneTool?.refresh();
+ // New/moved world models change the static sun map; update it once.
+ light.shadow.needsUpdate=true;
+ zoneTool?.refresh();
 objectMeshOverlays?.dispose();
 vertexEditor?.beforeDraw();
 renderedNodes.clear();
