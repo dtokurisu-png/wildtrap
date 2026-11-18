@@ -1,0 +1,37 @@
+name: Validar capa global handpaint 10K · Luz intensa
+on:
+  push:
+    branches: [handpaint-global-hardlight-20261118, main]
+    paths:
+      - 'terrain-handpaint-overlay.mjs'
+      - 'editor.mjs'
+      - 'index.html'
+      - 'tests/terrain-handpaint-overlay.test.mjs'
+      - 'tests/handpaint-overlay-smoke.html'
+      - 'tests/browser-handpaint-overlay.mjs'
+      - 'assets/terrain/texturas/terreno_handpaint_10K.png'
+      - '.github/workflows/handpaint-overlay.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar sintaxis y matemáticas Hard Light
+        run: |
+          node --check terrain-handpaint-overlay.mjs
+          node --check editor.mjs
+          node tests/terrain-handpaint-overlay.test.mjs
+          node tests/explorer-shadow-cadence.test.mjs
+      - name: Servir los assets originales
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 >/tmp/wt-handpaint.log 2>&1 &
+          sleep 2
+      - name: Verificar proyección, modo de fusión y archivo PNG en Chrome
+        env:
+          WILDTRAP_SMOKE_URL: http://127.0.0.1:8123/
+        run: node tests/browser-handpaint-overlay.mjs
