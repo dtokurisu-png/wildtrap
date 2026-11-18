@@ -122,8 +122,11 @@ function fullResolutionSource(image){
  return canvas;
 }
 export function createTerrainGPULayers({scene,terrain}){
- let records=[];
+ let records=[],shadowMesh=null,shadowMaterial=null;
  function clear(){
+  // Clean up old overlay on each texture rebake; no leaking shadow receivers.
+  if(shadowMesh){scene.remove(shadowMesh);shadowMesh.geometry=null;shadowMesh=null}
+  if(shadowMaterial){shadowMaterial.dispose();shadowMaterial=null}
   const releasedMasks=new Set();
   for(const entry of records){
    scene.remove(entry.mesh);
@@ -225,8 +228,28 @@ export function createTerrainGPULayers({scene,terrain}){
     records.push({mesh:detailMesh,mask,texture:detailTexture,material:detailMaterial});
    }
   }
+  if(records.length){
+   // Biome and cliff shaders remain unmodified (including their fog uniforms).
+   // This one transparent pass receives real world AND avatar shadows on
+   // textured ground and vertical cliff faces. It NEVER casts shadows.
+   shadowMaterial=new THREE.ShadowMaterial({color:0x1a231e,opacity:.55,side:THREE.DoubleSide});
+   shadowMaterial.polygonOffset=true;
+   shadowMaterial.polygonOffsetFactor=-10;
+   shadowMaterial.polygonOffsetUnits=-10;
+   shadowMesh=new THREE.Mesh(terrain.geometry,shadowMaterial);
+   shadowMesh.name='TerrainSoftSunShadows';
+   shadowMesh.castShadow=false;
+   shadowMesh.receiveShadow=true;
+   shadowMesh.renderOrder=11;
+   shadowMesh.frustumCulled=false;
+   scene.add(shadowMesh);
+  }
  }
  function sync(visible=true){
+  if(shadowMesh){
+   shadowMesh.geometry=terrain.geometry;
+   shadowMesh.visible=Boolean(visible&&terrain.visible);
+  }
   for(const entry of records){
    entry.mesh.geometry=terrain.geometry;
    entry.mesh.visible=Boolean(visible&&terrain.visible);
