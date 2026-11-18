@@ -19,7 +19,8 @@ try{
    return;
   }
   const label=d.querySelector('#cliffHeightStatus')?.textContent||'';
-  if(label.includes('vértices desplazados')&&w.__cliffHeightmapEditor.getState().colorMeshes>=1&&d.querySelector('#textureTarget option[value="cliff:plains"]')){
+  if(label.includes('vértices desplazados')&&w.__cliffHeightmapEditor.getState().colorMeshes>=1&&
+     w.__terrainTexturePainter?.getState?.().layers>=1&&d.querySelector('#textureTarget option[value="cliff:plains"]')){
    const count=Number(label.match(/(\d+) vértices desplazados/)?.[1]||0);
    const marked=[...d.querySelectorAll('#zoneList button')].some(b=>b.textContent.includes('⛰ ✓')&&b.title.includes('Acantilado asociado'));
    const dialog=!!d.getElementById('zoneCliffDialog');
@@ -28,8 +29,9 @@ try{
    const options=d.querySelectorAll('#textureTarget option').length;
    const geometryControls=!!d.getElementById('cliffHeightSmoothing')&&!!d.getElementById('cliffHeightFlatten');
    const colorMeshes=w.__cliffHeightmapEditor.getState().colorMeshes;
-   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&label.includes('zonas ⛰')?'PASS':'FAIL';
-   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes;return;
+   const groundLayers=w.__terrainTexturePainter.getState().layers;
+   clearInterval(interval);document.body.dataset.result=count>0&&marked&&dialog&&images===6&&repeats===1&&options===25&&geometryControls&&colorMeshes>0&&groundLayers>0&&label.includes('zonas ⛰')?'PASS':'FAIL';
+   document.querySelector('#result').textContent=label+' · marcador zona: '+marked+' · diálogo: '+dialog+' · imágenes: '+images+' · control global: '+repeats+' · selector: '+options+' · colorMeshes: '+colorMeshes+' · texturas suelo: '+groundLayers;return;
   }
   if(Date.now()-start>30000){clearInterval(interval);fail('Sin geometría aplicada: '+label)}
  },250);
