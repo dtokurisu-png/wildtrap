@@ -10,7 +10,7 @@ try{
   nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
  const frame=document.createElement('iframe');
- frame.width=800;frame.height=580;frame.src='../?safe=1&noShadows=1';
+ frame.width=800;frame.height=580;frame.src='../?safe=1&noShadows=1&handpaint=1';
  document.body.append(frame);
  const started=Date.now();
  let tested=false;
