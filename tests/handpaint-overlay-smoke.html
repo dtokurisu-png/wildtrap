@@ -1,0 +1,61 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Global hard-light 10K artwork smoke</title></head>
+<body data-result="PENDING"><div id="result">Cargando la capa mundial handpaint 10K…</div>
+<script>
+const fail=msg=>{document.body.dataset.result='FAIL';document.querySelector('#result').textContent=String(msg)};
+try{
+ const N=129,H=Array(N*N).fill(0);
+ for(let z=0;z<N;z++)for(let x=0;x<N;x++)H[z*N+x]=x<64?35:0;
+ const draft={version:3,size:630,resolution:N,heights:H,nodes:[],objectGroups:[],holes:[],cuts3d:[],
+  zones:[{id:'all',name:'Terreno completo',biomeId:'plains',points:[{x:-312,z:-312},{x:312,z:-312},{x:312,z:312},{x:-312,z:312}]}],
+  nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
+ localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
+ const frame=document.createElement('iframe');
+ frame.width=800;frame.height=580;frame.src='../?safe=1&noShadows=1';
+ document.body.append(frame);
+ const started=Date.now();
+ let tested=false;
+ const timer=setInterval(()=>{
+  const w=frame.contentWindow,d=frame.contentDocument;
+  const tool=w?.__terrainHandpaintOverlay;
+  const state=tool?.getState?.();
+  if(!d?.querySelector('#boot[hidden]')||!state?.ready||!w?.__wildtrapDiagnostics){
+   if(state?.error){clearInterval(timer);fail('No se cargó el arte original: '+state.error);return;}
+   if(Date.now()-started>85000){clearInterval(timer);fail('Carga del arte: '+JSON.stringify(state)+' · Boot: '+(d?.getElementById('bootMsg')?.textContent||''));}
+   return;
+  }
+  if(tested)return;tested=true;
+  try{
+   const {renderer,scene,getCamera}=w.__wildtrapDiagnostics;
+   const camera=getCamera();
+   const canvas=renderer.domElement;
+   const gl=renderer.getContext();
+   const W=canvas.width,H=canvas.height;
+   const normal=new Uint8Array(W*H*4),painted=new Uint8Array(W*H*4);
+   renderer.setRenderTarget(null);
+   renderer.render(scene,camera);
+   gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,normal);
+   tool.render(camera);
+   gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,painted);
+   let delta=0,affected=0;
+   for(let i=0;i<normal.length;i+=4){
+    const d=Math.abs(normal[i]-painted[i])+Math.abs(normal[i+1]-painted[i+1])+Math.abs(normal[i+2]-painted[i+2]);
+    if(d>12)affected++;
+    delta+=d;
+   }
+   const ready=tool.getState();
+   const pass=ready.mode==='hard-light'&&ready.transparency===.35&&ready.opacity===.65&&
+    ready.gpuWidth>0&&ready.gpuWidth<=4096&&ready.gpuHeight>0&&ready.gpuHeight<=4096&&
+    ready.sourceWidth>=4096&&ready.depthOcclusion&&ready.terrainGeometryLinked&&
+    ready.frames>0&&delta>20000&&affected>300;
+   clearInterval(timer);
+   document.body.dataset.result=pass?'PASS':'FAIL';
+   document.querySelector('#result').textContent=(pass?'PASS':'FAIL')+
+    ': arte '+ready.sourceWidth+'×'+ready.sourceHeight+
+    ', GPU '+ready.gpuWidth+'×'+ready.gpuHeight+
+    ', transparencia '+Math.round(ready.transparency*100)+
+    '%, pixeles modificados '+affected+', delta '+delta+
+    ', pant. '+W+'×'+H+', error '+ready.error;
+  }catch(e){clearInterval(timer);fail(e.stack||e)}
+ },500);
+}catch(e){fail(e.stack||e)}
+</script></body></html>
