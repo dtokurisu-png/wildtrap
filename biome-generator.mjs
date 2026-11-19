@@ -133,4 +133,38 @@ export function generateBiomeAssignments(zones,raw){
  return {ok:true,seed:settings.seed,assignments:zones.map((zone,i)=>({zoneId:zone.id,biomeId:result[i]})),
   adjacency:adjacency.reduce((sum,edges)=>sum+edges.length,0)/2,changed:zones.filter((z,i)=>z.biomeId!==result[i]).length};
 }
+// Exhaustive, deterministic permutations of one of each biome for five
+// persistent map regions. Existing neighbor incompatibilities remain enforced.
+// Locked results are deliberately ignored here: choosing another possibility
+// must not require manually unlocking the previously displayed layout.
+export function enumerateBiomeDistributions(zones,raw){
+ if(!Array.isArray(zones)||zones.length!==5)
+  return {ok:false,error:'Necesitas exactamente cinco regiones principales para enumerar las distribuciones.'};
+ if(zones.some(z=>!z||!Array.isArray(z.points)||z.points.length<3))
+  return {ok:false,error:'Hay zonas sin contornos válidos.'};
+ const rules=normalizeBiomeGenerator(raw);
+ const adjacency=buildZoneAdjacency(zones);
+ const forbidden=new Set(rules.forbiddenPairs);
+ const distributions=[];
+ const assignment=Array(zones.length).fill(null);
+ const remaining=new Set(BIOME_IDS);
+ function visit(index){
+  if(index===zones.length){
+   distributions.push(zones.map((z,i)=>({zoneId:z.id,biomeId:assignment[i]})));
+   return;
+  }
+  for(const biome of BIOME_IDS){
+   if(!remaining.has(biome))continue;
+   if(biome==='mountain'&&isMountainExcludedZone(zones[index]))continue;
+   if(adjacency[index].some(n=>n<index&&forbidden.has(keyPair(biome,assignment[n]))))continue;
+   assignment[index]=biome;
+   remaining.delete(biome);
+   visit(index+1);
+   remaining.add(biome);
+   assignment[index]=null;
+  }
+ }
+ visit(0);
+ return {ok:true,distributions,adjacency:adjacency.reduce((n,edges)=>n+edges.length,0)/2};
+}
 export function nextBiomeSeed(seed){return (Math.trunc(finite(seed,1))%2147483646)+1;}
