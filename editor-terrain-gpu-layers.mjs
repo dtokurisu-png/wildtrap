@@ -90,8 +90,6 @@ uniform float variationSeed;
 uniform float slotNumber;
 uniform float intensity;
 varying vec2 vTerrainXZ;
-varying vec3 vTerrainWorld;
-${GLOBAL_HANDPAINT_GLSL}
 float rand2(vec2 p){
  return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
 }
@@ -139,7 +137,7 @@ void main(){
   }
  }
  if(combinedAlpha<.002)discard;
- gl_FragColor=vec4(paintOverlayColor(premultiplied/max(combinedAlpha,.0001)),combinedAlpha);
+ gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001),combinedAlpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -257,7 +255,6 @@ export function createTerrainGPULayers({scene,terrain}){
     const detailMaterial=new THREE.ShaderMaterial({
      uniforms:{
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
-      ...artUniforms,
       regionMask:{value:mask},
       detailTexture:{value:detailTexture},
       repeats:{value:limit(Number(detailSlot.scale)||8,.25,1000)},
@@ -266,7 +263,6 @@ export function createTerrainGPULayers({scene,terrain}){
       intensity:{value:opacity}
      },
      vertexShader:VERTEX,fragmentShader:DETAIL_FRAGMENT,fog:true,
-     extensions:{derivatives:true},
      side:THREE.DoubleSide,transparent:true,depthWrite:false,depthTest:true,
      polygonOffset:true,polygonOffsetFactor:-3-i,polygonOffsetUnits:-3-i
     });
