@@ -178,6 +178,12 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </div>
 
 <label>Bioma<select id="textureBiome" style="width:100%;padding:7px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px"></select></label>
+<div style="padding:8px 0 10px;border-bottom:1px solid #548574;margin-bottom:10px" aria-label="Color independiente por bioma">
+ <div style="display:flex;align-items:center;justify-content:space-between"><strong>Color del bioma</strong><button type="button" class="infoHelp" title="Contraste e intensidad del color se aplican únicamente al bioma seleccionado, tanto a su suelo base como a sus complementarias. 100 % es el aspecto original. No afecta a la capa pintada global." aria-label="Ayuda del color por bioma" style="padding:2px 7px">ⓘ</button></div>
+ <select id="biomeColorTarget" aria-label="Bioma para ajustar color" style="width:100%;margin-top:6px;padding:6px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px"></select>
+ <label style="display:flex;align-items:center;gap:8px;margin-top:7px">Contraste <input id="biomeColorContrast" type="range" min="0" max="300" step="5" value="100" style="flex:1;min-width:65px"><output id="biomeColorContrastValue" for="biomeColorContrast" style="min-width:45px;text-align:right">100 %</output></label>
+ <label style="display:flex;align-items:center;gap:8px;margin-top:7px">Color <input id="biomeColorSaturation" type="range" min="0" max="300" step="5" value="100" style="flex:1;min-width:65px"><output id="biomeColorSaturationValue" for="biomeColorSaturation" style="min-width:45px;text-align:right">100 %</output></label>
+</div>
 <div style="display:flex;align-items:center;gap:7px;margin:4px 0">
  <label style="display:flex;align-items:center;gap:8px;flex:1"><input id="textureShow" type="checkbox" checked> Mostrar texturas</label>
  <button id="textureReloadImages" type="button" title="Volver a cargar las imágenes del repositorio sin tocar el escenario" aria-label="Actualizar imágenes del repositorio" style="width:34px;height:30px;min-width:34px;padding:0;border-radius:7px">↻</button>
@@ -451,5 +457,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.152').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.153').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
