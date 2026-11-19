@@ -1,7 +1,8 @@
-import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.143';
+import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.149';
 import {BIOMES,ensureBiomeTextureDefaults} from './editor-biome-textures.mjs?v=0.9.123';
-export function createTerrainTexturePainter({scene,terrain,material,intangibleMaterial,live,toast,isTesting=()=>false,getTextureAssetUrl=url=>url}){
+export function createTerrainTexturePainter({scene,terrain,material,intangibleMaterial,live,toast,isTesting=()=>false,getTextureAssetUrl=url=>url,getHandpaintTexture=()=>null}){
  const status=document.getElementById('textureRenderStatus'),gpuLayers=createTerrainGPULayers({scene,terrain});
+ gpuLayers.setHandpaintTexture(getHandpaintTexture());
  const cache=new Map(),loaded=new Map();let enabled=true,timer=0,generation=0;
  function decode(url){if(!url)return Promise.resolve(null);if(cache.has(url))return cache.get(url);
   const result=new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>resolve(null);img.src=getTextureAssetUrl(url)});cache.set(url,result);return result}
@@ -21,5 +22,7 @@ export function createTerrainTexturePainter({scene,terrain,material,intangibleMa
  function setEnabled(next){enabled=Boolean(next);if(enabled)schedule();else{++generation;gpuLayers.clear();apply()}}
  function invalidateTextureImages(){++generation;cache.clear();loaded.clear();if(enabled)schedule()}
  function dispose(){clearTimeout(timer);++generation;gpuLayers.clear()}
- return {schedule,apply,invalidateTextureImages,setEnabled,dispose};
+ return {schedule,apply,invalidateTextureImages,setEnabled,dispose,
+  setHandpaintTexture:texture=>gpuLayers.setHandpaintTexture(texture),
+  getHandpaintState:()=>gpuLayers.getHandpaintState()};
 }
