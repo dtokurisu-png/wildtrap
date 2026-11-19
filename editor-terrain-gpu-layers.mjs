@@ -6,6 +6,38 @@ import {createFeatheredZoneMask} from './terrain-zone-feather.mjs?v=0.9.124';
 // visual testing. The canvas is ONLY the alpha mask of each geographic zone;
 // the PNG itself is sampled directly by the GPU at the saved repeat scale.
 const WORLD=630, MASK_RES=768;
+// Sample the artwork directly in the existing biomes, at real world XZ.
+// One shader draw, no fullscreen quad/framebuffer or view-dependent depths.
+const GLOBAL_HANDPAINT_GLSL=`
+uniform sampler2D globalHandpaint;
+uniform float globalHandpaintEnabled;
+uniform float globalHandpaintOpacity;
+uniform float globalHandpaintContrast;
+vec3 paintOverlayColor(vec3 terrainColor){
+ if(globalHandpaintEnabled<0.5)return terrainColor;
+ vec3 gradX=dFdx(vTerrainWorld);
+ vec3 gradY=dFdy(vTerrainWorld);
+ vec3 face=cross(gradX,gradY);
+ float upness=abs(face.y)/max(length(face),0.000001);
+ float flatMask=smoothstep(0.70,0.86,upness);
+ if(flatMask<0.001)return terrainColor;
+ vec2 artUV=vec2(vTerrainWorld.x/630.0+.5,.5-vTerrainWorld.z/630.0);
+ if(artUV.x<0.0||artUV.y<0.0||artUV.x>1.0||artUV.y>1.0)return terrainColor;
+ float edge=min(min(artUV.x,1.0-artUV.x),min(artUV.y,1.0-artUV.y));
+ float edgeFade=smoothstep(0.0,0.06,edge);
+ if(edgeFade<0.001)return terrainColor;
+ vec4 art=texture2D(globalHandpaint,artUV);
+ float luma=dot(art.rgb,vec3(0.2126,0.7152,0.0722));
+ float darkCoverage=1.0-smoothstep(0.70,0.99,luma);
+ float weight=clamp(globalHandpaintOpacity*art.a*edgeFade*flatMask*darkCoverage,0.0,1.0);
+ if(weight<0.0001)return terrainColor;
+ vec3 artTone=mix(vec3(0.5),art.rgb,globalHandpaintContrast);
+ vec3 multiply=2.0*terrainColor*artTone;
+ vec3 screen=1.0-2.0*(1.0-terrainColor)*(1.0-artTone);
+ vec3 overlay=mix(multiply,screen,step(vec3(0.5),terrainColor));
+ return mix(terrainColor,overlay,weight);
+}
+`;
 const limit=(x,a,b)=>Math.max(a,Math.min(b,x));
 const VERTEX=`
 #include <fog_pars_vertex>
@@ -30,6 +62,7 @@ uniform float intensity;
 varying vec2 vTerrainXZ;
 varying vec3 vTerrainWorld;
 varying vec3 vTerrainNormal;
+${GLOBAL_HANDPAINT_GLSL}
 void main(){
  vec2 maskUV=vec2(vTerrainXZ.x/630.0+.5,.5-vTerrainXZ.y/630.0);
  float alpha=texture2D(regionMask,maskUV).a;
@@ -40,7 +73,7 @@ void main(){
  vec2 wallUV=vec2(abs(vTerrainNormal.x)>abs(vTerrainNormal.z)?vTerrainWorld.z:vTerrainWorld.x,vTerrainWorld.y)/630.0*repeats;
  vec3 ground=texture2D(baseTexture,sourceUV).rgb;
  vec3 wallGround=texture2D(baseTexture,wallUV).rgb;
- gl_FragColor=vec4(mix(ground,wallGround,wallMix),alpha*intensity);
+ gl_FragColor=vec4(paintOverlayColor(mix(ground,wallGround,wallMix)),alpha*intensity);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -57,6 +90,8 @@ uniform float variationSeed;
 uniform float slotNumber;
 uniform float intensity;
 varying vec2 vTerrainXZ;
+varying vec3 vTerrainWorld;
+${GLOBAL_HANDPAINT_GLSL}
 float rand2(vec2 p){
  return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
 }
@@ -104,7 +139,7 @@ void main(){
   }
  }
  if(combinedAlpha<.002)discard;
- gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001),combinedAlpha);
+ gl_FragColor=vec4(paintOverlayColor(premultiplied/max(combinedAlpha,.0001)),combinedAlpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -123,6 +158,17 @@ function fullResolutionSource(image){
 }
 export function createTerrainGPULayers({scene,terrain}){
  let records=[],shadowMesh=null,shadowMaterial=null;
+ // A single shared art GPU texture/uniform group for all biome materials.
+ const artUniforms={
+  globalHandpaint:{value:null},
+  globalHandpaintEnabled:{value:0},
+  globalHandpaintOpacity:{value:0.50},
+  globalHandpaintContrast:{value:0.45}
+ };
+ function setHandpaintTexture(texture){
+  artUniforms.globalHandpaint.value=texture||null;
+  artUniforms.globalHandpaintEnabled.value=texture?1:0;
+ }
  function clear(){
   // Clean up old overlay on each texture rebake; no leaking shadow receivers.
   if(shadowMesh){scene.remove(shadowMesh);shadowMesh.geometry=null;shadowMesh=null}
@@ -171,12 +217,14 @@ export function createTerrainGPULayers({scene,terrain}){
    const shader=new THREE.ShaderMaterial({
     uniforms:{
      ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+     ...artUniforms,
      baseTexture:{value:texture},
      regionMask:{value:mask},
      repeats:{value:limit(Number(slot.scale)||8,.25,1000)},
       intensity:{value:limit(Number.isFinite(Number(slot.opacity))?Number(slot.opacity):1,0,1)}
     },
     vertexShader:VERTEX,fragmentShader:FRAGMENT,fog:true,
+    extensions:{derivatives:true},
     side:THREE.DoubleSide,
     transparent:true,depthWrite:false,depthTest:true,
     polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2
@@ -209,6 +257,7 @@ export function createTerrainGPULayers({scene,terrain}){
     const detailMaterial=new THREE.ShaderMaterial({
      uniforms:{
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
+      ...artUniforms,
       regionMask:{value:mask},
       detailTexture:{value:detailTexture},
       repeats:{value:limit(Number(detailSlot.scale)||8,.25,1000)},
@@ -217,6 +266,7 @@ export function createTerrainGPULayers({scene,terrain}){
       intensity:{value:opacity}
      },
      vertexShader:VERTEX,fragmentShader:DETAIL_FRAGMENT,fog:true,
+     extensions:{derivatives:true},
      side:THREE.DoubleSide,transparent:true,depthWrite:false,depthTest:true,
      polygonOffset:true,polygonOffsetFactor:-3-i,polygonOffsetUnits:-3-i
     });
@@ -255,5 +305,7 @@ export function createTerrainGPULayers({scene,terrain}){
    entry.mesh.visible=Boolean(visible&&terrain.visible);
   }
  }
- return {build,sync,clear,count:()=>records.length};
+ return {build,sync,clear,setHandpaintTexture,count:()=>records.length,
+  getHandpaintState:()=>({enabled:Boolean(artUniforms.globalHandpaintEnabled.value),
+   materials:records.filter(r=>r.material.uniforms.globalHandpaint).length})};
 }
