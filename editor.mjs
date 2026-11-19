@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {cliffShadowFaceIndices} from './terrain-shadow-geometry.mjs';
-import {createTerrainHandpaintOverlay} from './terrain-handpaint-overlay.mjs?v=0.9.147';
+import {createTerrainHandpaintOverlay} from './terrain-handpaint-overlay.mjs?v=0.9.148';
 import {explorerShadowDue} from './explorer-shadow-cadence.mjs';
 // El editor de zonas se carga después del motor principal; un módulo opcional no bloquea la apertura.
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
