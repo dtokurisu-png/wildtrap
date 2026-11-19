@@ -2098,6 +2098,32 @@ async function loadPublishedWorld(){
   if(!response.ok)throw Error('HTTP '+response.status);
   const world=await response.json();
   if(world.size!==SIZE||world.resolution!==N||world.heights?.length!==COUNT||!Array.isArray(world.nodes))throw Error('Escenario publicado incompatible');
+  // The user's exported sculpt is stored as two small supplemental documents.
+  // Shared locked-vertex maps were repeated 529 times in the original JSON.
+  // Rehydrate them only on the desktop editor, not on the mobile play-only view.
+  try{
+   const [stampsResponse,anchorsResponse]=await Promise.all([
+    fetch('./assets/terrain/wildtrap-sculpt-ops.json',{cache:'no-cache'}),
+    fetch('./assets/terrain/wildtrap-sculpt-anchors.json',{cache:'no-cache'})
+   ]);
+   if(!stampsResponse.ok||!anchorsResponse.ok)throw Error('Faltan archivos de esculpido publicado');
+   const stamps=await stampsResponse.json(),anchors=await anchorsResponse.json();
+   const nodes=new Map(world.nodes.map(n=>[n.id,n]));
+   for(const record of stamps.stamps||[]){
+    const node=nodes.get(record.nodeId);if(!node)continue;
+    node.meshSculptOps=(record.ops||[]).map(op=>{
+     const {lockRef,...rest}=op;
+     return {...rest,locked:record.locks?.[lockRef]||{}};
+    });
+    node.meshVertexMoves=record.meshVertexMoves||{};
+    node.vertexLocks=record.vertexLocks||{};
+    if(record.vertexTotalLock===true)node.vertexTotalLock=true;
+   }
+   for(const record of anchors.anchors||[]){
+    const node=nodes.get(record.id);if(node)node.vertexLockAnchors=record.vertexLockAnchors;
+   }
+  }catch(error){console.warn('Los modelos se cargaron sin todas sus modificaciones de vértices:',error)}
+
   Object.assign(live,world);
   live.terrainSeams=Array.isArray(world.terrainSeams)?world.terrainSeams:[];
   
