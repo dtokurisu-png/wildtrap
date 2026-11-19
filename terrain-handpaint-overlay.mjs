@@ -107,9 +107,13 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
  paintingMesh.matrixAutoUpdate=false;
  const paintingScene=new THREE.Scene();paintingScene.add(paintingMesh);
 
- // This is deliberately asynchronous: the original 43MB source loads once.
- // An 8K/10K GPU texture would otherwise trigger huge VRAM allocations.
- if(enabled){
+ // Defer even image decoding and the 4K canvas allocation until AFTER the
+ // editor has hydrated its terrain. Doing this during startup starved the UI
+ // thread on some devices, despite using the optimized WebP.
+ let loadStarted=false;
+ function startArtworkLoading(){
+  if(loadStarted||!enabled||disposed)return;
+  loadStarted=true;
   const img=new Image();
   img.decoding='async';
   img.onload=()=>{
@@ -160,10 +164,10 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
   img.src=getTextureAssetUrl(HANDPAINT_GPU_SOURCE);
  }
  function render(camera){
-  // The editor must finish recovering geometry and hide its loading screen
-  // BEFORE performing an extra fullscreen composite. Otherwise software/WebGL
-  // devices can be starved by the new pass during startup.
- if(!enabled||!ready||!terrain.visible||window.__terrainHydrated!==true){
+  // Do not start decoding the artwork until the editor is fully interactive.
+  // The scene continues rendering normally while the 4K copy is prepared.
+  if(window.__terrainHydrated===true&&!loadStarted)startArtworkLoading();
+  if(!enabled||!ready||!terrain.visible||window.__terrainHydrated!==true){
    renderer.render(scene,camera);
    return;
   }
