@@ -1,110 +1,71 @@
-import {ensureBiomeTextureDefaults} from './editor-biome-textures.mjs?v=0.9.119';
-import {BIOME_IDS,defaultBiomeGenerator,normalizeBiomeGenerator,generateBiomeAssignments,nextBiomeSeed} from './biome-generator.mjs?v=0.9.154';
-const LABELS={mountain:'Montañoso',desert:'Desierto',plains:'Llanura',swamp:'Pantano',forest:'Bosque'};
-const PAIRS=[];
-for(let i=0;i<BIOME_IDS.length;i++)for(let j=i+1;j<BIOME_IDS.length;j++)PAIRS.push([BIOME_IDS[i],BIOME_IDS[j]]);
-const pair=(a,b)=>[a,b].sort().join(':');
+import {enumerateBiomeDistributions} from './biome-generator.mjs?v=0.9.156';
+
+const LABELS={mountain:'Montaña',desert:'Desierto',plains:'Llanura',swamp:'Pantano',forest:'Bosque'};
+const PAGE_SIZE=12;
+
+// Deliberately simple: all permitted maps, not a seed/weight generator.
 export function createBiomeGeneratorPanel({live,snapshot,persist,toast,onChange=()=>{},onZoneChange=()=>{}}){
  const $=id=>document.getElementById(id);
- const root=$('biomeGeneratorPanel');
- if(!root)throw Error('Falta el panel del generador de biomas');
- let storedRef=null;
- function config(){
-  // Initial projects have biomeGenerator=null. Never mistake the null
-  // sentinel for an already normalized configuration.
-  if(!storedRef||storedRef!==live.biomeGenerator){
-   live.biomeGenerator=normalizeBiomeGenerator(live.biomeGenerator);
-   storedRef=live.biomeGenerator;
-  }
-  return storedRef;
- }
- function mutate(fn){
+ const list=$('biomePossibilities');
+ const status=$('biomeGeneratorStatus');
+ const previous=$('biomePossibilitiesPrev');
+ const next=$('biomePossibilitiesNext');
+ const pages=$('biomePossibilitiesPage');
+ if(!list||!status||!previous||!next||!pages)throw Error('Faltan controles de distribuciones');
+ let page=0;
+ let latest=[];
+ let regionIds=[];
+ const mainZones=()=>Array.isArray(live.zones)?live.zones.filter(z=>!z.isCliff):[];
+ const getSelectedIndex=()=>{
+  const zones=mainZones();
+  return latest.findIndex(option=>option.every((item,i)=>zones[i]?.id===item.zoneId&&zones[i]?.biomeId===item.biomeId));
+ };
+ function apply(index){
+  const chosen=latest[index],zones=mainZones();
+  if(!chosen||chosen.length!==zones.length)return;
+  if(chosen.every((item,i)=>zones[i].biomeId===item.biomeId))return;
   snapshot();
-  fn(config());
+  for(let i=0;i<zones.length;i++){
+   zones[i].biomeId=chosen[i].biomeId;
+   // A selected possibility is editable and replaceable by another click.
+   zones[i].biomeLocked=false;
+  }
+  // Cliff zones inherit their main region's biome elsewhere in the editor.
   persist();
-  refresh();
+  onZoneChange();
+  onChange();
+  render();
  }
- const make=(tag,text)=>{
-  const el=document.createElement(tag);
-  if(text!==undefined)el.textContent=text;
-  return el;
- };
- const weights=$('biomeWeights');
- const rules=$('biomePairRules');
- for(const id of BIOME_IDS){
-  const row=make('div');row.style.cssText='display:grid;grid-template-columns:1fr 70px 56px;align-items:center;gap:6px;margin:7px 0';
-  const active=make('label',LABELS[id]);active.style.margin='0';
-  const check=make('input');check.type='checkbox';check.dataset.enabled=id;
-  active.prepend(check);
-  const weight=make('input');weight.type='number';weight.min='0';weight.max='10';weight.step='1';weight.dataset.weight=id;
-  weight.style.cssText='min-width:0;width:100%;background:#1e4034;color:#fff;border:1px solid #598071;border-radius:5px;padding:5px';
-  row.append(active,weight,make('small','Peso'));
-  weights.append(row);
-  check.onchange=e=>mutate(v=>{
-   v.enabled=e.target.checked?[...new Set([...v.enabled,id])]:v.enabled.filter(x=>x!==id);
-  });
-  weight.onchange=e=>mutate(v=>v.weights[id]=Math.max(0,Math.min(10,Math.round(Number(e.target.value)||0))));
- }
- for(const [a,b] of PAIRS){
-  const label=make('label');label.style.cssText='display:flex;align-items:center;gap:7px;margin:4px 0';
-  const check=make('input');check.type='checkbox';check.dataset.pair=pair(a,b);
-  label.append(check,make('span',LABELS[a]+' ↔ '+LABELS[b]));
-  rules.append(label);
-  check.onchange=e=>mutate(v=>{
-   const p=pair(a,b);
-   v.forbiddenPairs=e.target.checked?v.forbiddenPairs.filter(x=>x!==p):[...new Set([...v.forbiddenPairs,p])];
-  });
- }
- function refresh(){
-  const v=config(),zones=Array.isArray(live.zones)?live.zones:[];
-  $('biomeGeneratorSeed').value=v.seed;
-  for(const id of BIOME_IDS){
-   root.querySelector('[data-enabled="'+id+'"]').checked=v.enabled.includes(id);
-   root.querySelector('[data-weight="'+id+'"]').value=v.weights[id];
+ function render(){
+  const zones=mainZones();
+  const result=enumerateBiomeDistributions(zones,live.biomeGenerator);
+  latest=result.ok?result.distributions:[];
+  regionIds=zones.map(z=>z.id);
+  const count=latest.length;
+  page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(count/PAGE_SIZE)-1)));
+  list.replaceChildren();
+  if(!result.ok){status.textContent=result.error;}
+  else if(!count){status.textContent='No hay combinaciones válidas con las restricciones de vecinos guardadas.';}
+  else status.textContent=count+' posibilidades · Montaña excluida de Zona Oeste';
+  const selected=getSelectedIndex();
+  const start=page*PAGE_SIZE;
+  for(let i=start;i<Math.min(count,start+PAGE_SIZE);i++){
+   const option=latest[i];
+   const button=document.createElement('button');
+   button.type='button';
+   button.textContent='Posibilidad '+(i+1);
+   button.title=option.map((item,j)=>(zones[j].name||'Zona '+(j+1))+': '+LABELS[item.biomeId]).join(' · ');
+   button.setAttribute('aria-pressed',String(i===selected));
+   if(i===selected){button.style.borderColor='#00ffdf';button.style.fontWeight='700'}
+   button.onclick=()=>apply(i);
+   list.append(button);
   }
-  for(const [a,b] of PAIRS){
-   root.querySelector('[data-pair="'+pair(a,b)+'"]').checked=!v.forbiddenPairs.includes(pair(a,b));
-  }
-  const assigned=zones.filter(z=>BIOME_IDS.includes(z.biomeId)).length;
-  const locked=zones.filter(z=>z.biomeLocked===true).length;
-  const last=v.lastGeneration;
-  $('biomeGeneratorStatus').textContent=zones.length+' zonas · '+assigned+' con bioma · '+locked+' bloqueadas'
-   +(last?' · Última generación: semilla '+last.seed:'');
-  $('biomeGenerate').disabled=!zones.length;
-  $('biomeRegenerate').disabled=!zones.length;
-  $('biomeLockAll').disabled=!zones.length;
-  $('biomeUnlockAll').disabled=!zones.length;
+  previous.disabled=page<=0;
+  next.disabled=(page+1)*PAGE_SIZE>=count;
+  pages.textContent=count?'Página '+(page+1)+' de '+Math.ceil(count/PAGE_SIZE):'';
  }
- $('biomeGeneratorSeed').onchange=e=>mutate(v=>{
-  v.seed=Math.max(1,Math.min(2147483646,Math.trunc(Number(e.target.value)||1)));
- });
- function generate(advance){
-  const original=config();
-  const candidate={...original,seed:advance?nextBiomeSeed(original.seed):original.seed};
-  const mainZones=(live.zones||[]);
-  const result=generateBiomeAssignments(mainZones,candidate);
-  if(!result.ok){toast(result.error);$('biomeGeneratorResult').textContent=result.error;return;}
-  snapshot();
-  const mapping=new Map(result.assignments.map(a=>[a.zoneId,a.biomeId]));
-  for(const zone of mainZones)zone.biomeId=mapping.get(zone.id)||zone.biomeId||null;
-  for(const z of live.zones)z.biomeLocked=!!z.biomeId;
-  persist();refresh();onZoneChange();
-  toast('Asignación actual conservada: zonas con bioma bloqueadas');
- };
- $('biomeUnlockAll').onclick=()=>{
-  if(!live.zones?.length)return;
-  snapshot();
-  for(const z of live.zones)z.biomeLocked=false;
-  persist();refresh();onZoneChange();
-  toast('Zonas desbloqueadas para la próxima generación');
- };
- $('biomeResetRules').onclick=()=>{
-  if(!confirm('¿Restablecer pesos y compatibilidades? Los biomas asignados a zonas se mantienen.'))return;
-  mutate(v=>{
-   const def=defaultBiomeGenerator();
-   v.enabled=def.enabled;v.weights=def.weights;v.forbiddenPairs=[];
-  });
- };
- refresh();
- return {refresh};
+ previous.onclick=()=>{page--;render()};
+ next.onclick=()=>{page++;render()};
+ render();
+ return {refresh:render};
 }
