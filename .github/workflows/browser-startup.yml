@@ -6,6 +6,7 @@ on:
       - 'tests/browser-startup.mjs'
       - '.github/workflows/browser-startup.yml'
       - 'editor.mjs'
+      - 'terrain-handpaint-overlay.mjs'
       - 'map-publisher.mjs'
       - 'tests/map-publisher.mjs'
       - 'biome-generator.mjs'
