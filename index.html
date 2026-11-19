@@ -160,6 +160,18 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </div>
 <p class="hint" id="playerSpawnStatus">Selecciona un jugador y pulsa Colocar / mover; haz clic en el mapa.</p>
 <div id="playerSpawnList"></div>
+<div style="margin:12px 0;padding:9px 0;border-top:1px solid #548574">
+ <h2 style="margin:0 0 7px">Spawns básicos · Vértices</h2>
+ <p class="hint">Marca vértices concretos de la malla con un clic. No se pinta por radio ni se crean modelos todavía.</p>
+ <label>Categoría
+ <select id="basicSpawnCategory" style="width:100%;padding:7px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px">
+ <option value="trees">Árboles</option><option value="grass">Hierbas y pasto</option><option value="rocks">Rocas</option><option value="plants">Plantas y raíces</option><option value="dunes">Dunas</option>
+ </select></label>
+ <button data-tool="basicSpawnVertex" type="button" style="width:100%;margin:7px 0">⌖ Seleccionar vértices de spawn</button>
+ <label style="display:flex;gap:8px;align-items:center;margin-top:5px"><input id="basicSpawnErase" type="checkbox"> Quitar puntos con clic</label>
+ <button id="basicSpawnClear" type="button" style="width:100%;margin-top:6px">Limpiar esta categoría</button>
+ <small id="basicSpawnStatus">0 vértices marcados</small>
+</div>
 <h2>Otros spawns existentes</h2>
 <div id="spawnsLegacyButtons" class="grid"><button data-tool="tree" type="button">Spawn árbol</button><button data-tool="wallspawn" type="button">Spawn muro</button><button data-tool="spawn" type="button">Respawn antiguo</button></div>
 <p class="hint">Spawn árbol, Spawn muro y Respawn ahora están aquí. El modo Probar prioriza la posición del jugador 1; si todavía no existe, conserva el Respawn antiguo.</p>
@@ -438,5 +450,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.160').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.161').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
