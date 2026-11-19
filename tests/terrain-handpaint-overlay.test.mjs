@@ -18,7 +18,7 @@ hardLightRGB([.2,.6,.9],[.5,.5,.5]).forEach((v,i)=>{
 });
 const green=hardLightRGB([.2,.5,.8],[.9,.1,.6]);
 assert.ok(green[0]>.2&&green[1]<.5&&green[2]>.8);
-assert.match(moduleCode,/abs\(gl_FragCoord\.z-visibleDepth\)>0\.00006/,'No paint over closer GLB meshes');
+assert.match(moduleCode,/visibleDepth\+0\.00005<gl_FragCoord\.z/,'Occlude paint only behind closer meshes');
 assert.match(moduleCode,/world\.x\/\$\{WORLD_SIZE\.toFixed\(1\)\}/,'World X used in the UV mapping');
 assert.match(moduleCode,/world\.z\/\$\{WORLD_SIZE\.toFixed\(1\)\}/,'World Z used in the UV mapping');
 assert.match(moduleCode,/renderer\.render\(scene,camera\); \/\/ One scene render/,'Do not render the world twice');
