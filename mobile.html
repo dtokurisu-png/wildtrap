@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#101d19">
+<title>WildTrap · Explorar</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101d19;color:white;font-family:system-ui,sans-serif;overscroll-behavior:none;touch-action:none}
+#world{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#loading{position:absolute;inset:0;z-index:20;background:#10251fe8;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;font-size:15px}
+#loading[hidden]{display:none}
+#hud{position:absolute;inset:0;pointer-events:none;z-index:8}
+#spawnButton{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:14px;min-width:90px;min-height:46px;border:1px solid #85dbc4;border-radius:12px;background:#184b3fdd;color:white;font-size:14px;font-weight:700;pointer-events:auto}
+#joystick{position:absolute;left:calc(env(safe-area-inset-left) + 22px);bottom:calc(env(safe-area-inset-bottom) + 28px);width:142px;height:142px;border-radius:50%;background:#153d34a8;border:2px solid #a9ffe17a;pointer-events:auto;touch-action:none}
+#knob{position:absolute;left:46px;top:46px;width:46px;height:46px;border-radius:50%;background:#00bfaabf;box-shadow:0 0 0 3px #aaf8de73;pointer-events:none}
+#help{position:absolute;left:12px;top:calc(env(safe-area-inset-top) + 12px);font-size:11px;opacity:.7;max-width:45vw}
+#mapOverlay{position:absolute;inset:0;background:#081b19d9;display:flex;justify-content:center;align-items:center;padding:18px;z-index:15;pointer-events:auto}
+#mapOverlay[hidden]{display:none}
+#mapPanel{width:min(95vw,460px);max-height:94dvh;overflow:auto;background:#19382e;border:1px solid #63bba2;border-radius:15px;padding:13px}
+#mapPanel h2{font-size:16px;margin:0 0 5px}
+#mapPanel p{font-size:12px;margin:3px 0 10px;color:#c8e8dc}
+#map{width:100%;aspect-ratio:1;display:block;touch-action:none;background:#1b302b;border:1px solid #669b89;border-radius:9px}
+#coords{font-size:12px;padding:7px 1px;color:#cef0e4}
+.actions{display:flex;gap:8px}.actions button{flex:1;min-height:43px;background:#295748;color:white;border:1px solid #8ed1b8;border-radius:9px;font-size:14px}
+#accept{background:#007d67;border-color:#80f6d7;font-weight:700}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head><body>
+<canvas id="world"></canvas>
+<div id="loading">Cargando escenario WildTrap…</div>
+<div id="hud">
+ <div id="help">WILDTRAP · exploración móvil</div>
+ <button id="spawnButton" type="button">⌖ Jugador 1</button>
+ <div id="joystick" role="group" aria-label="Joystick para caminar"><div id="knob"></div></div>
+</div>
+<div id="mapOverlay" hidden><div id="mapPanel">
+ <h2>⌖ Colocar spawn · Jugador 1</h2><p>Vista cenital (eje Y). Toca un lugar del escenario y pulsa Aceptar.</p>
+ <canvas id="map" width="630" height="630" aria-label="Mapa cenital para elegir una posición"></canvas>
+ <div id="coords">Selecciona un punto del mapa</div>
+ <div class="actions"><button id="cancel" type="button">Cancelar</button><button id="accept" type="button">Aceptar</button></div>
+</div></div>
+<button id="test" hidden></button><span id="testModelStatus" hidden></span><span id="testCoords" hidden></span><span id="toast" hidden></span>
+<script type="module" src="./mobile.mjs?v=0.9.170"></script>
+</body></html>
