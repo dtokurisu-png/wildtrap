@@ -2178,7 +2178,7 @@ async function initializeTextureTool(){
 void initializeTextureTool();
 async function initializeBiomeGenerator(){
  try{
-  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.119');
+  const {createBiomeGeneratorPanel}=await import('./editor-biome-generator.mjs?v=0.9.154');
   biomeGeneratorTool=createBiomeGeneratorPanel({live,snapshot,persist,toast,
    onChange:()=>{terrainPainter?.schedule();cliffHeightTool?.schedule();},onZoneChange:()=>{zoneTool?.refreshAll();cliffHeightTool?.schedule();}});
  }catch(error){
