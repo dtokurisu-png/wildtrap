@@ -6,27 +6,65 @@ import {createPrefabLibrary} from './prefab-library.mjs?v=0.9.160';
 const $=id=>document.getElementById(id);
 const canvas=$('world'),loading=$('loading'),map=$('map'),ctx=map.getContext('2d');
 const SIZE=630,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-let play=null,world=null,terrain=null,renderer=null,marked=null;
+let play=null,world=null,terrain=null,renderer=null,marked=null,scene=null,topDownCanvas=null;
+function captureTopDown(){
+ if(!renderer||!scene)return;
+ let target=null,previous=null;
+ try{
+  const side=512;
+  target=new THREE.WebGLRenderTarget(side,side,{depthBuffer:true,stencilBuffer:false});
+  const camera=new THREE.OrthographicCamera(-SIZE/2,SIZE/2,SIZE/2,-SIZE/2,.1,2200);
+  camera.position.set(0,950,0);camera.up.set(0,0,-1);camera.lookAt(0,0,0);
+  camera.layers.enable(1);
+  const bytes=new Uint8Array(side*side*4);
+  previous=renderer.getRenderTarget();
+  renderer.setRenderTarget(target);renderer.render(scene,camera);
+  renderer.readRenderTargetPixels(target,0,0,side,side,bytes);
+  const image=ctx.createImageData(side,side);
+  // WebGL readPixels is bottom-up, Canvas2D is top-down.
+  for(let y=0;y<side;y++)image.data.set(bytes.subarray((side-1-y)*side*4,(side-y)*side*4),y*side*4);
+  topDownCanvas=document.createElement('canvas');
+  topDownCanvas.width=side;topDownCanvas.height=side;
+  topDownCanvas.getContext('2d').putImageData(image,0,0);
+ }catch(error){
+  topDownCanvas=null;
+  console.warn('Minimapa 3D no disponible; mostrando relieve cenital:',error);
+ }finally{
+  if(renderer&&previous!==null)renderer.setRenderTarget(previous);
+  target?.dispose();
+ }
+}
 const stopLoading=(message)=>{loading.textContent=message};
 function drawMap(){
  if(!world)return;
- const res=world.resolution,heights=world.heights;
- const image=ctx.createImageData(630,630);
- let min=Infinity,max=-Infinity;
- for(const v of heights){min=Math.min(min,v);max=Math.max(max,v)}
- for(let y=0;y<630;y++)for(let x=0;x<630;x++){
-  const i=Math.min(res-1,Math.round(y/630*(res-1)))*res+Math.min(res-1,Math.round(x/630*(res-1)));
-  const h=(heights[i]-min)/Math.max(1,max-min),shade=Math.round(26+h*85),index=(y*630+x)*4;
-  image.data[index]=shade*.73;image.data[index+1]=shade;image.data[index+2]=shade*.83;image.data[index+3]=255;
+ ctx.clearRect(0,0,SIZE,SIZE);
+ if(topDownCanvas){
+  // A true overhead view of the rendered textured scene, not a schematic.
+  ctx.drawImage(topDownCanvas,0,0,SIZE,SIZE);
+ }else{
+  const res=world.resolution,heights=world.heights;
+  const image=ctx.createImageData(SIZE,SIZE);
+  let min=Infinity,max=-Infinity;
+  for(const v of heights){min=Math.min(min,v);max=Math.max(max,v)}
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+   const i=Math.min(res-1,Math.round(y/SIZE*(res-1)))*res+Math.min(res-1,Math.round(x/SIZE*(res-1)));
+   const h=(heights[i]-min)/Math.max(1,max-min),shade=Math.round(26+h*85),index=(y*SIZE+x)*4;
+   image.data[index]=shade*.73;image.data[index+1]=shade;image.data[index+2]=shade*.83;image.data[index+3]=255;
+  }
+  ctx.putImageData(image,0,0);
  }
- ctx.putImageData(image,0,0);
  const palette={forest:'#50bc8b',mountain:'#a5a9b0',desert:'#d5b97b',swamp:'#527f74',plains:'#a4b96e'};
  for(const zone of world.zones||[]){
   if(zone.isCliff||!zone.points?.length)continue;
   ctx.beginPath();
   zone.points.forEach((p,i)=>{const x=p.x+SIZE/2,y=p.z+SIZE/2;if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y)});
-  ctx.closePath();ctx.fillStyle=(palette[zone.biomeId]||'#8cc0bb')+'55';ctx.fill();
-  ctx.strokeStyle=palette[zone.biomeId]||'#a2cbc1';ctx.lineWidth=2;ctx.stroke();
+  ctx.closePath();if(!topDownCanvas){ctx.fillStyle=(palette[zone.biomeId]||'#8cc0bb')+'55';ctx.fill();}
+  ctx.strokeStyle=palette[zone.biomeId]||'#a2cbc1';ctx.lineWidth=topDownCanvas?1:2;ctx.stroke();
+ }
+ if(play?.active){
+  const current=play.getPosition(),x=current.x+SIZE/2,y=current.z+SIZE/2;
+  ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fillStyle='#4aabff';ctx.fill();
+  ctx.lineWidth=2;ctx.strokeStyle='white';ctx.stroke();
  }
  if(marked){
   const x=marked.x+SIZE/2,y=marked.z+SIZE/2;
@@ -57,7 +95,7 @@ function setupJoystick(){
 function setupMap(){
  $('spawnButton').onclick=()=>{
   if(!play?.active)return;
-  marked=null;drawMap();$('coords').textContent='Selecciona un punto del mapa';
+  marked=null;captureTopDown();drawMap();$('coords').textContent='Selecciona un punto del mapa';
   $('mapOverlay').hidden=false;play.setJoystick(0,0);
  };
  map.addEventListener('pointerdown',e=>{
@@ -84,7 +122,7 @@ async function main(){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.25));
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.shadowMap.enabled=false;
-  const scene=new THREE.Scene();scene.background=new THREE.Color('#789f9f');
+  scene=new THREE.Scene();scene.background=new THREE.Color('#789f9f');
   const sky=new THREE.HemisphereLight(0xf1f5e5,0x53634a,2.2);sky.layers.enable(1);scene.add(sky);
   const sun=new THREE.DirectionalLight(0xffe5c0,2.0);sun.layers.enable(1);sun.position.set(-280,600,250);scene.add(sun);
   const n=world.resolution,geo=new THREE.PlaneGeometry(SIZE,SIZE,n-1,n-1);
