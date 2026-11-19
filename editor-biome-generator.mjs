@@ -1,4 +1,4 @@
-import {enumerateBiomeDistributions} from './biome-generator.mjs?v=0.9.157';
+import {enumerateBiomeDistributions} from './biome-generator.mjs?v=0.9.158';
 
 const LABELS={mountain:'Montaña',desert:'Desierto',plains:'Llanura',swamp:'Pantano',forest:'Bosque'};
 const PAGE_SIZE=12;
