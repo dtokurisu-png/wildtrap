@@ -16,6 +16,7 @@ import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
 import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.160';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
 import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.103';
+import {createBasicSpawnVertexTool} from './editor-basic-spawn-vertices.mjs?v=0.9.161';
 import {restoreTerrainSeams,seamVertexIds} from './terrain-seams.mjs?v=0.9.116';
 import {constrainedRotation,normalizedLocks} from './mesh-deform.mjs?v=0.9.12';
 import {cleanSculptStamps} from './mesh-vertex-freeze.mjs?v=0.9.61';
@@ -187,7 +188,7 @@ const cursor=new THREE.Mesh(new THREE.RingGeometry(1,1.02,64),new THREE.MeshBasi
 const colours={path:0xb69c6b,wall:0x826f57,tree:0x276b53,mountain:0x7f756a,cave:0x442c34,stairs:0xb8a080,spawn:0x1ebfef,exit:0xf47979,gate:0xe1b94f,anchor:0xffd76b};
 const solid=(c,alpha=1)=>new THREE.MeshLambertMaterial({color:c,flatShading:true,transparent:alpha<1,opacity:alpha,side:THREE.DoubleSide});
 const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:[],objectGroups:[],holes:[],cuts3d:[],zones:[],nextId:1,settings:{heightMax:120}};
-let holesEditor=null,vertexEditor=null,terrainVertexEditor=null,terrainInspector=null,objectMeshOverlays=null,zoneTool=null,textureTool=null,terrainPainter=null,cliffHeightTool=null,biomeGeneratorTool=null,playerSpawnPanel=null,testingScene=false;
+let holesEditor=null,vertexEditor=null,terrainVertexEditor=null,basicSpawnTool=null,terrainInspector=null,objectMeshOverlays=null,zoneTool=null,textureTool=null,terrainPainter=null,cliffHeightTool=null,biomeGeneratorTool=null,playerSpawnPanel=null,testingScene=false;
 let textureRevisionWatcher=null;
 const getTextureAssetUrl=url=>revisionedTextureUrl(url,textureRevisionWatcher?.getRevision()||'editor-0.9.107');
 // Load one world-aligned art texture and attach it directly to EXISTING
@@ -425,7 +426,7 @@ for(let i=0;i<COUNT;i++){
  const green=.40+clamp(h/55,0,1)*-.25;color.setRGB(.20+green*.18,green+.20,.26+green*.08);
  rgb[i*3]=color.r;rgb[i*3+1]=color.g;rgb[i*3+2]=color.b;
 }
-p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();holesEditor?.syncGeometry();cliffHeightTool?.schedule();terrainInspector?.refresh();terrainVertexEditor?.refresh();zoneTool?.refresh();terrainPainter?.schedule();
+p.needsUpdate=true;terrainGeo.setAttribute('color',new THREE.BufferAttribute(rgb,3));terrainGeo.computeVertexNormals();terrainGeo.computeBoundingSphere();terrainGeo.computeBoundingBox();holesEditor?.syncGeometry();cliffHeightTool?.schedule();terrainInspector?.refresh();terrainVertexEditor?.refresh();basicSpawnTool?.refresh();zoneTool?.refresh();terrainPainter?.schedule();
 }
 function shape(type,geo,color,x,y,z,group=surface){
  const m=new THREE.Mesh(geo,solid(color));
@@ -820,7 +821,7 @@ function setMode(v){
   modelSculptSession=null;
  }
  if(v!=='prefab'&&armedPrefabId)clearPlacement();
- if(v==='holePaint'||v==='zones'||v==='textures'||v==='playerSpawn'){
+ if(v==='holePaint'||v==='zones'||v==='textures'||v==='playerSpawn'||v==='basicSpawnVertex'){
   if(dragSession)completeModelDrag({pointerId:dragSession.pointerId});
   pointerDown=false;marqueeStart=null;
   $('selectionMarquee').style.display='none';
@@ -836,9 +837,10 @@ function setMode(v){
   if(modelSculptSession){modelSculptSession=null}
   view.style.cursor='crosshair';
  }else{
-  cursor.visible=v!=='holePaint'&&v!=='zones'&&v!=='textures'&&!placementGhost;
+  cursor.visible=v!=='holePaint'&&v!=='zones'&&v!=='textures'&&v!=='basicSpawnVertex'&&!placementGhost;
  }
  updateMeshInspection();
+ basicSpawnTool?.sync();
  if(v!=='holePaint')holesEditor?.hoverAt(null);
  zoneTool?.refreshAll();
  document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===v));
@@ -1481,6 +1483,7 @@ function marqueeHits(x,y){
 // Vertex picking owns the left button while Ver malla is active.
 view.addEventListener('pointerdown',e=>{
  if(preview.active||preview.busy||e.button!==0)return;
+ if(mode==='basicSpawnVertex'){basicSpawnTool?.pointerdown(e);return;}
  if(mode==='meshEdit'){
   // If no model is selected, the first click chooses a real model, not terrain.
   if(terrainVertexEditor?.getState().active){terrainVertexEditor.pointerdown(e);return;}
@@ -1697,7 +1700,7 @@ function completeModelDrag(e){
  view.style.cursor='crosshair';
 }
 view.addEventListener('pointerdown',e=>{
- if(preview.active||preview.busy||marqueeStart||prefabGallery.isBlocking()||mode==='meshEdit'||mode==='zones'||mode==='textures'||e.ctrlKey||e.button!==0)return;
+ if(preview.active||preview.busy||marqueeStart||prefabGallery.isBlocking()||mode==='meshEdit'||mode==='zones'||mode==='textures'||mode==='basicSpawnVertex'||e.ctrlKey||e.button!==0)return;
  if(mode==='playerSpawn'){
   e.preventDefault();const p=convertCoords(e);if(p)act(p);return;
  }
@@ -1751,7 +1754,7 @@ view.addEventListener('pointerdown',e=>{
  }else act(p);
 });
 view.addEventListener('pointermove',e=>{
- if(preview.active||preview.busy||prefabGallery.isBlocking()||marqueeStart||mode==='meshEdit'||mode==='zones'||mode==='textures')return;
+ if(preview.active||preview.busy||prefabGallery.isBlocking()||marqueeStart||mode==='meshEdit'||mode==='zones'||mode==='textures'||mode==='basicSpawnVertex')return;
  if(modelSculptSession){
   if(modelSculptSession.pointerId!==e.pointerId)return;
   const n=live.nodes.find(n=>n.id===modelSculptSession.nodeId);
@@ -1823,6 +1826,7 @@ view.addEventListener('wheel',e=>{
  e.preventDefault();viewSpan=clamp(viewSpan*Math.exp(e.deltaY*.001),80,1400);resize();scheduleCameraSave()
 },{passive:false});
 document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.tool)));
+basicSpawnTool=createBasicSpawnVertexTool({scene,terrain,terrainGeo,camera,view,live,snapshot,persist,toast,isActive:()=>mode==='basicSpawnVertex'});
 $('top').onclick=()=>{setTop();scheduleCameraSave()};
 $('angle').onclick=()=>{setDefault3D();scheduleCameraSave()};
 $('reset').onclick=()=>{if(!confirm('¿Vaciar el editor y el terreno?'))return;snapshot();live.heights.fill(0);live.terrainVertexOffsets={};live.terrainSeams=[];live.nodes=[];playerSpawnPanel?.refresh();live.objectGroups=[];live.holes=[];live.cuts3d=[];live.zones=[];live.cliffHeightmaps=[];cliffHeightTool?.refresh();live.biomeMaterials={};live.biomeGenerator=null;biomeGeneratorTool?.refresh();textureTool?.refresh();terrainPainter?.schedule();live.nextId=1;zoneTool?.refreshAll();selectedIds.clear();selectedId=null;holesEditor.clearSelection();refreshTerrain();draw();persist()};
@@ -1839,7 +1843,7 @@ function restoreHistoryState(data){
  if(!Array.isArray(live.zones))live.zones=[];cliffHeightTool?.refresh();
  if(!Array.isArray(v.cuts3d))live.cuts3d=[];
  live.objectGroups=cleanObjectGroups(v.objectGroups);
- playerSpawnPanel?.refresh();zoneTool?.refreshAll();cliffHeightTool?.refresh();textureTool?.refresh();
+ playerSpawnPanel?.refresh();basicSpawnTool?.refresh();zoneTool?.refreshAll();cliffHeightTool?.refresh();textureTool?.refresh();
  biomeGeneratorTool?.refresh();terrainPainter?.schedule();
  selectedIds.clear();
  for(const id of meshSelection)if(live.nodes.some(n=>n.id===id))selectedIds.add(id);
