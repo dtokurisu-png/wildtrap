@@ -12,7 +12,15 @@ export function createTerrainTexturePainter({scene,terrain,renderer,material,int
    live.biomeMaterials=ensureBiomeTextureDefaults(live.biomeMaterials);
   const zones=(live.zones||[]).filter(z=>BIOMES.some(b=>b.id===z.biomeId)&&Array.isArray(z.points)&&z.points.length>=3);
   const urls=new Set();for(const z of zones){const slots=live.biomeMaterials?.[z.biomeId]?.slots;for(const key of ['ground','detail1','detail2','detail3'])if(slots?.[key]?.image)urls.add(slots[key].image)}
-  await Promise.all([...urls].map(async url=>loaded.set(url,await decode(url))));if(ticket!==generation)return;
+  const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||location.pathname.endsWith('/mobile.html');
+  // Load one image at a time: 8K source PNGs otherwise decode concurrently
+  // into hundreds of MB and lose the WebGL context on mobile browsers.
+  for(const url of urls){
+   if(mobile&&!Object.values(live.biomeMaterials||{}).some(m=>m?.slots?.ground?.image===url))continue;
+   const image=await decode(url);
+   if(ticket!==generation)return;
+   loaded.set(url,image);
+  }
   const widths=Object.values(live.biomeMaterials||{}).map(m=>Number(m?.edgeBlend)||0);
   const transitionWorld=Math.max(16,...widths);
   gpuLayers.build({zones:live.zones||[],materials:live.biomeMaterials,loaded,enabled,transitionWorld});
