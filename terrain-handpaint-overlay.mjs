@@ -20,7 +20,7 @@ void main(){
 }`;
 const ART_FRAGMENT=`
 #include <common>
-#include <colorspace_pars_fragment>
+// Three.js already injects colorspace_pars_fragment for ShaderMaterial.
 uniform sampler2D sceneColor;
 uniform sampler2D sceneDepth;
 uniform sampler2D artTexture;
