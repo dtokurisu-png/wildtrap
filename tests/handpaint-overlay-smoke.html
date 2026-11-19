@@ -59,7 +59,8 @@ try{
    try{
     programErrors=(renderer.info.programs||[]).map(p=>({
      name:p.name||'anon',id:p.id,linked:gl.getProgramParameter(p.program,gl.LINK_STATUS),
-     error:gl.getProgramInfoLog(p.program)
+     error:gl.getProgramInfoLog(p.program),
+     fragmentError:p.fragmentShader?gl.getShaderInfoLog(p.fragmentShader):'no fragment shader ref'
     })).filter(p=>!p.linked||p.error);
    }catch(e){programErrors=[{exception:String(e)}]}
    tool.setDebugMode(0);
