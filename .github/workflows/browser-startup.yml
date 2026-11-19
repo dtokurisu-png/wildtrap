@@ -1,7 +1,7 @@
 name: Comprobar inicio real en navegador
 on:
   push:
-    branches: [main, handpaint-safe-startup-v0.9.146]
+    branches: [main, handpaint-safe-startup-v0.9.146, arreglar-visibilidad-handpaint-v0.9.147]
     paths:
       - 'tests/browser-startup.mjs'
       - '.github/workflows/browser-startup.yml'
