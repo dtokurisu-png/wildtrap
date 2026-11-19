@@ -42,35 +42,21 @@ try{
     if(d>12)affected++;
     delta+=d;
    }
-   const probe={};
-   for(const mode of [1,2,3]){
-    tool.setDebugMode(mode);
-    tool.render(camera);
-    const buffer=new Uint8Array(W*H*4);
-    gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,buffer);
-    let different=0;
-    for(let i=0;i<buffer.length;i+=4){
-      if(Math.abs(normal[i]-buffer[i])+Math.abs(normal[i+1]-buffer[i+1])+Math.abs(normal[i+2]-buffer[i+2])>20)
-       different++;
-    }
-    probe[mode]={different,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
-   }
    let programErrors=[];
    try{
     programErrors=(renderer.info.programs||[]).map(p=>({
      name:p.name||'anon',id:p.id,linked:gl.getProgramParameter(p.program,gl.LINK_STATUS),
      error:gl.getProgramInfoLog(p.program),
-     fragmentError:p.fragmentShader?gl.getShaderInfoLog(p.fragmentShader):'no fragment shader ref'
+     fragmentError:p.fragmentShader?gl.getShaderInfoLog(p.fragmentShader):''
     })).filter(p=>!p.linked||p.error);
    }catch(e){programErrors=[{exception:String(e)}]}
-   tool.setDebugMode(0);
    const ready=tool.getState();
    const pass=ready.mode==='hard-light'&&ready.transparency===.35&&ready.opacity===.65&&
     ready.gpuWidth>0&&ready.gpuWidth<=4096&&ready.gpuHeight>0&&ready.gpuHeight<=4096&&
     Math.max(ready.sourceWidth,ready.sourceHeight)>=4096&&
     ready.loadedSource.includes('terreno_handpaint_4K.webp')&&
     ready.depthOcclusion&&ready.terrainGeometryLinked&&
-    ready.frames>0&&delta>20000&&affected>300;
+    ready.frames>0&&programErrors.length===0&&delta>W*H*10&&affected>W*H*0.25;
    clearInterval(timer);
    document.body.dataset.result=pass?'PASS':'FAIL';
    document.querySelector('#result').textContent=(pass?'PASS':'FAIL')+
@@ -78,7 +64,7 @@ try{
     ', GPU '+ready.gpuWidth+'×'+ready.gpuHeight+
     ', transparencia '+Math.round(ready.transparency*100)+
     '%, pixeles modificados '+affected+', delta '+delta+
-    ', pant. '+W+'×'+H+', probe '+JSON.stringify(probe)+', programs '+JSON.stringify(programErrors)+', error '+ready.error;
+    ', cobertura '+Math.round(100*affected/(W*H))+'%, pant. '+W+'×'+H+', programs '+JSON.stringify(programErrors)+', error '+ready.error;
   }catch(e){clearInterval(timer);fail(e.stack||e)}
  },500);
 }catch(e){fail(e.stack||e)}
