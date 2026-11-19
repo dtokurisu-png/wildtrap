@@ -14,8 +14,37 @@ uniform float globalHandpaintEnabled;
 uniform float globalHandpaintOpacity;
 uniform float globalHandpaintContrast;
 uniform float globalHandpaintRotation;
+uniform float globalHandpaintBlendMode;
+// 0 normal (pintura), 1 multiply, 2 screen, 3 overlay,
+// 4 soft light, 5 hard light, 6 color, 7 luminosity.
+vec3 handpaintBlend(vec3 base, vec3 art, float mode){
+ if(mode<0.5)return art;
+ if(mode<1.5)return base*art;
+ if(mode<2.5)return 1.0-(1.0-base)*(1.0-art);
+ if(mode<3.5){
+  vec3 multiply=2.0*base*art;
+  vec3 screen=1.0-2.0*(1.0-base)*(1.0-art);
+  return mix(multiply,screen,step(vec3(.5),base));
+ }
+ if(mode<4.5){
+  // Smooth light: a gentle highlight/shadow enhancement.
+  vec3 low=base-(1.0-2.0*art)*base*(1.0-base);
+  vec3 high=base+(2.0*art-1.0)*(sqrt(max(base,vec3(0.0)))-base);
+  return mix(low,high,step(vec3(.5),art));
+ }
+ if(mode<5.5){
+  vec3 multiply=2.0*base*art;
+  vec3 screen=1.0-2.0*(1.0-base)*(1.0-art);
+  return mix(multiply,screen,step(vec3(.5),art));
+ }
+ const vec3 lumaWeights=vec3(.2126,.7152,.0722);
+ float baseLuma=dot(base,lumaWeights);
+ float artLuma=dot(art,lumaWeights);
+ if(mode<6.5)return clamp(art+(baseLuma-artLuma),0.0,1.0);
+ return clamp(base+(artLuma-baseLuma),0.0,1.0);
+}
 vec3 paintOverlayColor(vec3 terrainColor){
- if(globalHandpaintEnabled<0.5)return terrainColor;
+ if(globalHandpaintEnabled<0.5||globalHandpaintOpacity<=0.0)return terrainColor;
  vec3 gradX=dFdx(vTerrainWorld);
  vec3 gradY=dFdy(vTerrainWorld);
  vec3 face=cross(gradX,gradY);
@@ -32,14 +61,14 @@ vec3 paintOverlayColor(vec3 terrainColor){
  if(edgeFade<0.001)return terrainColor;
  vec4 art=texture2D(globalHandpaint,artUV);
  float luma=dot(art.rgb,vec3(0.2126,0.7152,0.0722));
- float darkCoverage=1.0-smoothstep(0.70,0.99,luma);
- float weight=clamp(globalHandpaintOpacity*art.a*edgeFade*flatMask*darkCoverage,0.0,1.0);
+ // White artwork background is transparent. Unlike the former 0.70 cutoff,
+ // preserve the real opacity of all colored strokes; fade only near white.
+ float paintedCoverage=1.0-smoothstep(0.94,0.995,luma);
+ float weight=clamp(globalHandpaintOpacity*art.a*edgeFade*flatMask*paintedCoverage,0.0,1.0);
  if(weight<0.0001)return terrainColor;
- vec3 artTone=mix(vec3(0.5),art.rgb,globalHandpaintContrast);
- vec3 multiply=2.0*terrainColor*artTone;
- vec3 screen=1.0-2.0*(1.0-terrainColor)*(1.0-artTone);
- vec3 overlay=mix(multiply,screen,step(vec3(0.5),terrainColor));
- return mix(terrainColor,overlay,weight);
+ vec3 artTone=mix(vec3(.5),art.rgb,globalHandpaintContrast);
+ vec3 blended=handpaintBlend(terrainColor,artTone,globalHandpaintBlendMode);
+ return mix(terrainColor,clamp(blended,0.0,1.0),weight);
 }
 `;
 const limit=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -165,16 +194,18 @@ export function createTerrainGPULayers({scene,terrain}){
   globalHandpaint:{value:null},
   globalHandpaintEnabled:{value:0},
   globalHandpaintOpacity:{value:0.90},
-  globalHandpaintContrast:{value:0.45},
-  globalHandpaintRotation:{value:180}
+  globalHandpaintContrast:{value:1.0},
+  globalHandpaintRotation:{value:180},
+  globalHandpaintBlendMode:{value:3}
  };
  function setHandpaintTexture(texture){
   artUniforms.globalHandpaint.value=texture||null;
   artUniforms.globalHandpaintEnabled.value=texture?1:0;
  }
- function setHandpaintSettings({opacity,rotation}={}){
+ function setHandpaintSettings({opacity,rotation,blendMode}={}){
   if(Number.isFinite(Number(opacity)))artUniforms.globalHandpaintOpacity.value=limit(Number(opacity),0,1);
   if(Number.isFinite(Number(rotation)))artUniforms.globalHandpaintRotation.value=((Number(rotation)%360)+360)%360;
+  if(blendMode!==undefined&&Number.isFinite(Number(blendMode)))artUniforms.globalHandpaintBlendMode.value=Math.round(limit(Number(blendMode),0,7));
  }
  function clear(){
   // Clean up old overlay on each texture rebake; no leaking shadow receivers.
