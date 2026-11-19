@@ -18,6 +18,15 @@ export function createBasicSpawnVertexTool({scene,terrain,terrainGeo,camera,view
  const points=new THREE.Points(new THREE.BufferGeometry(),material);
  points.name='BasicSpawnVertices';points.userData.editorOnly=true;points.raycast=()=>{};
  points.renderOrder=85;points.frustumCulled=false;scene.add(points);
+ // Lightweight view of the actual selectable terrain vertices.
+ // Reuse the existing geometry; never clone or update thousands of vertices on clicks.
+ const vertexDots=new THREE.Points(terrainGeo,new THREE.PointsMaterial({
+  color:0x9fb9b1,size:3,sizeAttenuation:false,transparent:true,opacity:.7,
+  depthTest:true,depthWrite:false
+ }));
+ vertexDots.name='BasicSpawnSelectableVertices';
+ vertexDots.userData.editorOnly=true;vertexDots.raycast=()=>{};
+ vertexDots.renderOrder=84;vertexDots.visible=false;scene.add(vertexDots);
  const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),p=new THREE.Vector3();
  function records(){
   if(!Array.isArray(live.basicSpawnVertices))live.basicSpawnVertices=[];
@@ -35,7 +44,7 @@ export function createBasicSpawnVertexTool({scene,terrain,terrainGeo,camera,view
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(coords,3));
   geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
   points.geometry.dispose();points.geometry=geometry;
-  points.visible=isActive();
+  points.visible=isActive();vertexDots.visible=isActive();
   status.textContent=recordsList.length+' vértices marcados · '+recordsList.filter(x=>x.category===selector.value).length+' de '+(TYPES[selector.value]?.name||'esta categoría');
  }
  function closestVertex(event){
@@ -83,7 +92,7 @@ export function createBasicSpawnVertexTool({scene,terrain,terrainGeo,camera,view
   if(!confirm('¿Eliminar los puntos de '+TYPES[category].name+'?'))return;
   snapshot();live.basicSpawnVertices=items.filter(item=>item.category!==category);persist();refresh();
  };
- function sync(){points.visible=isActive();refresh()}
+ function sync(){points.visible=isActive();vertexDots.visible=isActive();refresh()}
  refresh();
  return {pointerdown,refresh,sync};
 }
