@@ -29,7 +29,8 @@ export function createPrefabGallery({library,root,onPick}){
  const views=[...root.querySelectorAll('[data-preview-view]')];
  const cached=new Map();
  let renderer=null,renderError='',currentView='iso',generation=0,open=false;
- let visibleLimit=6;
+ const visibleCards=new Set();
+ let observer=null;
  const inline=root.dataset.inlineGallery==='true';
  const closeButton=root.querySelector('#closePrefabGallery');
  let previouslyFocused=null;
@@ -91,9 +92,9 @@ export function createPrefabGallery({library,root,onPick}){
   if(img)img.src=url;
  }
  async function refresh(){
-  const request=++generation;
+  const request=generation;
   const view=currentView;
-  for(const button of buttons.slice(0,visibleLimit)){
+  for(const button of visibleCards){
    const id=button.dataset.prefabChoice;
    const entry=PREFABS.find(p=>p.id===id);
    button.disabled=false;
@@ -122,6 +123,7 @@ export function createPrefabGallery({library,root,onPick}){
  function setView(view){
   if(!Object.hasOwn(VIEWS,view))return;
   currentView=view;
+  generation++;
   for(const button of views)button.setAttribute('aria-pressed',String(button.dataset.previewView===view));
   if(open)void refresh();
  }
@@ -130,11 +132,25 @@ export function createPrefabGallery({library,root,onPick}){
   open=true;
   root.hidden=false;
   if(!inline)closeButton?.focus();
-  void refresh();
+  visibleCards.clear();
+  if(typeof IntersectionObserver!=='undefined'){
+   observer=new IntersectionObserver(entries=>{
+    let added=false;
+    for(const item of entries)if(item.isIntersecting&&!visibleCards.has(item.target)){
+     visibleCards.add(item.target);added=true;
+    }
+    if(added)void refresh();
+   },{root:null,rootMargin:'250px'});
+   for(const button of buttons)observer.observe(button);
+  }else{
+   for(const button of buttons)visibleCards.add(button);
+   void refresh();
+  }
  }
  function close(){
   if(!open)return;
   open=false;generation++;
+  observer?.disconnect();observer=null;visibleCards.clear();
   root.hidden=true;
   if(!inline)previouslyFocused?.focus?.();
  }
