@@ -1,10 +1,12 @@
-name: Validar capa global handpaint 10K · Luz intensa
+name: Validar superposición 50% sin pasada adicional
 on:
   push:
-    branches: [handpaint-global-hardlight-20261118, handpaint-safe-startup-v0.9.146, arreglar-visibilidad-handpaint-v0.9.147, handpaint-negros-sin-acantilados-v0.9.148, main]
+    branches: [handpaint-global-hardlight-20261118, handpaint-safe-startup-v0.9.146, arreglar-visibilidad-handpaint-v0.9.147, handpaint-negros-sin-acantilados-v0.9.148, superposicion-directa-terreno-v0.9.149, main]
     paths:
       - 'terrain-handpaint-overlay.mjs'
       - 'terrain-handpaint-settings.mjs'
+      - 'editor-terrain-gpu-layers.mjs'
+      - 'editor-terrain-texture-renderer.mjs'
       - 'editor.mjs'
       - 'index.html'
       - 'tests/terrain-handpaint-overlay.test.mjs'
@@ -30,9 +32,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validar sintaxis y matemáticas Hard Light
+      - name: Validar sintaxis, fusión Overlay y coste gráfico
         run: |
           node --check terrain-handpaint-overlay.mjs
+          node --check terrain-handpaint-settings.mjs
+          node --check editor-terrain-gpu-layers.mjs
+          node --check editor-terrain-texture-renderer.mjs
           node --check editor.mjs
           node tests/terrain-handpaint-overlay.test.mjs
           node tests/explorer-shadow-cadence.test.mjs
