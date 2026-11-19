@@ -14,7 +14,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,getTextureAssetUrl
  const statusNode=document.getElementById('terrainHandpaintStatus');
  const report=message=>{if(statusNode)statusNode.textContent=message};
  const listeners=new Set();
- let disposed=false,loadStarted=false,ready=false,paintTexture=null;
+ let disposed=false,loadStarted=false,ready=false,paintTexture=null,active=true;
  let sourceWidth=0,sourceHeight=0,gpuWidth=0,gpuHeight=0;
  let error='',loadedSource='',frames=0;
 
@@ -24,12 +24,12 @@ export function createTerrainHandpaintOverlay({renderer,scene,getTextureAssetUrl
 
  function notify(){
   for(const listener of listeners){
-   try{listener(paintTexture)}catch(err){console.warn('Handpaint callback:',err)}
+   try{listener(active&&enabled?paintTexture:null)}catch(err){console.warn('Handpaint callback:',err)}
   }
  }
  function subscribe(listener){
   listeners.add(listener);
-  listener(paintTexture);
+  listener(active&&enabled?paintTexture:null);
   return ()=>listeners.delete(listener);
  }
  function startArtworkLoading(){
@@ -93,17 +93,24 @@ export function createTerrainHandpaintOverlay({renderer,scene,getTextureAssetUrl
   renderer.render(scene,camera);
   if(ready)frames++;
  }
- function getTexture(){return paintTexture}
+ function getTexture(){return active&&enabled?paintTexture:null}
+ function setActive(value){
+  active=Boolean(value);
+  notify();
+  report(!active?'Capa hand-painted: desactivada temporalmente (comparación)':
+   ready?'Capa hand-painted: ACTIVA · Superposición 50 % · sin acantilados':
+   'Capa hand-painted · Superposición 50 %: preparando material del terreno…');
+ }
  function getState(){
-  return {enabled,ready,mode:'overlay',opacity:HANDPAINT_OPACITY,transparency:1-HANDPAINT_OPACITY,
+  return {enabled,ready,active,mode:'overlay',opacity:HANDPAINT_OPACITY,transparency:1-HANDPAINT_OPACITY,
    contrast:HANDPAINT_CONTRAST,whiteIsNeutral:true,cliffsExcluded:true,
    source:HANDPAINT_SOURCE,loadedSource,sourceWidth,sourceHeight,
    gpuWidth,gpuHeight,frames,error,depthOcclusion:'native',
    worldMapping:'XZ one-to-one',singleSceneRender:true,extraRenderTargets:0};
  }
  function dispose(){
-  disposed=true;ready=false;notify();listeners.clear();
+  disposed=true;ready=false;active=false;notify();listeners.clear();
   paintTexture?.dispose();paintTexture=null;
  }
- return {render,getTexture,getState,subscribe,dispose};
+ return {render,getTexture,getState,setActive,subscribe,dispose};
 }
