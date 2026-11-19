@@ -2094,7 +2094,7 @@ live.editorCamera=currentEditorCamera();
 // que desaparezca la pantalla de inicio. La recuperación ocurre después.
 async function loadPublishedWorld(){
  try{
-  const response=await fetch('./assets/terrain/wildtrap-world.json',{cache:'no-cache'});
+  const response=await fetch('./assets/terrain/wildtrap-mobile-world.json',{cache:'no-cache'});
   if(!response.ok)throw Error('HTTP '+response.status);
   const world=await response.json();
   if(world.size!==SIZE||world.resolution!==N||world.heights?.length!==COUNT||!Array.isArray(world.nodes))throw Error('Escenario publicado incompatible');
@@ -2111,7 +2111,7 @@ async function loadPublishedWorld(){
   if(!restoreEditorCamera(world.editorCamera,{remember:true}))
    live.editorCamera=currentEditorCamera();
   playerSpawnPanel?.refresh();updateMaxHeightControl();refreshTerrain();draw();persist();
-  toast('Escenario oficial cargado desde el repositorio');
+  toast('Escenario con biomas cargado desde el repositorio (versión ligera)');
  }catch(err){console.warn('No se pudo cargar mapa oficial',err);void restoreSavedBase(false)}
 }
 $('loadPublished').onclick=()=>{if(confirm('¿Abrir el mapa publicado en GitHub? El proyecto local será reemplazado. Exporta JSON antes si necesitas conservarlo.')){snapshot();void loadPublishedWorld()}};
@@ -2220,7 +2220,7 @@ void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
   const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.155');
-  terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
+  terrainPainter=createTerrainTexturePainter({scene,terrain,renderer,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl,getHandpaintTexture:()=>handpaintOverlay.getTexture()});
   window.__terrainTexturePainter=terrainPainter;
