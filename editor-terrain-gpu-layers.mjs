@@ -13,7 +13,7 @@ uniform sampler2D globalHandpaint;
 uniform float globalHandpaintEnabled;
 uniform float globalHandpaintOpacity;
 uniform float globalHandpaintContrast;
-uniform float globalHandpaintRotation;
+uniform vec2 globalHandpaintRotationCS;
 uniform float globalHandpaintBlendMode;
 // 0 normal (pintura), 1 multiply, 2 screen, 3 overlay,
 // 4 soft light, 5 hard light, 6 color, 7 luminosity.
@@ -45,16 +45,12 @@ vec3 handpaintBlend(vec3 base, vec3 art, float mode){
 }
 vec3 paintOverlayColor(vec3 terrainColor){
  if(globalHandpaintEnabled<0.5||globalHandpaintOpacity<=0.0)return terrainColor;
- vec3 gradX=dFdx(vTerrainWorld);
- vec3 gradY=dFdy(vTerrainWorld);
- vec3 face=cross(gradX,gradY);
- float upness=abs(face.y)/max(length(face),0.000001);
+ float upness=abs(normalize(vTerrainNormal).y);
  float flatMask=smoothstep(0.70,0.86,upness);
  if(flatMask<0.001)return terrainColor;
  vec2 artUV=vec2(vTerrainWorld.x/630.0+.5,.5-vTerrainWorld.z/630.0);
- float angle=radians(globalHandpaintRotation);
  vec2 centered=artUV-vec2(.5);
- artUV=vec2(cos(angle)*centered.x-sin(angle)*centered.y,sin(angle)*centered.x+cos(angle)*centered.y)+vec2(.5);
+ artUV=vec2(dot(centered,vec2(globalHandpaintRotationCS.x,-globalHandpaintRotationCS.y)),dot(centered,globalHandpaintRotationCS.yx))+vec2(.5);
  if(artUV.x<0.0||artUV.y<0.0||artUV.x>1.0||artUV.y>1.0)return terrainColor;
  float edge=min(min(artUV.x,1.0-artUV.x),min(artUV.y,1.0-artUV.y));
  float edgeFade=smoothstep(0.0,0.06,edge);
@@ -102,6 +98,7 @@ uniform float intensity;
 uniform float biomeContrast;
 uniform float biomeSaturation;
 vec3 adjustBiomeColor(vec3 sourceColor){
+ if(abs(biomeContrast-1.0)<0.0001&&abs(biomeSaturation-1.0)<0.0001)return sourceColor;
  vec3 withContrast=clamp((sourceColor-vec3(0.5))*biomeContrast+vec3(0.5),0.0,1.0);
  float gray=dot(withContrast,vec3(.2126,.7152,.0722));
  return clamp(mix(vec3(gray),withContrast,biomeSaturation),0.0,1.0);
@@ -139,6 +136,7 @@ uniform float intensity;
 uniform float biomeContrast;
 uniform float biomeSaturation;
 vec3 adjustBiomeColor(vec3 sourceColor){
+ if(abs(biomeContrast-1.0)<0.0001&&abs(biomeSaturation-1.0)<0.0001)return sourceColor;
  vec3 withContrast=clamp((sourceColor-vec3(0.5))*biomeContrast+vec3(0.5),0.0,1.0);
  float gray=dot(withContrast,vec3(.2126,.7152,.0722));
  return clamp(mix(vec3(gray),withContrast,biomeSaturation),0.0,1.0);
@@ -216,7 +214,7 @@ export function createTerrainGPULayers({scene,terrain}){
   globalHandpaintEnabled:{value:0},
   globalHandpaintOpacity:{value:0.90},
   globalHandpaintContrast:{value:1.6},
-  globalHandpaintRotation:{value:180},
+  globalHandpaintRotationCS:{value:new THREE.Vector2(-1,0)},
   globalHandpaintBlendMode:{value:3}
  };
  function setHandpaintTexture(texture){
@@ -225,7 +223,7 @@ export function createTerrainGPULayers({scene,terrain}){
  }
  function setHandpaintSettings({opacity,rotation,blendMode,contrast}={}){
   if(Number.isFinite(Number(opacity)))artUniforms.globalHandpaintOpacity.value=limit(Number(opacity),0,1);
-  if(Number.isFinite(Number(rotation)))artUniforms.globalHandpaintRotation.value=((Number(rotation)%360)+360)%360;
+  if(rotation!==undefined&&Number.isFinite(Number(rotation))){const angle=Number(rotation)*Math.PI/180;artUniforms.globalHandpaintRotationCS.value.set(Math.cos(angle),Math.sin(angle));}
   if(blendMode!==undefined&&Number.isFinite(Number(blendMode)))artUniforms.globalHandpaintBlendMode.value=Math.round(limit(Number(blendMode),0,7));
   if(contrast!==undefined&&Number.isFinite(Number(contrast)))artUniforms.globalHandpaintContrast.value=limit(Number(contrast),0,4);
  }
@@ -286,7 +284,6 @@ export function createTerrainGPULayers({scene,terrain}){
      biomeSaturation:{value:limit(Number(materials[biome].colorSaturation??1),0,3)}
     },
     vertexShader:VERTEX,fragmentShader:FRAGMENT,fog:true,
-    extensions:{derivatives:true},
     side:THREE.DoubleSide,
     transparent:true,depthWrite:false,depthTest:true,
     polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2
