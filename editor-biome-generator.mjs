@@ -1,4 +1,4 @@
-import {enumerateBiomeDistributions} from './biome-generator.mjs?v=0.9.156';
+import {enumerateBiomeDistributions} from './biome-generator.mjs?v=0.9.157';
 
 const LABELS={mountain:'Montaña',desert:'Desierto',plains:'Llanura',swamp:'Pantano',forest:'Bosque'};
 const PAGE_SIZE=12;
@@ -46,7 +46,7 @@ export function createBiomeGeneratorPanel({live,snapshot,persist,toast,onChange=
   list.replaceChildren();
   if(!result.ok){status.textContent=result.error;}
   else if(!count){status.textContent='No hay combinaciones válidas con las restricciones de vecinos guardadas.';}
-  else status.textContent=count+' posibilidades · Montaña excluida de Zona Oeste';
+  else status.textContent=count+' posibilidades · Montaña excluida de Zona Este';
   const selected=getSelectedIndex();
   const start=page*PAGE_SIZE;
   for(let i=start;i<Math.min(count,start+PAGE_SIZE);i++){
