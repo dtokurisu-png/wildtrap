@@ -2224,7 +2224,7 @@ async function initializeTerrainPainter(){
   let savedPainting={};
   try{savedPainting=JSON.parse(localStorage.getItem('wildtrap-handpaint-controls-v1')||'{}')||{}}catch(_){}
   if(rotationInput&&opacityInput){
-   rotationInput.value=String(Math.max(0,Math.min(360,Number(savedPainting.rotation) || 180)));
+   rotationInput.value=String(Math.max(0,Math.min(360,Number.isFinite(Number(savedPainting.rotation))&&savedPainting.rotation!==undefined?Number(savedPainting.rotation):180)));
    opacityInput.value=String(Math.max(0,Math.min(100,Number.isFinite(Number(savedPainting.opacity))?Number(savedPainting.opacity):90)));
    const applyPainting=()=>{
     const rotation=Number(rotationInput.value),opacity=Number(opacityInput.value);
