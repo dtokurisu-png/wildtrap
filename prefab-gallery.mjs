@@ -13,10 +13,23 @@ const VIEWS=Object.freeze({
 const VIEW_LABELS=Object.freeze({iso:'Perspectiva 3D',front:'Frente',side:'Lado',back:'Atrás',top:'Arriba'});
 export function createPrefabGallery({library,root,onPick}){
  if(!root)throw Error('No existe la ventana de modelos GLB');
- const buttons=[...root.querySelectorAll('[data-prefab-choice]')];
+ const cards=root.querySelector('#prefabCards');
+ if(!cards)throw Error('Falta el catálogo de objetos');
+ // The catalog is generated from its manifest, never a fixed list of four.
+ cards.replaceChildren();
+ for(const prefab of PREFABS){
+  const button=document.createElement('button');button.type='button';
+  button.className='prefab-card';button.dataset.prefabChoice=prefab.id;
+  const img=document.createElement('img');img.dataset.prefabPreview=prefab.id;img.alt='Vista previa 3D de '+prefab.name;img.loading='lazy';
+  const title=document.createElement('strong');title.textContent=prefab.name;
+  const status=document.createElement('span');status.dataset.prefabMessage=prefab.id;status.textContent='Pulsa para cargar el modelo';
+  button.append(img,title,status);cards.append(button);
+ }
+ const buttons=[...cards.querySelectorAll('[data-prefab-choice]')];
  const views=[...root.querySelectorAll('[data-preview-view]')];
  const cached=new Map();
  let renderer=null,renderError='',currentView='iso',generation=0,open=false;
+ let visibleLimit=6;
  const inline=root.dataset.inlineGallery==='true';
  const closeButton=root.querySelector('#closePrefabGallery');
  let previouslyFocused=null;
@@ -80,7 +93,7 @@ export function createPrefabGallery({library,root,onPick}){
  async function refresh(){
   const request=++generation;
   const view=currentView;
-  for(const button of buttons){
+  for(const button of buttons.slice(0,visibleLimit)){
    const id=button.dataset.prefabChoice;
    const entry=PREFABS.find(p=>p.id===id);
    button.disabled=false;
