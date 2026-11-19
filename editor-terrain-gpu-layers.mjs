@@ -209,7 +209,23 @@ function fullResolutionSource(image,limit=4096){
 export function createTerrainGPULayers({scene,terrain,renderer}){
  const maxSize=renderer?.capabilities?.maxTextureSize||4096;
  const textureLimit=Math.max(512,Math.min(maxSize,(typeof navigator!=='undefined'&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)))?1024:(new URLSearchParams(location.search).has('hdTextures')?4096:2048)));
- let records=[],shadowMesh=null,shadowMaterial=null;
+ let records=[],shadowMesh=null,shadowMaterial=null,textureCache=new WeakMap();
+ function sharedTexture(image,repeat){
+  let entries=textureCache.get(image);
+  if(!entries){entries={};textureCache.set(image,entries)}
+  const key=repeat?'base':'detail';
+  if(entries[key])return entries[key];
+  const texture=new THREE.Texture(fullResolutionSource(image,textureLimit));
+  texture.wrapS=texture.wrapT=repeat?THREE.RepeatWrapping:THREE.ClampToEdgeWrapping;
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.minFilter=THREE.LinearMipmapLinearFilter;
+  texture.magFilter=THREE.LinearFilter;
+  texture.anisotropy=Math.min(8,renderer?.capabilities?.getMaxAnisotropy?.()||8);
+  texture.generateMipmaps=true;
+  texture.needsUpdate=true;
+  entries[key]=texture;
+  return texture;
+ }
  // A single shared art GPU texture/uniform group for all biome materials.
  const artUniforms={
   globalHandpaint:{value:null},
@@ -233,14 +249,14 @@ export function createTerrainGPULayers({scene,terrain,renderer}){
   // Clean up old overlay on each texture rebake; no leaking shadow receivers.
   if(shadowMesh){scene.remove(shadowMesh);shadowMesh.geometry=null;shadowMesh=null}
   if(shadowMaterial){shadowMaterial.dispose();shadowMaterial=null}
-  const releasedMasks=new Set();
+  const releasedMasks=new Set(),releasedTextures=new Set();
   for(const entry of records){
    scene.remove(entry.mesh);
    if(!releasedMasks.has(entry.mask)){entry.mask.dispose();releasedMasks.add(entry.mask)}
-   entry.texture.dispose();
+   if(!releasedTextures.has(entry.texture)){entry.texture.dispose();releasedTextures.add(entry.texture)}
    entry.material.dispose();
   }
-  records=[];
+  records=[];textureCache=new WeakMap();
  }
  function build({zones,materials,loaded,enabled=true,transitionWorld=14}){
   clear();
@@ -266,14 +282,7 @@ export function createTerrainGPULayers({scene,terrain,renderer}){
    const image=loaded.get(slot.image);
    if(!image)continue;
    const mask=createFeatheredZoneMask(areas,{featherWorld:limit(transitionWorld,10,45),expandWorld:4});
-   const texture=new THREE.Texture(fullResolutionSource(image,textureLimit));
-   texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
-   texture.colorSpace=THREE.SRGBColorSpace;
-   texture.minFilter=THREE.LinearMipmapLinearFilter;
-   texture.magFilter=THREE.LinearFilter;
-   texture.anisotropy=8;
-   texture.generateMipmaps=true;
-   texture.needsUpdate=true;
+   const texture=sharedTexture(image,true);
    const shader=new THREE.ShaderMaterial({
     uniforms:{
      ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
@@ -307,14 +316,7 @@ export function createTerrainGPULayers({scene,terrain,renderer}){
     if(!detailImage)continue;
     const opacity=limit(Number(detailSlot?.opacity??.5),0,1);
     if(opacity<=0)continue;
-    const detailTexture=new THREE.Texture(fullResolutionSource(detailImage,textureLimit));
-    detailTexture.wrapS=detailTexture.wrapT=THREE.ClampToEdgeWrapping;
-    detailTexture.colorSpace=THREE.SRGBColorSpace;
-    detailTexture.minFilter=THREE.LinearMipmapLinearFilter;
-    detailTexture.magFilter=THREE.LinearFilter;
-    detailTexture.generateMipmaps=true;
-    detailTexture.anisotropy=8;
-    detailTexture.needsUpdate=true;
+    const detailTexture=sharedTexture(detailImage,false);
     const detailMaterial=new THREE.ShaderMaterial({
      uniforms:{
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
