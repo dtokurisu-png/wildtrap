@@ -53,8 +53,15 @@ try{
       if(Math.abs(normal[i]-buffer[i])+Math.abs(normal[i+1]-buffer[i+1])+Math.abs(normal[i+2]-buffer[i+2])>20)
        different++;
     }
-    probe[mode]=different;
+    probe[mode]={different,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
    }
+   let programErrors=[];
+   try{
+    programErrors=(renderer.info.programs||[]).map(p=>({
+     name:p.name||'anon',id:p.id,linked:gl.getProgramParameter(p.program,gl.LINK_STATUS),
+     error:gl.getProgramInfoLog(p.program)
+    })).filter(p=>!p.linked||p.error);
+   }catch(e){programErrors=[{exception:String(e)}]}
    tool.setDebugMode(0);
    const ready=tool.getState();
    const pass=ready.mode==='hard-light'&&ready.transparency===.35&&ready.opacity===.65&&
@@ -70,7 +77,7 @@ try{
     ', GPU '+ready.gpuWidth+'×'+ready.gpuHeight+
     ', transparencia '+Math.round(ready.transparency*100)+
     '%, pixeles modificados '+affected+', delta '+delta+
-    ', pant. '+W+'×'+H+', probe '+JSON.stringify(probe)+', error '+ready.error;
+    ', pant. '+W+'×'+H+', probe '+JSON.stringify(probe)+', programs '+JSON.stringify(programErrors)+', error '+ready.error;
   }catch(e){clearInterval(timer);fail(e.stack||e)}
  },500);
 }catch(e){fail(e.stack||e)}
