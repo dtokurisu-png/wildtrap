@@ -13,7 +13,7 @@ import {createTerrainMeshInspector} from './terrain-mesh-inspector.mjs?v=0.9.116
 import {createObjectMeshOverlays,normalizedMeshLayers} from './scene-mesh-overlays.mjs?v=0.9.50';
 import {createCavePieceObject} from './cave-pieces-three.mjs?v=0.9.6';
 import {pieceOptions,CAVE_PIECE_TYPES} from './cave-pieces.mjs?v=0.9.6';
-import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.61';
+import {createPrefabLibrary,prefabById,PREFABS} from './prefab-library.mjs?v=0.9.160';
 import {createMeshVertexEditor} from './mesh-vertex-editor.mjs?v=0.9.58';
 import {createTerrainVertexEditor} from './terrain-vertex-editor.mjs?v=0.9.103';
 import {restoreTerrainSeams,seamVertexIds} from './terrain-seams.mjs?v=0.9.116';
@@ -23,7 +23,7 @@ import {DEFAULT_3D_CAMERA,normalizeEditorCameraState} from './editor-camera-stat
 import {isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.160';
 import {createTextureRevisionWatcher,revisionedTextureUrl} from './editor-texture-live-refresh.mjs?v=0.9.109';
 import {syncPublishedTextureCatalog,isPublishedTextureUrl} from './editor-texture-catalog.mjs?v=0.9.121';
-import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.11';
+import {createPrefabGallery} from './prefab-gallery.mjs?v=0.9.160';
 import {scaleFromVerticalDrag,translateNodeOnTerrain,rotateFromPointerDrag,altitudeFromVerticalDrag,freeCaveFromScreenDrag,constrainTranslationAxes} from './prefab-gestures.mjs?v=0.9.16';
 const $=id=>document.getElementById(id), SIZE=630, N=129, COUNT=N*N;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), index=(x,z)=>z*N+x;
@@ -1110,7 +1110,7 @@ function setDefault3D(){
 // No saved view: start at the same angled 3D view as the existing Vista 3D button.
 setDefault3D();
 prefabLibrary=createPrefabLibrary(()=>{draw();updatePrefabLoadStatus()});
-void prefabLibrary.preload().then(()=>{draw();updatePrefabLoadStatus()}).catch(error=>{console.error('Error en precarga de modelos:',error);toast('Algunos modelos no se pudieron precargar; el editor continúa')});
+// Models are loaded on demand. Preloading every large GLB would stall the editor.
 updatePrefabLoadStatus();
 const prefabGallery=createPrefabGallery({
  library:prefabLibrary,
