@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {createPlaytest} from './playtest.mjs?v=0.9.170';
+import {createPlaytest} from './playtest.mjs?v=0.9.174';
 import {createTerrainTexturePainter} from './editor-terrain-texture-renderer.mjs?v=0.9.173';
 import {createPrefabLibrary} from './prefab-library.mjs?v=0.9.160';
 
