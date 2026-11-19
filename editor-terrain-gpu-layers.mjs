@@ -60,15 +60,22 @@ vec3 paintOverlayColor(vec3 terrainColor){
  float edgeFade=smoothstep(0.0,0.06,edge);
  if(edgeFade<0.001)return terrainColor;
  vec4 art=texture2D(globalHandpaint,artUV);
- float luma=dot(art.rgb,vec3(0.2126,0.7152,0.0722));
- // White artwork background is transparent. Unlike the former 0.70 cutoff,
- // preserve the real opacity of all colored strokes; fade only near white.
- float paintedCoverage=1.0-smoothstep(0.94,0.995,luma);
- float weight=clamp(globalHandpaintOpacity*art.a*edgeFade*flatMask*paintedCoverage,0.0,1.0);
- if(weight<0.0001)return terrainColor;
- vec3 artTone=mix(vec3(.5),art.rgb,globalHandpaintContrast);
- vec3 blended=handpaintBlend(terrainColor,artTone,globalHandpaintBlendMode);
- return mix(terrainColor,clamp(blended,0.0,1.0),weight);
+ const vec3 lumaWeights=vec3(.2126,.7152,.0722);
+ float artLuma=dot(art.rgb,lumaWeights);
+ // The painted artwork is underneath. It contributes only grayscale shape
+ // and relief, never its original hue. White paper is fully neutral.
+ float ink=clamp((1.0-artLuma)*globalHandpaintContrast,0.0,1.0);
+ float coverage=1.0-smoothstep(0.985,0.999,artLuma);
+ float strength=clamp(globalHandpaintOpacity*art.a*edgeFade*flatMask*coverage,0.0,1.0);
+ if(strength<0.0001||ink<0.0001)return terrainColor;
+ vec3 paintedUnderlay=vec3(1.0-ink);
+ // Apply the BIOME base color as foreground to the grayscale underlay.
+ vec3 mixed=handpaintBlend(paintedUnderlay,terrainColor,globalHandpaintBlendMode);
+ // The resulting luminance changes, but the biome texture retains its hue.
+ float baseLight=dot(terrainColor,lumaWeights);
+ float mixedLight=dot(mixed,lumaWeights);
+ vec3 biomeColored=clamp(terrainColor*(mixedLight/max(baseLight,0.002)),0.0,1.0);
+ return mix(terrainColor,biomeColored,strength);
 }
 `;
 const limit=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -194,7 +201,7 @@ export function createTerrainGPULayers({scene,terrain}){
   globalHandpaint:{value:null},
   globalHandpaintEnabled:{value:0},
   globalHandpaintOpacity:{value:0.90},
-  globalHandpaintContrast:{value:1.0},
+  globalHandpaintContrast:{value:1.6},
   globalHandpaintRotation:{value:180},
   globalHandpaintBlendMode:{value:3}
  };
@@ -202,10 +209,11 @@ export function createTerrainGPULayers({scene,terrain}){
   artUniforms.globalHandpaint.value=texture||null;
   artUniforms.globalHandpaintEnabled.value=texture?1:0;
  }
- function setHandpaintSettings({opacity,rotation,blendMode}={}){
+ function setHandpaintSettings({opacity,rotation,blendMode,contrast}={}){
   if(Number.isFinite(Number(opacity)))artUniforms.globalHandpaintOpacity.value=limit(Number(opacity),0,1);
   if(Number.isFinite(Number(rotation)))artUniforms.globalHandpaintRotation.value=((Number(rotation)%360)+360)%360;
   if(blendMode!==undefined&&Number.isFinite(Number(blendMode)))artUniforms.globalHandpaintBlendMode.value=Math.round(limit(Number(blendMode),0,7));
+  if(contrast!==undefined&&Number.isFinite(Number(contrast)))artUniforms.globalHandpaintContrast.value=limit(Number(contrast),0,4);
  }
  function clear(){
   // Clean up old overlay on each texture rebake; no leaking shadow receivers.
