@@ -8,6 +8,13 @@ export function defaultBiomeGenerator(){
  return {seed:1,enabled:[...BIOME_IDS],weights:{...DEFAULT_WEIGHTS},forbiddenPairs:[],lastGeneration:null};
 }
 const keyPair=(a,b)=>[a,b].sort().join(':');
+// Restricted by the region's persistent identifier/name, not by its
+// physical compass position: the map's east/west labels were interchanged.
+export function isMountainExcludedZone(zone){
+ const label=String(zone?.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+ return /^(?:zona[\\s_-]+)?oeste(?:[\\s_-]+\\d+)?$/.test(label);
+}
+
 export function normalizeBiomeGenerator(data){
  const def=defaultBiomeGenerator(),v=data&&typeof data==='object'?data:{};
  const enabled=Array.isArray(v.enabled)?[...new Set(v.enabled.filter(id=>BIOME_IDS.includes(id)))]:def.enabled;
@@ -88,6 +95,9 @@ export function generateBiomeAssignments(zones,raw){
  for(let i=0;i<fixed.length;i++)
   if(fixed[i]&&!BIOME_IDS.includes(fixed[i]))
    return {ok:false,error:'La zona '+(zones[i].name||zones[i].id)+' tiene un bioma bloqueado desconocido.'};
+ for(let i=0;i<fixed.length;i++)
+  if(fixed[i]==='mountain'&&isMountainExcludedZone(zones[i]))
+   return {ok:false,error:'La zona Oeste no admite el bioma montañoso. Desbloquea esa zona antes de generar.'};
  const compatible=(a,b)=>!a||!b||a===b||!forbidden.has(keyPair(a,b));
  for(let i=0;i<fixed.length;i++)for(const j of adjacency[i])
   if(j<i&&!compatible(fixed[i],fixed[j]))
@@ -108,7 +118,7 @@ export function generateBiomeAssignments(zones,raw){
   if(index===order.length)return true;
   if(++attempts>120000)return false;
   const pos=order[index];
-  const options=candidates.filter(id=>(!uniqueFive||counts[id]===0)&&adjacency[pos].every(n=>compatible(id,result[n])));
+  const options=candidates.filter(id=>(id!=='mountain'||!isMountainExcludedZone(zones[pos]))&&(!uniqueFive||counts[id]===0)&&adjacency[pos].every(n=>compatible(id,result[n])));
   const arranged=options.map(id=>({id,r:rand(),score:(counts[id]+1)/settings.weights[id]}))
    .sort((a,b)=>a.score-b.score||a.r-b.r);
   for(const option of arranged){
