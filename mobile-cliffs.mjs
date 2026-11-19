@@ -3,11 +3,11 @@ import {buildCliffHeightmapGeometry} from './cliff-heightmap-geometry.mjs?v=0.9.
 import {registeredCliffZones,cliffRepeatCount} from './cliff-zone-bindings.mjs?v=0.9.123';
 import {createCliffColorRenderer} from './cliff-color-renderer.mjs?v=0.9.142';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-async function sampleCliff(file){
+async function sampleCliff(file,getTextureAssetUrl){
  const image=new Image();
  await new Promise((resolve,reject)=>{
   image.onload=resolve;image.onerror=()=>reject(Error('Heightmap no disponible: '+file));
-  image.src='./assets/terrain/texturas/'+encodeURIComponent(file);
+  image.src=getTextureAssetUrl('./assets/terrain/texturas/'+encodeURIComponent(file));
  });
  const canvas=document.createElement('canvas'),ratio=Math.min(1,1024/Math.max(image.naturalWidth,image.naturalHeight,1));
  canvas.width=Math.max(1,Math.round(image.naturalWidth*ratio));
@@ -34,12 +34,12 @@ function geometryFrom(r){
  g.setIndex(new THREE.BufferAttribute(r.indices,1));
  g.computeVertexNormals();g.computeBoundingSphere();g.computeBoundingBox();return g;
 }
-export async function applyMobileCliffs({terrain,scene,live}){
+export async function applyMobileCliffs({terrain,scene,live,getTextureAssetUrl=u=>u}){
  const config=live.cliffHeightSettings||{},entries=registeredCliffZones(live);
  let working=terrain.geometry;const samples=new Map();let count=0;
  if(config.enabled!==false)for(const entry of entries.filter(e=>e.map)){
   try{
-   if(!samples.has(entry.map.file))samples.set(entry.map.file,await sampleCliff(entry.map.file));
+   if(!samples.has(entry.map.file))samples.set(entry.map.file,await sampleCliff(entry.map.file,getTextureAssetUrl));
    const p=entry.zone.points,xs=p.map(q=>q.x),zs=p.map(q=>q.z),b=config.biomes?.[entry.map.biome]||{};
    const output=buildCliffHeightmapGeometry(geometryData(working),{
     point:{x:(Math.min(...xs)+Math.max(...xs))/2,z:(Math.min(...zs)+Math.max(...zs))/2},
@@ -54,7 +54,7 @@ export async function applyMobileCliffs({terrain,scene,live}){
   }catch(err){console.warn('WildTrap: acantilado sin relieve',entry.zone.id,err)}
  }
  if(working!==terrain.geometry){terrain.geometry.dispose();terrain.geometry=working}
- const colors=createCliffColorRenderer({scene,terrain,live});
+ const colors=createCliffColorRenderer({scene,terrain,live,getTextureAssetUrl});
  colors.setVisible(live.settings?.biomeTexturesVisible!==false);
  await colors.rebuild();
  return {count,colors};
