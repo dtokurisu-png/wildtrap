@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {HANDPAINT_SOURCE,HANDPAINT_GPU_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE}
+import {HANDPAINT_SOURCE,HANDPAINT_GPU_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE,
+ HANDPAINT_EDGE_FADE,HANDPAINT_SLOPE_START,HANDPAINT_SLOPE_END}
  from './terrain-handpaint-settings.mjs';
 export {HANDPAINT_SOURCE,HANDPAINT_GPU_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MAX_SIZE}
  from './terrain-handpaint-settings.mjs';
@@ -8,30 +9,27 @@ export {HANDPAINT_SOURCE,HANDPAINT_GPU_SOURCE,HANDPAINT_OPACITY,HANDPAINT_GPU_MA
 // Keep the 10K source intact; send a 4096px downsampled copy to the GPU.
 const WORLD_SIZE=630;
 
-// Render terrain + props ONCE to the normal-resolution target, then compose
-// the art on top of just the actually visible terrain fragments.
-// The depth texture protects Explorer, GLBs, caves, trees, UI and sky.
+// Render the world once to its color/depth target, then overlay only upward-
+// facing terrain surfaces. White art is neutral; dark paint multiplies color.
+// Neither the original terrain mesh nor its lighting/shadows are modified.
 const ART_VERTEX=`
 varying vec2 vArtUV;
+varying vec3 vWorldPos;
 void main(){
  vec4 world=modelMatrix*vec4(position,1.0);
+ vWorldPos=world.xyz;
  vArtUV=vec2(world.x/${WORLD_SIZE.toFixed(1)}+0.5,0.5-world.z/${WORLD_SIZE.toFixed(1)});
  gl_Position=projectionMatrix*viewMatrix*world;
 }`;
 const ART_FRAGMENT=`
 #include <common>
-// Three.js already injects colorspace_pars_fragment for ShaderMaterial.
 uniform sampler2D sceneColor;
 uniform sampler2D sceneDepth;
 uniform sampler2D artTexture;
 uniform vec2 screenSize;
 uniform float opacity;
 varying vec2 vArtUV;
-vec3 hardLight(vec3 base,vec3 paint){
- vec3 multiply=2.0*base*paint;
- vec3 screen=1.0-2.0*(1.0-base)*(1.0-paint);
- return mix(multiply,screen,step(vec3(0.5),paint));
-}
+varying vec3 vWorldPos;
 vec3 toSRGB(vec3 c){
  return mix(c*12.92,1.055*pow(max(c,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));
 }
@@ -39,23 +37,39 @@ vec3 fromSRGB(vec3 c){
  return mix(c/12.92,pow((max(c,vec3(0.0))+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));
 }
 void main(){
+ // Derivative-based FACE normal: accurate even when sculpted cliff vertices
+ // do not have reliable/split smoothed vertex normals.
+ vec3 face=cross(dFdx(vWorldPos),dFdy(vWorldPos));
+ vec3 faceN=face/max(length(face),0.000001);
+ float upness=abs(faceN.y);
+ float flatMask=smoothstep(${HANDPAINT_SLOPE_START.toFixed(2)},${HANDPAINT_SLOPE_END.toFixed(2)},upness);
+ if(flatMask<0.001)discard; // Do not paint vertical cliffs or walls.
+ if(vArtUV.x<0.0||vArtUV.y<0.0||vArtUV.x>1.0||vArtUV.y>1.0)discard;
+ // Every edge of the full, non-repeating 630x630 painting fades to zero.
+ float edgeDistance=min(min(vArtUV.x,1.0-vArtUV.x),min(vArtUV.y,1.0-vArtUV.y));
+ float edgeFade=smoothstep(0.0,${HANDPAINT_EDGE_FADE.toFixed(2)},edgeDistance);
+ if(edgeFade<0.001)discard;
+
  vec2 screenUV=gl_FragCoord.xy/screenSize;
  float visibleDepth=texture2D(sceneDepth,screenUV).r;
- // Do not paint across nearer objects or scene openings. The terrain here is
- // the exact original mesh, with the same cuts and heightmapped geometry.
- // One-sided depth comparison: only a surface genuinely CLOSER to the
- // camera may occlude the terrain paint. Exact depth-equality wrongly rejects
- // terrain because the biome overlays and depth buffer differ in precision.
- if(visibleDepth+0.00005<gl_FragCoord.z)discard;
- if(vArtUV.x<0.0||vArtUV.y<0.0||vArtUV.x>1.0||vArtUV.y>1.0)discard;
+ // Grazing camera views need more tolerance due to raster depth precision.
+ // Compare against genuinely closer scene surfaces, not exact equality.
+ float facing=abs(dot(faceN,normalize(cameraPosition-vWorldPos)));
+ float depthEpsilon=mix(0.00035,0.00005,smoothstep(0.06,0.78,facing));
+ if(visibleDepth+depthEpsilon<gl_FragCoord.z)discard;
+
  vec4 art=texture2D(artTexture,vArtUV);
  if(art.a<0.001)discard;
- vec3 sceneLinear=texture2D(sceneColor,screenUV).rgb;
- vec3 sceneSRGB=toSRGB(sceneLinear);
  vec3 paintSRGB=toSRGB(art.rgb);
- vec3 blended=hardLight(sceneSRGB,paintSRGB);
- float strength=clamp(opacity*art.a,0.0,1.0);
- gl_FragColor=vec4(fromSRGB(mix(sceneSRGB,blended,strength)),1.0);
+ float luma=dot(paintSRGB,vec3(0.2126,0.7152,0.0722));
+ float darkMask=smoothstep(0.05,0.77,1.0-luma);
+ float strength=clamp(opacity*art.a*edgeFade*flatMask*darkMask,0.0,1.0);
+ if(strength<0.0001)discard;
+
+ vec3 sceneSRGB=toSRGB(texture2D(sceneColor,screenUV).rgb);
+ // Multiply is exactly neutral for pure white; dark pigment is visible.
+ vec3 darkened=sceneSRGB*paintSRGB;
+ gl_FragColor=vec4(fromSRGB(mix(sceneSRGB,darkened,strength)),1.0);
  #include <colorspace_fragment>
 }`;
 
@@ -67,7 +81,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
  const enabled=!flags.has('noHandpaint')&&(!flags.has('safe')||flags.has('handpaint'));
  const statusNode=document.getElementById('terrainHandpaintStatus');
  const reportStatus=(msg)=>{if(statusNode)statusNode.textContent=msg};
- reportStatus(enabled?'Capa global hand-painted · Luz intensa · 35 % de transparencia: cargando…':
+ reportStatus(enabled?'Capa global hand-painted · Oscurecimiento · 35 % de transparencia: cargando…':
   'Capa global hand-painted: desactivada (modo seguro o comparación)');
  const drawingSize=new THREE.Vector2();
  const rt=new THREE.WebGLRenderTarget(1,1,{
@@ -97,6 +111,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
    opacity:{value:HANDPAINT_OPACITY}
   },
   vertexShader:ART_VERTEX,fragmentShader:ART_FRAGMENT,
+  extensions:{derivatives:true}, // Supports geometric face normals on WebGL1 too.
   side:THREE.DoubleSide,
   depthTest:false,depthWrite:false,transparent:false,
   blending:THREE.NoBlending,toneMapped:false
@@ -142,7 +157,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
     paintTexture.needsUpdate=true;
     shader.uniforms.artTexture.value=paintTexture;
     ready=true;
-    reportStatus('Capa global hand-painted: ACTIVA · Luz intensa · 35 % de transparencia');
+    reportStatus('Capa global hand-painted: ACTIVA · blancos invisibles · sin acantilados · 35 % de transparencia');
    }catch(error){
     loaderError=error?.message||String(error);
     reportStatus('Capa hand-painted: error al preparar la imagen');
@@ -196,7 +211,9 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
   }
  }
  function getState(){
-  return {enabled,ready,mode:'hard-light',transparency:0.35,opacity:HANDPAINT_OPACITY,
+  return {enabled,ready,mode:'dark-only',transparency:0.35,opacity:HANDPAINT_OPACITY,
+   whiteIsNeutral:true,cliffsExcluded:true,edgeFadeFraction:HANDPAINT_EDGE_FADE,
+   slopeThreshold:[HANDPAINT_SLOPE_START,HANDPAINT_SLOPE_END],grazingAngleDepthTolerance:true,
    source:HANDPAINT_SOURCE,loadedSource,sourceWidth,sourceHeight,
    gpuWidth:uploadedWidth,gpuHeight:uploadedHeight,frames,error:loaderError,
    depthOcclusion:true,terrainGeometryLinked:paintingMesh.geometry===terrain.geometry,
