@@ -1,7 +1,7 @@
 name: Validate new isolated sun shadows (pre-release)
 on:
   push:
-    branches: [main, integracion-sombras-sin-rayas-v0.9.143, optimizar-latencia-sombras-v0.9.144, handpaint-global-hardlight-20261118, handpaint-safe-startup-v0.9.146]
+    branches: [main, integracion-sombras-sin-rayas-v0.9.143, optimizar-latencia-sombras-v0.9.144, handpaint-global-hardlight-20261118, handpaint-safe-startup-v0.9.146, arreglar-visibilidad-handpaint-v0.9.147]
     paths:
       - 'editor.mjs'
       - 'terrain-handpaint-overlay.mjs'
