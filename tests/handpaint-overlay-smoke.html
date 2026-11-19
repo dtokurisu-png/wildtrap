@@ -42,6 +42,20 @@ try{
     if(d>12)affected++;
     delta+=d;
    }
+   const probe={};
+   for(const mode of [1,2,3]){
+    tool.setDebugMode(mode);
+    tool.render(camera);
+    const buffer=new Uint8Array(W*H*4);
+    gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,buffer);
+    let different=0;
+    for(let i=0;i<buffer.length;i+=4){
+      if(Math.abs(normal[i]-buffer[i])+Math.abs(normal[i+1]-buffer[i+1])+Math.abs(normal[i+2]-buffer[i+2])>20)
+       different++;
+    }
+    probe[mode]=different;
+   }
+   tool.setDebugMode(0);
    const ready=tool.getState();
    const pass=ready.mode==='hard-light'&&ready.transparency===.35&&ready.opacity===.65&&
     ready.gpuWidth>0&&ready.gpuWidth<=4096&&ready.gpuHeight>0&&ready.gpuHeight<=4096&&
@@ -56,7 +70,7 @@ try{
     ', GPU '+ready.gpuWidth+'×'+ready.gpuHeight+
     ', transparencia '+Math.round(ready.transparency*100)+
     '%, pixeles modificados '+affected+', delta '+delta+
-    ', pant. '+W+'×'+H+', error '+ready.error;
+    ', pant. '+W+'×'+H+', probe '+JSON.stringify(probe)+', error '+ready.error;
   }catch(e){clearInterval(timer);fail(e.stack||e)}
  },500);
 }catch(e){fail(e.stack||e)}
