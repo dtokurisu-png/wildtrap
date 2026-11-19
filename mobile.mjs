@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {createPlaytest} from './playtest.mjs?v=0.9.174';
-import {createTerrainTexturePainter} from './editor-terrain-texture-renderer.mjs?v=0.9.173';
+import {createTerrainTexturePainter} from './editor-terrain-texture-renderer.mjs?v=0.9.175';
 import {createPrefabLibrary} from './prefab-library.mjs?v=0.9.160';
 
 const $=id=>document.getElementById(id);
