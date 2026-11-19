@@ -30,7 +30,7 @@ function captureTopDown(){
   topDownCanvas=null;
   console.warn('Minimapa 3D no disponible; mostrando relieve cenital:',error);
  }finally{
-  if(renderer&&previous!==null)renderer.setRenderTarget(previous);
+  if(renderer)renderer.setRenderTarget(previous);
   target?.dispose();
  }
 }
