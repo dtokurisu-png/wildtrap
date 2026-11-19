@@ -8,11 +8,21 @@ export function defaultBiomeGenerator(){
  return {seed:1,enabled:[...BIOME_IDS],weights:{...DEFAULT_WEIGHTS},forbiddenPairs:[],lastGeneration:null};
 }
 const keyPair=(a,b)=>[a,b].sort().join(':');
-// Restricted by the region's persistent identifier/name, not by its
-// physical compass position: use the actual label shown in the Zones list.
+// Match the actual user-visible region name, including descriptors such as
+// "Zona Este - estrecha". A whole-word match never confuses Este with Noreste.
 export function isMountainExcludedZone(zone){
- const label=String(zone?.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
- return /^(?:zona[\s_-]+)?este(?:[\s_-]+\d+)?$/.test(label);
+ const label=String(zone?.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ return /(?:^|[^a-z])este(?:$|[^a-z])/.test(label);
+}
+function excludedEastIndex(zones){
+ const matches=zones.map((zone,i)=>isMountainExcludedZone(zone)?i:-1).filter(i=>i>=0);
+ return matches.length===1?matches[0]:-1;
+}
+function eastZoneError(zones){
+ const matches=zones.filter(isMountainExcludedZone);
+ if(matches.length===1)return '';
+ if(matches.length>1)return 'Hay varias regiones con «Este» en su nombre. Cambia sus nombres para identificar una sola Zona Este.';
+ return 'No encuentro la región «Zona Este» en los nombres de las zonas. Identifícala en Creador de zonas antes de elegir una distribución.';
 }
 
 export function normalizeBiomeGenerator(data){
@@ -89,6 +99,8 @@ export function generateBiomeAssignments(zones,raw){
   return {ok:false,error:'Hay zonas sin contornos válidos.'};
  const candidates=settings.enabled.filter(id=>settings.weights[id]>0);
  if(!candidates.length)return {ok:false,error:'Habilita al menos un bioma con peso mayor que cero.'};
+ const zoneError=eastZoneError(zones);
+ if(zoneError)return {ok:false,error:zoneError};
  const adjacency=buildZoneAdjacency(zones);
  const forbidden=new Set(settings.forbiddenPairs);
  const fixed=zones.map(z=>z.biomeLocked===true?z.biomeId:null);
@@ -143,6 +155,9 @@ export function enumerateBiomeDistributions(zones,raw){
  if(zones.some(z=>!z||!Array.isArray(z.points)||z.points.length<3))
   return {ok:false,error:'Hay zonas sin contornos válidos.'};
  const rules=normalizeBiomeGenerator(raw);
+ const zoneError=eastZoneError(zones);
+ if(zoneError)return {ok:false,error:zoneError};
+ const eastIndex=excludedEastIndex(zones);
  const adjacency=buildZoneAdjacency(zones);
  const forbidden=new Set(rules.forbiddenPairs);
  const distributions=[];
@@ -155,7 +170,7 @@ export function enumerateBiomeDistributions(zones,raw){
   }
   for(const biome of BIOME_IDS){
    if(!remaining.has(biome))continue;
-   if(biome==='mountain'&&isMountainExcludedZone(zones[index]))continue;
+   if(biome==='mountain'&&index===eastIndex)continue;
    if(adjacency[index].some(n=>n<index&&forbidden.has(keyPair(biome,assignment[n]))))continue;
    assignment[index]=biome;
    remaining.delete(biome);
