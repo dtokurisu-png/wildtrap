@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import {createPlaytest} from './playtest.mjs?v=0.9.174';
 import {createTerrainTexturePainter} from './editor-terrain-texture-renderer.mjs?v=0.9.175';
 import {createPrefabLibrary} from './prefab-library.mjs?v=0.9.160';
+import {createTerrainHandpaintOverlay} from './terrain-handpaint-overlay.mjs?v=0.9.149';
+import {applyMobileCliffs} from './mobile-cliffs.mjs?v=0.9.176';
+import {buildAdaptiveTerrain} from './adaptive-terrain-cuts.mjs';
 
 const $=id=>document.getElementById(id);
 const canvas=$('world'),loading=$('loading'),map=$('map'),ctx=map.getContext('2d');
@@ -125,7 +128,7 @@ async function main(){
   scene=new THREE.Scene();scene.background=new THREE.Color('#789f9f');
   const sky=new THREE.HemisphereLight(0xf1f5e5,0x53634a,2.2);sky.layers.enable(1);scene.add(sky);
   const sun=new THREE.DirectionalLight(0xffe5c0,2.0);sun.layers.enable(1);sun.position.set(-280,600,250);scene.add(sun);
-  const n=world.resolution,geo=new THREE.PlaneGeometry(SIZE,SIZE,n-1,n-1);
+  const n=world.resolution;let geo=new THREE.PlaneGeometry(SIZE,SIZE,n-1,n-1);
   geo.rotateX(-Math.PI/2);
   const pos=geo.getAttribute('position');
   for(let i=0;i<pos.count;i++){
@@ -133,11 +136,35 @@ async function main(){
    pos.setXYZ(i,pos.getX(i)+(Number(o?.[0])||0),world.heights[i],pos.getZ(i)+(Number(o?.[1])||0));
   }
   pos.needsUpdate=true;geo.computeVertexNormals();geo.computeBoundingSphere();
+  if((world.cuts3d?.length||0)||(world.holes?.length||0)){
+   const cut=buildAdaptiveTerrain({positions:geo.getAttribute('position').array,
+    colors:new Float32Array(pos.count*3).fill(1),normals:geo.getAttribute('normal').array,
+    uvs:geo.getAttribute('uv').array,indices:geo.index.array},
+    world.holes||[],world.cuts3d||[],SIZE,n);
+   if(cut&&!cut.stats?.incomplete){
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(cut.positions,3));
+    g.setAttribute('uv',new THREE.Float32BufferAttribute(cut.uvs,2));
+    g.setIndex(cut.indices);g.computeVertexNormals();g.computeBoundingSphere();
+    geo.dispose();geo=g;
+   }
+  }
   const base=new THREE.MeshLambertMaterial({color:'#668972',side:THREE.DoubleSide});
   terrain=new THREE.Mesh(geo,base);terrain.name='MobileTerrain';scene.add(terrain);
+  await applyMobileCliffs({terrain,scene,live:world});
   const textures=createTerrainTexturePainter({scene,terrain,renderer,material:base,intangibleMaterial:base,live:world,
    toast:console.warn,isTesting:()=>true});
-  textures.schedule();
+  // The desktop biome shaders mix the same underlying hand-painted artwork.
+  const handpaint=createTerrainHandpaintOverlay({renderer,scene});
+  handpaint.subscribe(texture=>textures.setHandpaintTexture(texture));
+  let paint={};
+  try{paint=JSON.parse(localStorage.getItem('wildtrap-handpaint-controls-v1')||'{}')||{}}catch(_){}
+  const setting=(key,def,min,max)=>Math.max(min,Math.min(max,Number.isFinite(Number(paint[key]))&&paint[key]!==undefined?Number(paint[key]):def));
+  textures.setHandpaintSettings({rotation:setting('rotation',180,0,360),
+   opacity:setting('opacity',90,0,100)/100,blendMode:setting('blendMode',3,0,7),
+   contrast:setting('contrast',160,0,400)/100});
+  textures.setEnabled(world.settings?.biomeTexturesVisible!==false);
+  window.__terrainHydrated=true;
   const models=new THREE.Group();scene.add(models);
   const library=createPrefabLibrary();
   // Only the three placed GLB objects; the entire catalog is never preloaded.
@@ -165,7 +192,7 @@ async function main(){
    if(document.hidden)return;
    const cam=play.frame();
    if(!cam)return;
-   if(now-previous>23){renderer.render(scene,cam);previous=now}
+   if(now-previous>23){handpaint.render(cam);previous=now}
   }
   requestAnimationFrame(frame);
  }catch(e){

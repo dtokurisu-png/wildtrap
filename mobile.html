@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#101d19">
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#101d19"><meta name="mobile-web-app-capable" content="yes"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/wildtrap-192.png">
 <title>WildTrap · Explorar</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101d19;color:white;font-family:system-ui,sans-serif;overscroll-behavior:none;touch-action:none}
@@ -20,6 +20,13 @@
 #coords{font-size:12px;padding:7px 1px;color:#cef0e4}
 .actions{display:flex;gap:8px}.actions button{flex:1;min-height:43px;background:#295748;color:white;border:1px solid #8ed1b8;border-radius:9px;font-size:14px}
 #accept{background:#007d67;border-color:#80f6d7;font-weight:700}
+#landscapeButton,#installButton{position:absolute;top:calc(env(safe-area-inset-top) + 12px);height:46px;border:1px solid #85dbc4;border-radius:12px;background:#184b3fdd;color:#fff;padding:0 8px;font-size:12px;font-weight:700;pointer-events:auto}
+#landscapeButton{right:119px}#installButton{right:222px;background:#007d67}
+#updateBanner{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 67px);transform:translateX(-50%);z-index:19;display:flex;align-items:center;gap:7px;max-width:92vw;padding:8px;background:#15372f;border:1px solid #7de5c5;border-radius:11px;font-size:12px}
+#updateBanner[hidden],#installButton[hidden],#installHint[hidden]{display:none}
+#updateBanner button,#installHint button{background:#007d67;border:1px solid #89f7d9;color:white;border-radius:8px;padding:8px;font-size:12px;font-weight:700}
+#installHint{position:absolute;right:12px;bottom:10px;max-width:min(365px,94vw);background:#163c31;color:white;border:1px solid #66c1a3;border-radius:10px;padding:10px;z-index:18;font-size:12px;pointer-events:auto}
+@media(max-width:650px){#landscapeButton{right:110px;padding:0 5px}#installButton{right:199px;padding:0 5px}#spawnButton{min-width:80px}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 </head><body>
@@ -27,9 +34,11 @@
 <div id="loading">Cargando escenario WildTrap…</div>
 <div id="hud">
  <div id="help">WILDTRAP · exploración móvil</div>
- <button id="spawnButton" type="button">⌖ Jugador 1</button>
+ <button id="installButton" type="button" hidden>Instalar</button><button id="landscapeButton" type="button">⛶ Horizontal</button><button id="spawnButton" type="button">⌖ Jugador 1</button>
  <div id="joystick" role="group" aria-label="Joystick para caminar"><div id="knob"></div></div>
 </div>
+<div id="updateBanner" hidden role="status"><span>Nueva versión de WildTrap</span><button id="updateNow" type="button">Actualizar</button><button id="updateLater" type="button">Después</button></div>
+<div id="installHint" hidden role="status"><span id="installHintText"></span> <button id="installHintClose" type="button">Cerrar</button></div>
 <div id="mapOverlay" hidden><div id="mapPanel">
  <h2>⌖ Colocar spawn · Jugador 1</h2><p>Vista cenital (eje Y). Toca un lugar del escenario y pulsa Aceptar.</p>
  <canvas id="map" width="630" height="630" aria-label="Mapa cenital para elegir una posición"></canvas>
@@ -37,5 +46,5 @@
  <div class="actions"><button id="cancel" type="button">Cancelar</button><button id="accept" type="button">Aceptar</button></div>
 </div></div>
 <button id="test" hidden></button><span id="testModelStatus" hidden></span><span id="testCoords" hidden></span><span id="toast" hidden></span>
-<script type="module" src="./mobile.mjs?v=0.9.175"></script>
+<script type="module" src="./mobile.mjs?v=0.9.176"></script><script type="module" src="./mobile-install.mjs?v=0.9.176"></script>
 </body></html>
