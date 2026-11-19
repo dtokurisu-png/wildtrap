@@ -13,6 +13,7 @@ uniform sampler2D globalHandpaint;
 uniform float globalHandpaintEnabled;
 uniform float globalHandpaintOpacity;
 uniform float globalHandpaintContrast;
+uniform float globalHandpaintRotation;
 vec3 paintOverlayColor(vec3 terrainColor){
  if(globalHandpaintEnabled<0.5)return terrainColor;
  vec3 gradX=dFdx(vTerrainWorld);
@@ -22,6 +23,9 @@ vec3 paintOverlayColor(vec3 terrainColor){
  float flatMask=smoothstep(0.70,0.86,upness);
  if(flatMask<0.001)return terrainColor;
  vec2 artUV=vec2(vTerrainWorld.x/630.0+.5,.5-vTerrainWorld.z/630.0);
+ float angle=radians(globalHandpaintRotation);
+ vec2 centered=artUV-vec2(.5);
+ artUV=vec2(cos(angle)*centered.x-sin(angle)*centered.y,sin(angle)*centered.x+cos(angle)*centered.y)+vec2(.5);
  if(artUV.x<0.0||artUV.y<0.0||artUV.x>1.0||artUV.y>1.0)return terrainColor;
  float edge=min(min(artUV.x,1.0-artUV.x),min(artUV.y,1.0-artUV.y));
  float edgeFade=smoothstep(0.0,0.06,edge);
@@ -160,12 +164,17 @@ export function createTerrainGPULayers({scene,terrain}){
  const artUniforms={
   globalHandpaint:{value:null},
   globalHandpaintEnabled:{value:0},
-  globalHandpaintOpacity:{value:0.50},
-  globalHandpaintContrast:{value:0.45}
+  globalHandpaintOpacity:{value:0.90},
+  globalHandpaintContrast:{value:0.45},
+  globalHandpaintRotation:{value:180}
  };
  function setHandpaintTexture(texture){
   artUniforms.globalHandpaint.value=texture||null;
   artUniforms.globalHandpaintEnabled.value=texture?1:0;
+ }
+ function setHandpaintSettings({opacity,rotation}={}){
+  if(Number.isFinite(Number(opacity)))artUniforms.globalHandpaintOpacity.value=limit(Number(opacity),0,1);
+  if(Number.isFinite(Number(rotation)))artUniforms.globalHandpaintRotation.value=((Number(rotation)%360)+360)%360;
  }
  function clear(){
   // Clean up old overlay on each texture rebake; no leaking shadow receivers.
@@ -301,7 +310,7 @@ export function createTerrainGPULayers({scene,terrain}){
    entry.mesh.visible=Boolean(visible&&terrain.visible);
   }
  }
- return {build,sync,clear,setHandpaintTexture,count:()=>records.length,
+ return {build,sync,clear,setHandpaintTexture,setHandpaintSettings,count:()=>records.length,
   getHandpaintState:()=>({enabled:Boolean(artUniforms.globalHandpaintEnabled.value),
    materials:records.filter(r=>r.material.uniforms.globalHandpaint).length})};
 }
