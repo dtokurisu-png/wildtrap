@@ -23,6 +23,7 @@ export function createPlaytest({scene,renderer,view,orbit,terrain,cursor,live,he
  const player=new THREE.Group();
  player.name='WILDTRAPPlayer1';
  let active=false,busy=false,drag=false,lastX=0,lastY=0,yaw=0,pitch=.22;
+ let joystickX=0,joystickY=0;
  let imported=null,mixer=null,idle=null,walk=null,walkWanted=false;
  const IDLE_CLIP_INDEX=2,RUN_CLIP_INDEX=4;
  let oldShow=null,oldShadow=null;
@@ -277,7 +278,7 @@ const hiddenDebugMarkers=[];
  }
  function stop(){
   if(!active)return;
-  active=false;drag=false;keys.clear();
+  active=false;drag=false;keys.clear();joystickX=joystickY=0;
   collider.restore();
   player.removeFromParent();
   cursor.visible=oldShow===null?true:oldShow;
@@ -297,7 +298,11 @@ const hiddenDebugMarkers=[];
   const dt=Math.min(clock.getDelta(),.055);
   // W goes where the camera faces; A/D strafe left/right relative to its yaw.
   // The camera never moves the player without keyboard input.
-  const move=movementAxes(keys,yaw),moving=move.moving;
+  const keyboard=movementAxes(keys,yaw);
+  const force=Math.min(1,Math.hypot(joystickX,joystickY));
+  const f=force>0?(-joystickY/force):0,r=force>0?(joystickX/force):0;
+  const analog={x:(f*Math.sin(yaw)+r*Math.cos(yaw))*force,z:(-f*Math.cos(yaw)+r*Math.sin(yaw))*force,moving:force>.08};
+  const move=analog.moving?analog:keyboard,moving=move.moving;
   // Half of the original world traversal speeds (3.8 / 6.0).
   const speed=(keys.has('ShiftLeft')||keys.has('ShiftRight'))?3.0:1.9;
   let moved=false;
@@ -361,5 +366,18 @@ const hiddenDebugMarkers=[];
    mixer=null;idle=null;walk=null;walkWanted=false;
    $('testModelStatus').textContent='Personaje propio: '+file.name+' · pulsa Probar';
  }
- return {start,stop,frame,resize,fromFile,get active(){return active},get busy(){return busy},get sourceError(){return sourceError},get shadowFocus(){return active?player.position:null},get shadowMoving(){return active&&walkWanted}};
+ function teleport(x,z){
+  if(!active||!Number.isFinite(x)||!Number.isFinite(z))return false;
+  const pad=live.size/2-3;
+  x=clamp(x,-pad,pad);z=clamp(z,-pad,pad);
+  const ground=collider.floorAt(x,z,heightAt(x,z),{stepUp:3,searchDepth:80})?.y??heightAt(x,z);
+  player.position.set(x,ground,z);verticalSpeed=0;setMovingAnimation(false);
+  const f=forwardOf(yaw);
+  camera.position.set(x-f.x*CAMERA_DISTANCE+.28,ground+CAMERA_ELEVATION,z-f.z*CAMERA_DISTANCE);
+  cameraFocus.set(x+f.x*CAMERA_LOOK_AHEAD,ground+CAMERA_HEIGHT,z+f.z*CAMERA_LOOK_AHEAD);
+  camera.lookAt(cameraFocus);
+  return true;
+ }
+ function setJoystick(x,y){joystickX=clamp(Number(x)||0,-1,1);joystickY=clamp(Number(y)||0,-1,1)}
+ return {start,stop,frame,resize,fromFile,teleport,setJoystick,get active(){return active},get busy(){return busy},get sourceError(){return sourceError},get shadowFocus(){return active?player.position:null},get shadowMoving(){return active&&walkWanted}};
 }
