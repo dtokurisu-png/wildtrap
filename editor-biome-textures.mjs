@@ -19,7 +19,7 @@ const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
 const defaults=()=>{
  const data=Object.fromEntries(BIOMES.map(b=>[b.id,{
   slots:Object.fromEntries(SLOTS.map(s=>[s.id,{name:'',image:'',scale:8,opacity:s.id==='ground'?1:.5}])),
-  noise:{scale:20,seed:1},edgeBlend:4
+  noise:{scale:20,seed:1},edgeBlend:4,colorContrast:1,colorSaturation:1
  }]));
  return data;
 };
@@ -65,10 +65,12 @@ export function normalizeBiomeMaterials(raw){
   dest.noise.scale=cl(Number(src.noise?.scale)||20,1,200);
   dest.noise.seed=cl(Math.round(Number(src.noise?.seed)||1),1,9999999);
   dest.edgeBlend=cl(Number.isFinite(Number(src.edgeBlend))?Number(src.edgeBlend):4,0,50);
+  dest.colorContrast=cl(Number.isFinite(Number(src.colorContrast))?Number(src.colorContrast):1,0,3);
+  dest.colorSaturation=cl(Number.isFinite(Number(src.colorSaturation))?Number(src.colorSaturation):1,0,3);
  }
  return out;
 }
-export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=()=>{},getTextureAssetUrl=url=>url}){
+export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=()=>{},onBiomeColorChange=()=>{},getTextureAssetUrl=url=>url}){
  const $=id=>document.getElementById(id);
  const root=$('texturePanel');if(!root)throw Error('Falta panel de texturizado');
  let biomeId=BIOMES[0].id,normalizedRef=null;
@@ -90,6 +92,36 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
  select.onchange=()=>{if(BIOMES.some(b=>b.id===select.value))biomeId=select.value;render()};
  function mutate(fn){
   snapshot();fn(model());persist();render();onChange();
+ }
+ const colorBiome=$('biomeColorTarget'),colorContrast=$('biomeColorContrast'),colorSaturation=$('biomeColorSaturation');
+ if(colorBiome&&colorContrast&&colorSaturation){
+  colorBiome.replaceChildren(...BIOMES.map(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=b.name;return o}));
+  colorBiome.value='mountain';
+  const refreshColors=()=>{
+   const settings=ensure()[colorBiome.value];
+   if(!settings)return;
+   colorContrast.value=String(Math.round(settings.colorContrast*100));
+   colorSaturation.value=String(Math.round(settings.colorSaturation*100));
+   $('biomeColorContrastValue').textContent=colorContrast.value+' %';
+   $('biomeColorSaturationValue').textContent=colorSaturation.value+' %';
+  };
+  colorBiome.onchange=refreshColors;
+  let begun=false;
+  for(const [input,key,output] of [[colorContrast,'colorContrast','biomeColorContrastValue'],[colorSaturation,'colorSaturation','biomeColorSaturationValue']]){
+   const begin=()=>{if(!begun){snapshot();begun=true}};
+   input.addEventListener('pointerdown',begin);
+   input.addEventListener('keydown',begin);
+   input.addEventListener('input',()=>{
+    begin();
+    const biome=colorBiome.value,settings=ensure()[biome];if(!settings)return;
+    settings[key]=cl(Number(input.value)/100,0,3);
+    $(output).textContent=input.value+' %';
+    onBiomeColorChange(biome,{contrast:settings.colorContrast,saturation:settings.colorSaturation});
+   });
+   input.addEventListener('change',()=>{persist();begun=false});
+   input.addEventListener('blur',()=>{if(begun){persist();begun=false}});
+  }
+  refreshColors();
  }
  const slots=$('textureSlots');
 
@@ -206,6 +238,7 @@ export function createBiomeTextureEditor({live,snapshot,persist,toast,onChange=(
  function render(){
   if(!root.isConnected)return;
   const data=model();renderCatalog();
+  if(colorBiome&&colorContrast&&colorSaturation){const colors=ensure()[colorBiome.value];if(colors){colorContrast.value=String(Math.round(colors.colorContrast*100));colorSaturation.value=String(Math.round(colors.colorSaturation*100));$('biomeColorContrastValue').textContent=colorContrast.value+' %';$('biomeColorSaturationValue').textContent=colorSaturation.value+' %'}}
   const entry=current(),record=entry.cliff?cliffSettings(entry.biome):ensure()[entry.biome].slots[entry.slot];
   repeat.value=String(Math.round((entry.cliff?cliffRepeats(entry.biome):record.scale)*100)/100);
   repeat.min=entry.cliff?'3.5':'.25';repeat.max=entry.cliff?'315':'1000';
