@@ -1,4 +1,4 @@
-import {enumerateBiomeDistributions} from './biome-generator.mjs?v=0.9.158';
+import {enumerateBiomeDistributions,isMountainExcludedZone} from './biome-generator.mjs?v=0.9.158';
 
 const LABELS={mountain:'Montaña',desert:'Desierto',plains:'Llanura',swamp:'Pantano',forest:'Bosque'};
 const PAGE_SIZE=12;
@@ -23,6 +23,7 @@ export function createBiomeGeneratorPanel({live,snapshot,persist,toast,onChange=
  function apply(index){
   const chosen=latest[index],zones=mainZones();
   if(!chosen||chosen.length!==zones.length)return;
+  if(chosen.some((item,i)=>item.biomeId==='mountain'&&isMountainExcludedZone(zones[i]))){toast('Distribución rechazada: Montaña no puede estar en Zona Este');return;}
   if(chosen.every((item,i)=>zones[i].biomeId===item.biomeId))return;
   snapshot();
   for(let i=0;i<zones.length;i++){
@@ -46,7 +47,7 @@ export function createBiomeGeneratorPanel({live,snapshot,persist,toast,onChange=
   list.replaceChildren();
   if(!result.ok){status.textContent=result.error;}
   else if(!count){status.textContent='No hay combinaciones válidas con las restricciones de vecinos guardadas.';}
-  else status.textContent=count+' posibilidades · Montaña excluida de Zona Este';
+  else {const east=zones.find(isMountainExcludedZone);const selectedBiome=east?.biomeId;status.textContent=count+' posibilidades · '+east.name+' · '+(LABELS[selectedBiome]||'Sin asignar')+' · Montaña prohibida';}
   const selected=getSelectedIndex();
   const start=page*PAGE_SIZE;
   for(let i=start;i<Math.min(count,start+PAGE_SIZE);i++){
