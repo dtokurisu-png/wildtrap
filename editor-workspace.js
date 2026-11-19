@@ -6,8 +6,13 @@
  const side=document.getElementById('side');
  if(!side||document.getElementById('workspaceTopbar'))return;
  const sections=Array.from(side.children).filter(el=>el.tagName==='SECTION');
- if(sections.length!==9)throw new Error('Estructura del editor no reconocida: se esperaban 9 secciones');
- const [project,sculpt,spawns,textures,zones,knife,logic,models,selection]=sections;
+ if(sections.length!==8&&sections.length!==9)throw new Error('Estructura del editor no reconocida: se esperaban 8 o 9 secciones');
+ // The retired anchors/path section is optional; it must never prevent
+ // building the top bar or side workspace.
+ const [project,sculpt,spawns,textures,zones,knife]=sections;
+ const logic=sections.length===9?sections[6]:null;
+ const models=sections.length===9?sections[7]:sections[6];
+ const selection=sections.length===9?sections[8]:sections[7];
  const title=side.querySelector(':scope > h1');
  const subtitle=side.querySelector(':scope > small');
  const help=Array.from(side.children).find(el=>el.classList.contains('hint'));
@@ -66,7 +71,7 @@
   ['zones','◇','Zonas','Creador de zonas del escenario'],
   ['textures','▧','Texturas','Biblioteca de texturas por bioma'],
   ['spawns','⌖','Spawns','Spawns de jugadores y enemigos'],
-  ['structures','▦','Estruct.','Estructuras'],
+  ['structures','▦','Objetos','Catálogo de objetos'],
  ];
  const workspaceButtons=new Map();
  for(const [key,symbol,label,longLabel] of toolbarEntries){
@@ -85,11 +90,12 @@
  // Panel de propiedades de herramienta, reutilizando las seis secciones existentes.
  const toolViews=el('div');toolViews.id='workspaceToolViews';
  const structureView=el('div','workspace-section');structureView.dataset.workspaceContent='structures';
- structureView.append(logic,models);
+ if(logic)structureView.append(logic);
+ structureView.append(models);
  // Existing spawn tools are real buttons: move, never clone, to the spawn workspace.
  const oldSpawnControls=document.getElementById('spawnsLegacyButtons');
  for(const kind of ['tree','wallspawn','spawn']){
-  const button=logic.querySelector('[data-tool="'+kind+'"]');
+  const button=logic?.querySelector('[data-tool="'+kind+'"]');
   if(button)oldSpawnControls.append(button);
  }
  // Biome generation belongs to geographic zones, not the texture library.
@@ -124,7 +130,7 @@
  // usando las vistas reales de cada archivo, sin modal ni segunda copia.
  const galleryRoot=$('prefabModal');
  if(!galleryRoot)throw new Error('No existe el catálogo de estructuras');
- models.append(galleryRoot);
+ structureView.append(galleryRoot);
  // Vista de objetos: Fase 1 crea la ventana, Fase 2 conectará el inventario vivo.
  const objectsView=el('div');
  objectsView.innerHTML='<h2>Objetos de la escena</h2><div class="workspace-empty"><strong>Gestor de objetos</strong>Esta ventana está preparada para mostrar únicamente modelos persistentes, agrupados por tipo. La lista sincronizada llegará en la Fase 2.</div>';
