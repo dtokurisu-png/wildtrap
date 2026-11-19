@@ -65,6 +65,10 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
  let frames=0,loaderError='',loadedSource='';
  // Recovery/safe mode deliberately avoids this extra GPU pass unless opted in.
  const enabled=!flags.has('noHandpaint')&&(!flags.has('safe')||flags.has('handpaint'));
+ const statusNode=document.getElementById('terrainHandpaintStatus');
+ const reportStatus=(msg)=>{if(statusNode)statusNode.textContent=msg};
+ reportStatus(enabled?'Capa global hand-painted · Luz intensa · 35 % de transparencia: cargando…':
+  'Capa global hand-painted: desactivada (modo seguro o comparación)');
  const drawingSize=new THREE.Vector2();
  const rt=new THREE.WebGLRenderTarget(1,1,{
   depthBuffer:true,stencilBuffer:false,
@@ -134,8 +138,10 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
     paintTexture.needsUpdate=true;
     shader.uniforms.artTexture.value=paintTexture;
     ready=true;
+    reportStatus('Capa global hand-painted: ACTIVA · Luz intensa · 35 % de transparencia');
    }catch(error){
     loaderError=error?.message||String(error);
+    reportStatus('Capa hand-painted: error al preparar la imagen');
     console.warn('Wildtrap: no se pudo preparar el overlay handpaint:',error);
    }
   };
@@ -147,6 +153,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
     return;
    }
    loaderError='No se pudo descargar la capa handpaint: '+HANDPAINT_GPU_SOURCE+' o '+HANDPAINT_SOURCE;
+   reportStatus('Capa hand-painted: error al descargar la imagen');
    console.warn('Wildtrap:',loaderError);
   };
   // The 4K derivative loads much faster, with original 10K as safe fallback.
