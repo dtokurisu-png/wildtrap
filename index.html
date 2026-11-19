@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WILDTRAP · Editor de escenarios</title>
+<script>if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)&&!new URLSearchParams(location.search).has('desktop'))location.replace('./mobile.html'+location.search);</script>
 <style>
 :root{font-family:system-ui,Segoe UI,sans-serif;color:#ddefe4;background:#0d1b18}*{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden}button,input,select{font:inherit}
@@ -484,5 +485,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.164').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.170').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
