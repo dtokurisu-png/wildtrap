@@ -3,9 +3,9 @@ import * as THREE from 'three';
 const AREA_TYPES=[
  ['trees','Árboles'],['grass','Hierbas y monte'],['plants','Plantas'],['rocks','Rocas'],
  ['objects','Objetos'],['river','Río'],['swamp','Pantano'],['lake','Lago'],
- ['oasis','Oasis'],['dune','Duna'],['mountain','Montaña']
+ ['oasis','Oasis'],['dune','Duna'],['mountain','Montaña'],['cliff','Acantilado']
 ];
-const SPECIAL=new Set(['river','swamp','lake','oasis','dune','mountain']);
+const SPECIAL=new Set(['river','swamp','lake','oasis','dune','mountain','cliff']);
 const BIOMES=[['any','Todos los biomas'],['forest','Bosque'],['plains','Llanura'],['desert','Desierto'],['swamp','Pantano'],['mountain','Montañoso']];
 const $=id=>document.getElementById(id);
 const norm=p=>({x:Math.max(-315,Math.min(315,p.x)),z:Math.max(-315,Math.min(315,p.z))});
@@ -31,7 +31,7 @@ function contains(poly,p){
 export function createSpawnAreasEditor({scene,terrain,view,camera,live,heightAt,snapshot,persist,toast,isActive,onPointChanged=()=>{}}){
  const layer=new THREE.Group();layer.name='SpawnAreaEditorOverlay';layer.userData.editorOnly=true;scene.add(layer);
  const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),mark=new THREE.Vector3();
- let pending=[],selected=null,hover=null,pressed=null,mode='area';
+ let pending=[],selected=null,hover=null,pressed=null,mode='area',forceDraw=false;
  const list=$('spawnAreaList'),pointList=$('spawnPointList');
  const typeInput=$('spawnAreaType'),biomeInput=$('spawnAreaBiome'),densityInput=$('spawnAreaDensity');
  const pointType=$('spawnPointType'),npcInput=$('spawnNpcType');
@@ -130,9 +130,9 @@ export function createSpawnAreasEditor({scene,terrain,view,camera,live,heightAt,
  }
  function click(e){
   const p=pick(e);if(!p)return;
+  const nearby=characters().map(n=>({n,d:screenDistance(n,e)})).sort((a,b)=>a.d-b.d)[0];
+  if(!pending.length&&nearby&&nearby.d<16){selected=nearby.n.id;refresh();return}
   if(mode==='point'){
-   const nearest=characters().map(n=>({n,d:screenDistance(n,e)})).sort((a,b)=>a.d-b.d)[0];
-   if(nearest&&nearest.d<16){selected=nearest.n.id;refresh();return}
    snapshot();
    const playerCount=points().length;
    if(playerCount>=6){toast('Ya hay seis spawns de jugador; cambia alguno a NPC o elimina uno');return}
@@ -144,12 +144,12 @@ export function createSpawnAreasEditor({scene,terrain,view,camera,live,heightAt,
    snapshot();
    const id='spawn-area-'+live.nextId++;
    const area={id,name:'Área '+(items().length+1),type:'trees',biome:'any',density:40,hidden:false,points:pending.slice()};
-   items().push(area);selected=id;pending=[];persist();refresh();return;
+   items().push(area);selected=id;pending=[];forceDraw=false;persist();refresh();return;
   }
   if(!pending.length){
    // Select existing area by clicking inside its footprint; clicking on empty
    // terrain starts a new polygon.
-   for(const a of items().slice().reverse())if(!a.hidden&&contains(a.points||[],p)){
+   for(const a of (forceDraw?[]:items().slice().reverse()))if(!a.hidden&&contains(a.points||[],p)){
     selected=a.id;refresh();return;
    }
    selected=null;
@@ -176,9 +176,9 @@ export function createSpawnAreasEditor({scene,terrain,view,camera,live,heightAt,
  view.addEventListener('pointermove',move,true);
  window.addEventListener('pointerup',up,true);
  window.addEventListener('pointercancel',()=>{pressed=null},true);
- $('spawnCreateArea').onclick=()=>{pending=[];selected=null;mode='area';refresh();toast('Marca el contorno y pulsa el primer punto para cerrarlo')};
- $('spawnCreatePoint').onclick=()=>{pending=[];selected=null;mode='point';refresh();toast('Haz clic para colocar o seleccionar un spawn de personaje')};
- $('spawnCancelArea').onclick=()=>{pending=[];hover=null;refresh()};
+ $('spawnCreateArea').onclick=()=>{pending=[];selected=null;mode='area';forceDraw=true;refresh();toast('Marca el contorno y pulsa el primer punto para cerrarlo')};
+ $('spawnCreatePoint').onclick=()=>{pending=[];selected=null;mode='point';forceDraw=false;refresh();toast('Haz clic para colocar o seleccionar un spawn de personaje')};
+ $('spawnCancelArea').onclick=()=>{pending=[];hover=null;forceDraw=false;refresh()};
  $('spawnDeleteSelected').onclick=()=>{
   if(selected===null)return;
   snapshot();live.spawnAreas=items().filter(a=>a.id!==selected);
@@ -197,7 +197,7 @@ export function createSpawnAreasEditor({scene,terrain,view,camera,live,heightAt,
   if(n.kind==='characterSpawn'){delete n.playerSlot;n.npcId=n.npcId||''}else delete n.npcId;
   syncPlayerSlots();persist();refresh();
  };
- function setVisible(activeMode){if(activeMode==='spawnPoint')mode='point';else if(activeMode==='spawnArea')mode='area';else {pending=[];hover=null;pressed=null}refresh()}
+ function setVisible(activeMode){if(activeMode==='spawnPoint')mode='point';else if(activeMode==='spawnArea')mode='area';else {pending=[];hover=null;pressed=null;forceDraw=false}refresh()}
  refresh();
  return {refresh,setVisible};
 }
