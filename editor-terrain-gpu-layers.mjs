@@ -99,6 +99,13 @@ uniform sampler2D baseTexture;
 uniform sampler2D regionMask;
 uniform float repeats;
 uniform float intensity;
+uniform float biomeContrast;
+uniform float biomeSaturation;
+vec3 adjustBiomeColor(vec3 sourceColor){
+ vec3 withContrast=clamp((sourceColor-vec3(0.5))*biomeContrast+vec3(0.5),0.0,1.0);
+ float gray=dot(withContrast,vec3(.2126,.7152,.0722));
+ return clamp(mix(vec3(gray),withContrast,biomeSaturation),0.0,1.0);
+}
 varying vec2 vTerrainXZ;
 varying vec3 vTerrainWorld;
 varying vec3 vTerrainNormal;
@@ -113,7 +120,7 @@ void main(){
  vec2 wallUV=vec2(abs(vTerrainNormal.x)>abs(vTerrainNormal.z)?vTerrainWorld.z:vTerrainWorld.x,vTerrainWorld.y)/630.0*repeats;
  vec3 ground=texture2D(baseTexture,sourceUV).rgb;
  vec3 wallGround=texture2D(baseTexture,wallUV).rgb;
- gl_FragColor=vec4(paintOverlayColor(mix(ground,wallGround,wallMix)),alpha*intensity);
+ gl_FragColor=vec4(adjustBiomeColor(paintOverlayColor(mix(ground,wallGround,wallMix))),alpha*intensity);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -129,6 +136,13 @@ uniform float repeats;
 uniform float variationSeed;
 uniform float slotNumber;
 uniform float intensity;
+uniform float biomeContrast;
+uniform float biomeSaturation;
+vec3 adjustBiomeColor(vec3 sourceColor){
+ vec3 withContrast=clamp((sourceColor-vec3(0.5))*biomeContrast+vec3(0.5),0.0,1.0);
+ float gray=dot(withContrast,vec3(.2126,.7152,.0722));
+ return clamp(mix(vec3(gray),withContrast,biomeSaturation),0.0,1.0);
+}
 varying vec2 vTerrainXZ;
 float rand2(vec2 p){
  return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);
@@ -177,7 +191,7 @@ void main(){
   }
  }
  if(combinedAlpha<.002)discard;
- gl_FragColor=vec4(premultiplied/max(combinedAlpha,.0001),combinedAlpha);
+ gl_FragColor=vec4(adjustBiomeColor(premultiplied/max(combinedAlpha,.0001)),combinedAlpha);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  #include <fog_fragment>
@@ -267,7 +281,9 @@ export function createTerrainGPULayers({scene,terrain}){
      baseTexture:{value:texture},
      regionMask:{value:mask},
      repeats:{value:limit(Number(slot.scale)||8,.25,1000)},
-      intensity:{value:limit(Number.isFinite(Number(slot.opacity))?Number(slot.opacity):1,0,1)}
+      intensity:{value:limit(Number.isFinite(Number(slot.opacity))?Number(slot.opacity):1,0,1)},
+     biomeContrast:{value:limit(Number(materials[biome].colorContrast??1),0,3)},
+     biomeSaturation:{value:limit(Number(materials[biome].colorSaturation??1),0,3)}
     },
     vertexShader:VERTEX,fragmentShader:FRAGMENT,fog:true,
     extensions:{derivatives:true},
@@ -280,7 +296,7 @@ export function createTerrainGPULayers({scene,terrain}){
    mesh.renderOrder=3;mesh.frustumCulled=false;
    // Not editorOnly: the same material MUST appear while playing.
    scene.add(mesh);
-   records.push({mesh,mask,texture,material:shader});
+   records.push({mesh,mask,texture,material:shader,biome});
    // Add three separate, optional complementary layers on top of the base.
    // Their shaders use the SAME zone mask and terrain geometry, but never
    // modify the base material. ?noDetails=1 is an instant safe fallback.
@@ -308,7 +324,9 @@ export function createTerrainGPULayers({scene,terrain}){
       repeats:{value:limit(Number(detailSlot.scale)||8,.25,1000)},
       variationSeed:{value:Number(materials[biome].noise?.seed)||1},
       slotNumber:{value:i},
-      intensity:{value:opacity}
+      intensity:{value:opacity},
+      biomeContrast:{value:limit(Number(materials[biome].colorContrast??1),0,3)},
+      biomeSaturation:{value:limit(Number(materials[biome].colorSaturation??1),0,3)}
      },
      vertexShader:VERTEX,fragmentShader:DETAIL_FRAGMENT,fog:true,
      side:THREE.DoubleSide,transparent:true,depthWrite:false,depthTest:true,
@@ -319,7 +337,7 @@ export function createTerrainGPULayers({scene,terrain}){
     detailMesh.renderOrder=3+i*.01;
     detailMesh.frustumCulled=false;
     scene.add(detailMesh);
-    records.push({mesh:detailMesh,mask,texture:detailTexture,material:detailMaterial});
+    records.push({mesh:detailMesh,mask,texture:detailTexture,material:detailMaterial,biome});
    }
   }
   if(records.length){
@@ -339,6 +357,14 @@ export function createTerrainGPULayers({scene,terrain}){
    scene.add(shadowMesh);
   }
  }
+ function setBiomeColorSettings(biome,{contrast,saturation}={}){
+  for(const record of records){
+   if(record.biome!==biome)continue;
+   const uniforms=record.material.uniforms;
+   if(contrast!==undefined&&Number.isFinite(Number(contrast)))uniforms.biomeContrast.value=limit(Number(contrast),0,3);
+   if(saturation!==undefined&&Number.isFinite(Number(saturation)))uniforms.biomeSaturation.value=limit(Number(saturation),0,3);
+  }
+ }
  function sync(visible=true){
   if(shadowMesh){
    shadowMesh.geometry=terrain.geometry;
@@ -349,7 +375,7 @@ export function createTerrainGPULayers({scene,terrain}){
    entry.mesh.visible=Boolean(visible&&terrain.visible);
   }
  }
- return {build,sync,clear,setHandpaintTexture,setHandpaintSettings,count:()=>records.length,
+ return {build,sync,clear,setHandpaintTexture,setHandpaintSettings,setBiomeColorSettings,count:()=>records.length,
   getHandpaintState:()=>({enabled:Boolean(artUniforms.globalHandpaintEnabled.value),
    materials:records.filter(r=>r.material.uniforms.globalHandpaint).length})};
 }
