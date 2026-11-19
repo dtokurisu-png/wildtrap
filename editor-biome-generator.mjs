@@ -1,5 +1,5 @@
 import {ensureBiomeTextureDefaults} from './editor-biome-textures.mjs?v=0.9.119';
-import {BIOME_IDS,defaultBiomeGenerator,normalizeBiomeGenerator,generateBiomeAssignments,nextBiomeSeed} from './biome-generator.mjs?v=0.9.69';
+import {BIOME_IDS,defaultBiomeGenerator,normalizeBiomeGenerator,generateBiomeAssignments,nextBiomeSeed} from './biome-generator.mjs?v=0.9.154';
 const LABELS={mountain:'Montañoso',desert:'Desierto',plains:'Llanura',swamp:'Pantano',forest:'Bosque'};
 const PAIRS=[];
 for(let i=0;i<BIOME_IDS.length;i++)for(let j=i+1;j<BIOME_IDS.length;j++)PAIRS.push([BIOME_IDS[i],BIOME_IDS[j]]);
