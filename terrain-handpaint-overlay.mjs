@@ -160,7 +160,10 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
   img.src=getTextureAssetUrl(HANDPAINT_GPU_SOURCE);
  }
  function render(camera){
-  if(!enabled||!ready||!terrain.visible){
+  // The editor must finish recovering geometry and hide its loading screen
+  // BEFORE performing an extra fullscreen composite. Otherwise software/WebGL
+  // devices can be starved by the new pass during startup.
+ if(!enabled||!ready||!terrain.visible||window.__terrainHydrated!==true){
    renderer.render(scene,camera);
    return;
   }
