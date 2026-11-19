@@ -9,10 +9,10 @@ export function defaultBiomeGenerator(){
 }
 const keyPair=(a,b)=>[a,b].sort().join(':');
 // Restricted by the region's persistent identifier/name, not by its
-// physical compass position: the map's east/west labels were interchanged.
+// physical compass position: use the actual label shown in the Zones list.
 export function isMountainExcludedZone(zone){
  const label=String(zone?.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
- return /^(?:zona[\s_-]+)?oeste(?:[\s_-]+\d+)?$/.test(label);
+ return /^(?:zona[\s_-]+)?este(?:[\s_-]+\d+)?$/.test(label);
 }
 
 export function normalizeBiomeGenerator(data){
@@ -97,7 +97,7 @@ export function generateBiomeAssignments(zones,raw){
    return {ok:false,error:'La zona '+(zones[i].name||zones[i].id)+' tiene un bioma bloqueado desconocido.'};
  for(let i=0;i<fixed.length;i++)
   if(fixed[i]==='mountain'&&isMountainExcludedZone(zones[i]))
-   return {ok:false,error:'La zona Oeste no admite el bioma montañoso. Desbloquea esa zona antes de generar.'};
+   return {ok:false,error:'La zona Este no admite el bioma montañoso. Desbloquea esa zona antes de generar.'};
  const compatible=(a,b)=>!a||!b||a===b||!forbidden.has(keyPair(a,b));
  for(let i=0;i<fixed.length;i++)for(const j of adjacency[i])
   if(j<i&&!compatible(fixed[i],fixed[j]))
