@@ -290,18 +290,11 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <div class="hint" id="holeMeshStats">Malla base sin recortes adicionales</div>
 <p class="hint"><b>Atajos:</b> Retroceso elimina el último punto; Escape cancela el contorno; Ctrl+Z deshace el corte aplicado. Puedes marcar puntos sobre el terreno o un GLB, pero cada contorno debe pertenecer a la misma malla. Los agujeros y restauraciones se guardan en el proyecto; la topología original de los modelos se conserva para reconstruir y deshacer.</p>
 </section>
-<section>
-<h2>3. Anclajes, caminos y estructuras</h2>
-<div class="grid">
-<button data-tool="anchor">Anclaje</button><button data-tool="path">Camino</button><button data-tool="wall">Muro</button>
-<button data-tool="stairs">Escalera</button><button data-tool="gate">Compuerta</button>
-<button data-tool="exit">Salida</button><button data-tool="delete">Borrar</button>
-</div>
-<div class="grid2"><label>Altura de muros<input id="wallHeight" type="number" min="2" max="60" value="12"></label><label>Subida de escaleras<input id="stairRise" type="number" min="1" max="50" value="8"></label></div>
-<p class="hint">Camino, muro, escalera y compuerta: haz clic en el punto inicial y luego en el final. Si colocas un anclaje cerca, el extremo se ajusta automáticamente a él. Las escaleras generan peldaños reales. El punto de spawn de árboles es solo un marcador: no genera árboles definitivos.</p>
-</section>
-<section id="cavePiecesPanel">
-<h2>Estructuras / Cuevas · Modelos GLB</h2>
+<!-- Legacy route heights retained for saved projects; retired tools are not shown. -->
+<input type="hidden" id="wallHeight" value="12"><input type="hidden" id="stairRise" value="8">
+
+<section id="cavePiecesPanel" hidden>
+<h2>Propiedades de modelos</h2>
 <p class="hint">Elige una estructura en la galería: aparecerá semitransparente siguiendo el cursor hasta que hagas clic en el terreno. Después puedes seleccionarla y arrastrarla directamente.</p>
 <input type="hidden" id="prefabType" value="mountain">
 <button id="openPrefabGallery" type="button" style="width:100%;font-weight:700">▦ Mostrar catálogo de modelos</button>
@@ -334,8 +327,8 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <canvas id="viewport"></canvas><div id="selectionMarquee"></div>
 <div id="prefabModal" hidden role="region" aria-labelledby="prefabGalleryTitle" data-inline-gallery="true">
  <div id="prefabDialog">
-  <div class="modal-head"><h2 id="prefabGalleryTitle">Catálogo de estructuras GLB</h2><button type="button" id="closePrefabGallery" aria-label="Contraer catálogo">− Ocultar</button></div>
-  <p class="hint">Estas vistas previas provienen de los cuatro archivos GLB del repositorio, no de imágenes inventadas. Selecciona el ángulo y después toca el modelo que quieras colocar.</p>
+  <div class="modal-head"><h2 id="prefabGalleryTitle">Catálogo de objetos</h2><button type="button" id="closePrefabGallery" aria-label="Contraer catálogo">− Ocultar</button></div>
+  <p class="hint">Modelos 3D del repositorio. Selecciona un ángulo y el objeto que quieras colocar.</p>
   <div class="modal-view-tabs" role="group" aria-label="Ángulo de vista previa">
    <button type="button" data-preview-view="iso" aria-pressed="true">Perspectiva 3D</button>
    <button type="button" data-preview-view="front" aria-pressed="false">Frente</button>
@@ -343,13 +336,8 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
    <button type="button" data-preview-view="back" aria-pressed="false">Atrás</button>
    <button type="button" data-preview-view="top" aria-pressed="false">Arriba</button>
   </div>
-  <div id="prefabCards">
-   <button type="button" class="prefab-card" data-prefab-choice="mountain"><img data-prefab-preview="mountain" alt="Vista previa 3D de montaña"><strong>Montaña</strong><span data-prefab-message="mountain">Preparando vista previa…</span></button>
-   <button type="button" class="prefab-card" data-prefab-choice="rocky-cave"><img data-prefab-preview="rocky-cave" alt="Vista previa 3D de cueva rocosa"><strong>Cueva rocosa</strong><span data-prefab-message="rocky-cave">Preparando vista previa…</span></button>
-   <button type="button" class="prefab-card" data-prefab-choice="stone-cave"><img data-prefab-preview="stone-cave" alt="Vista previa 3D de cueva de piedra"><strong>Cueva de piedra</strong><span data-prefab-message="stone-cave">Preparando vista previa…</span></button>
-   <button type="button" class="prefab-card" data-prefab-choice="stylized-cave"><img data-prefab-preview="stylized-cave" alt="Vista previa 3D de cueva estilizada"><strong>Cueva estilizada</strong><span data-prefab-message="stylized-cave">Preparando vista previa…</span></button>
-  </div>
-  <div class="modal-foot">Haz clic en una estructura para prepararla y después colócala sobre el escenario. Las vistas previas son de los GLB reales.</div>
+  <div id="prefabCards"></div>
+  <div class="modal-foot">Selecciona un objeto y colócalo sobre el escenario.</div>
  </div>
 </div>
 <section id="transformConstraints" hidden aria-label="Restricciones de transformación">
@@ -450,5 +438,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.159').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.160').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
