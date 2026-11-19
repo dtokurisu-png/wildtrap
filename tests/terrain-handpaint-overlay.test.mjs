@@ -14,7 +14,7 @@ assert.equal(HANDPAINT_SOURCE,'./assets/terrain/texturas/terreno_handpaint_10K.p
 assert.equal(HANDPAINT_GPU_SOURCE,'./assets/terrain/texturas/terreno_handpaint_4K.webp');
 assert.equal(HANDPAINT_OPACITY,.5,'Requested Overlay layer opacity must be exactly 50%');
 assert.equal(HANDPAINT_CONTRAST,.45,'Compress source brush contrast');
-assert.equal(HANDPAINT_GPU_MAX_SIZE,4096);
+assert.equal(HANDPAINT_GPU_MAX_SIZE,3072);
 assert.equal(HANDPAINT_EDGE_FADE,.06);
 assert.equal(HANDPAINT_SLOPE_START,.70);assert.equal(HANDPAINT_SLOPE_END,.86);
 for(const c of [0,.1,.3,.5,.7,1]){
@@ -35,7 +35,7 @@ assert.equal(handpaintSlopeFade(.6),0,'No painted very steep wall');
 assert.equal(handpaintSlopeFade(1),1,'Paint visible on horizontal ground');
 assert.match(gpu,/const GLOBAL_HANDPAINT_GLSL=/);
 assert.match(gpu,/paintOverlayColor\(mix\(ground,wallGround,wallMix\)\)/);
-assert.match(gpu,/paintOverlayColor\(premultiplied\/max\(combinedAlpha/);
+assert.doesNotMatch(gpu,/paintOverlayColor\(premultiplied\/max\(combinedAlpha/,'Keep detail patches untouched and cheap');
 assert.match(gpu,/vTerrainWorld\.x\/630\.0/);
 assert.match(gpu,/vTerrainWorld\.z\/630\.0/);
 assert.match(gpu,/dFdx\(vTerrainWorld\)/);
