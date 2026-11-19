@@ -1,4 +1,4 @@
-import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.155';
+import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.170';
 import {BIOMES,ensureBiomeTextureDefaults} from './editor-biome-textures.mjs?v=0.9.123';
 export function createTerrainTexturePainter({scene,terrain,renderer,material,intangibleMaterial,live,toast,isTesting=()=>false,getTextureAssetUrl=url=>url,getHandpaintTexture=()=>null}){
  const status=document.getElementById('textureRenderStatus'),gpuLayers=createTerrainGPULayers({scene,terrain,renderer});
@@ -24,6 +24,9 @@ export function createTerrainTexturePainter({scene,terrain,renderer,material,int
   const widths=Object.values(live.biomeMaterials||{}).map(m=>Number(m?.edgeBlend)||0);
   const transitionWorld=Math.max(16,...widths);
   gpuLayers.build({zones:live.zones||[],materials:live.biomeMaterials,loaded,enabled,transitionWorld});
+  // The renderer owns downscaled GPU source canvases. Release enormous original PNG
+  // Image objects after building the mobile terrain layers.
+  if(mobile){loaded.clear();cache.clear();}
   if(status)status.textContent=gpuLayers.count()?'Suelos base intactos · capas complementarias independientes · '+gpuLayers.count()+' capas GPU.':'Sin texturas de terreno para las zonas asignadas.';apply()}
  function apply(){terrain.material=live.settings?.terrainIntangible&&!isTesting()?intangibleMaterial:material;gpuLayers.sync(enabled&&!(live.settings?.terrainIntangible&&!isTesting()))}
  function schedule(){clearTimeout(timer);timer=setTimeout(()=>{void bake().catch(e=>toast('Error al generar texturas: '+e.message))},180)}
