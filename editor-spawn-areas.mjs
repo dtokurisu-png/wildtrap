@@ -197,7 +197,7 @@ export function createSpawnAreasEditor({scene,terrain,view,camera,live,heightAt,
   if(n.kind==='characterSpawn'){delete n.playerSlot;n.npcId=n.npcId||''}else delete n.npcId;
   syncPlayerSlots();persist();refresh();
  };
- function setVisible(){if(!isActive()){pending=[];hover=null;pressed=null}refresh()}
+ function setVisible(activeMode){if(activeMode==='spawnPoint')mode='point';else if(activeMode==='spawnArea')mode='area';else {pending=[];hover=null;pressed=null}refresh()}
  refresh();
  return {refresh,setVisible};
 }
