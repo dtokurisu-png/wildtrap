@@ -1,4 +1,4 @@
-import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.152';
+import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.153';
 import {BIOMES,ensureBiomeTextureDefaults} from './editor-biome-textures.mjs?v=0.9.123';
 export function createTerrainTexturePainter({scene,terrain,material,intangibleMaterial,live,toast,isTesting=()=>false,getTextureAssetUrl=url=>url,getHandpaintTexture=()=>null}){
  const status=document.getElementById('textureRenderStatus'),gpuLayers=createTerrainGPULayers({scene,terrain});
@@ -25,5 +25,6 @@ export function createTerrainTexturePainter({scene,terrain,material,intangibleMa
  return {schedule,apply,invalidateTextureImages,setEnabled,dispose,
   setHandpaintTexture:texture=>gpuLayers.setHandpaintTexture(texture),
   setHandpaintSettings:settings=>gpuLayers.setHandpaintSettings(settings),
+  setBiomeColorSettings:(biome,settings)=>gpuLayers.setBiomeColorSettings(biome,settings),
   getHandpaintState:()=>gpuLayers.getHandpaintState()};
 }
