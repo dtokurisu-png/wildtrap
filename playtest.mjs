@@ -379,5 +379,5 @@ const hiddenDebugMarkers=[];
   return true;
  }
  function setJoystick(x,y){joystickX=clamp(Number(x)||0,-1,1);joystickY=clamp(Number(y)||0,-1,1)}
- return {start,stop,frame,resize,fromFile,teleport,setJoystick,get active(){return active},get busy(){return busy},get sourceError(){return sourceError},get shadowFocus(){return active?player.position:null},get shadowMoving(){return active&&walkWanted}};
+ return {start,stop,frame,resize,fromFile,teleport,setJoystick,getPosition:()=>({x:player.position.x,y:player.position.y,z:player.position.z}),get active(){return active},get busy(){return busy},get sourceError(){return sourceError},get shadowFocus(){return active?player.position:null},get shadowMoving(){return active&&walkWanted}};
 }
