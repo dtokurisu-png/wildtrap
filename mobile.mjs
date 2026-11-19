@@ -85,8 +85,8 @@ async function main(){
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.shadowMap.enabled=false;
   const scene=new THREE.Scene();scene.background=new THREE.Color('#789f9f');
-  scene.add(new THREE.HemisphereLight(0xf1f5e5,0x53634a,2.2));
-  const sun=new THREE.DirectionalLight(0xffe5c0,2.0);sun.position.set(-280,600,250);scene.add(sun);
+  const sky=new THREE.HemisphereLight(0xf1f5e5,0x53634a,2.2);sky.layers.enable(1);scene.add(sky);
+  const sun=new THREE.DirectionalLight(0xffe5c0,2.0);sun.layers.enable(1);sun.position.set(-280,600,250);scene.add(sun);
   const n=world.resolution,geo=new THREE.PlaneGeometry(SIZE,SIZE,n-1,n-1);
   geo.rotateX(-Math.PI/2);
   const pos=geo.getAttribute('position');
