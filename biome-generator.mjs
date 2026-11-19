@@ -12,7 +12,7 @@ const keyPair=(a,b)=>[a,b].sort().join(':');
 // physical compass position: the map's east/west labels were interchanged.
 export function isMountainExcludedZone(zone){
  const label=String(zone?.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
- return /^(?:zona[\\s_-]+)?oeste(?:[\\s_-]+\\d+)?$/.test(label);
+ return /^(?:zona[\s_-]+)?oeste(?:[\s_-]+\d+)?$/.test(label);
 }
 
 export function normalizeBiomeGenerator(data){
