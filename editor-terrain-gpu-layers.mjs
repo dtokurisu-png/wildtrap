@@ -208,7 +208,7 @@ function fullResolutionSource(image,limit=4096){
 }
 export function createTerrainGPULayers({scene,terrain,renderer}){
  const maxSize=renderer?.capabilities?.maxTextureSize||4096;
- const textureLimit=Math.max(512,Math.min(maxSize,(typeof navigator!=='undefined'&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)))?1024:4096));
+ const textureLimit=Math.max(512,Math.min(maxSize,(typeof navigator!=='undefined'&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)))?1024:(new URLSearchParams(location.search).has('hdTextures')?4096:2048)));
  let records=[],shadowMesh=null,shadowMaterial=null;
  // A single shared art GPU texture/uniform group for all biome materials.
  const artUniforms={
