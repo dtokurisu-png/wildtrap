@@ -2213,30 +2213,33 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.151');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.152');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl,getHandpaintTexture:()=>handpaintOverlay.getTexture()});
   window.__terrainTexturePainter=terrainPainter;
   // World painting controls update the shared biome shader uniforms directly,
   // with no rebuild, extra draw pass, or change to project geometry.
-  const rotationInput=$('handpaintRotation'),opacityInput=$('handpaintOpacity'),blendModeInput=$('handpaintBlendMode');
+  const rotationInput=$('handpaintRotation'),opacityInput=$('handpaintOpacity'),blendModeInput=$('handpaintBlendMode'),contrastInput=$('handpaintContrast');
   let savedPainting={};
   try{savedPainting=JSON.parse(localStorage.getItem('wildtrap-handpaint-controls-v1')||'{}')||{}}catch(_){}
-  if(rotationInput&&opacityInput&&blendModeInput){
+  if(rotationInput&&opacityInput&&blendModeInput&&contrastInput){
    rotationInput.value=String(Math.max(0,Math.min(360,Number.isFinite(Number(savedPainting.rotation))&&savedPainting.rotation!==undefined?Number(savedPainting.rotation):180)));
    opacityInput.value=String(Math.max(0,Math.min(100,Number.isFinite(Number(savedPainting.opacity))?Number(savedPainting.opacity):90)));
    blendModeInput.value=String(Number.isInteger(Number(savedPainting.blendMode))&&savedPainting.blendMode!==undefined&&Number(savedPainting.blendMode)>=0&&Number(savedPainting.blendMode)<=7?Number(savedPainting.blendMode):3);
+   contrastInput.value=String(Math.max(0,Math.min(400,Number.isFinite(Number(savedPainting.contrast))&&savedPainting.contrast!==undefined?Number(savedPainting.contrast):160)));
    const applyPainting=()=>{
-    const rotation=Number(rotationInput.value),opacity=Number(opacityInput.value),blendMode=Number(blendModeInput.value);
+    const rotation=Number(rotationInput.value),opacity=Number(opacityInput.value),blendMode=Number(blendModeInput.value),contrast=Number(contrastInput.value);
     $('handpaintRotationValue').textContent=rotation+'°';
     $('handpaintOpacityValue').textContent=opacity+' %';
-    terrainPainter?.setHandpaintSettings({rotation,opacity:opacity/100,blendMode});
-    try{localStorage.setItem('wildtrap-handpaint-controls-v1',JSON.stringify({rotation,opacity,blendMode}))}catch(_){}
+    $('handpaintContrastValue').textContent=contrast+' %';
+    terrainPainter?.setHandpaintSettings({rotation,opacity:opacity/100,blendMode,contrast:contrast/100});
+    try{localStorage.setItem('wildtrap-handpaint-controls-v1',JSON.stringify({rotation,opacity,blendMode,contrast}))}catch(_){}
    };
    rotationInput.addEventListener('input',applyPainting);
    opacityInput.addEventListener('input',applyPainting);
    blendModeInput.addEventListener('change',applyPainting);
+   contrastInput.addEventListener('input',applyPainting);
    applyPainting();
   }
   const toggle=$('textureShow');
