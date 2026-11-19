@@ -26,6 +26,7 @@ uniform sampler2D sceneDepth;
 uniform sampler2D artTexture;
 uniform vec2 screenSize;
 uniform float opacity;
+uniform float debugMode;
 varying vec2 vArtUV;
 vec3 hardLight(vec3 base,vec3 paint){
  vec3 multiply=2.0*base*paint;
@@ -43,10 +44,12 @@ void main(){
  float visibleDepth=texture2D(sceneDepth,screenUV).r;
  // Do not paint across nearer objects or scene openings. The terrain here is
  // the exact original mesh, with the same cuts and heightmapped geometry.
- if(visibleDepth>=0.999999||abs(gl_FragCoord.z-visibleDepth)>0.00006)discard;
+ if(debugMode<1.5 && (visibleDepth>=0.999999||abs(gl_FragCoord.z-visibleDepth)>0.00006))discard;
+ if(debugMode>2.5){gl_FragColor=vec4(1.0,0.0,1.0,1.0);return;}
  if(vArtUV.x<0.0||vArtUV.y<0.0||vArtUV.x>1.0||vArtUV.y>1.0)discard;
  vec4 art=texture2D(artTexture,vArtUV);
  if(art.a<0.001)discard;
+ if(debugMode>1.5){gl_FragColor=vec4(0.0,1.0,0.0,1.0);return;}
  vec3 sceneLinear=texture2D(sceneColor,screenUV).rgb;
  vec3 sceneSRGB=toSRGB(sceneLinear);
  vec3 paintSRGB=toSRGB(art.rgb);
@@ -87,7 +90,8 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
    sceneDepth:{value:rt.depthTexture},
    artTexture:{value:null},
    screenSize:{value:new THREE.Vector2(1,1)},
-   opacity:{value:HANDPAINT_OPACITY}
+   opacity:{value:HANDPAINT_OPACITY},
+   debugMode:{value:0}
   },
   vertexShader:ART_VERTEX,fragmentShader:ART_FRAGMENT,
   side:THREE.DoubleSide,
@@ -178,6 +182,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
    renderer.setRenderTarget(previousTarget);
   }
  }
+ function setDebugMode(n){shader.uniforms.debugMode.value=n}
  function getState(){
   return {enabled,ready,mode:'hard-light',transparency:0.35,opacity:HANDPAINT_OPACITY,
    source:HANDPAINT_SOURCE,loadedSource,sourceWidth,sourceHeight,
@@ -191,5 +196,5 @@ export function createTerrainHandpaintOverlay({renderer,scene,terrain,getTexture
   shader.dispose();quadMaterial.dispose();quad.geometry.dispose();
   rt.dispose();
  }
- return {render,getState,dispose};
+ return {render,getState,setDebugMode,dispose};
 }
