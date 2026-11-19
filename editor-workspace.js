@@ -222,7 +222,7 @@
   for(const section of toolViews.querySelectorAll('.workspace-section'))section.hidden=section.dataset.workspaceContent!==key;
   activateTab('tools');
   if(triggerTool){
-   const mode={project:'move',sculpt:'raise',knife:'holePaint',zones:'zones',textures:'textures',spawns:'playerSpawn',structures:'move'}[key];
+   const mode={project:'move',sculpt:'raise',knife:'holePaint',zones:'zones',textures:'textures',spawns:'spawnArea',structures:'move'}[key];
    if(mode)document.querySelector('[data-tool="'+mode+'"]')?.click();
   }
   saveLayout();
