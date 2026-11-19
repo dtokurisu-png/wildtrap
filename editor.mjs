@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {cliffShadowFaceIndices} from './terrain-shadow-geometry.mjs';
-import {createTerrainHandpaintOverlay} from './terrain-handpaint-overlay.mjs?v=0.9.148';
+import {createTerrainHandpaintOverlay} from './terrain-handpaint-overlay.mjs?v=0.9.149';
 import {explorerShadowDue} from './explorer-shadow-cadence.mjs';
 // El editor de zonas se carga después del motor principal; un módulo opcional no bloquea la apertura.
 import {createSceneObjectManager} from './scene-object-manager.mjs?v=0.9.17';
@@ -190,9 +190,11 @@ const live={version:3,size:SIZE,resolution:N,heights:Array(COUNT).fill(0),nodes:
 let holesEditor=null,vertexEditor=null,terrainVertexEditor=null,terrainInspector=null,objectMeshOverlays=null,zoneTool=null,textureTool=null,terrainPainter=null,cliffHeightTool=null,biomeGeneratorTool=null,playerSpawnPanel=null,testingScene=false;
 let textureRevisionWatcher=null;
 const getTextureAssetUrl=url=>revisionedTextureUrl(url,textureRevisionWatcher?.getRevision()||'editor-0.9.107');
-// One projected Hard Light painting covering the whole terrain, composited
-// AFTER biome/cliff textures and after real shadows, without painting GLBs.
+// Load one world-aligned art texture and attach it directly to EXISTING
+// terrain-biome shaders. No extra framebuffer, render pass, depth test, or
+// postprocessing at low camera angles. Do not change world/hero shadows.
 const handpaintOverlay=createTerrainHandpaintOverlay({renderer,scene,terrain,getTextureAssetUrl});
+handpaintOverlay.subscribe(texture=>terrainPainter?.setHandpaintTexture(texture));
 window.__terrainHandpaintOverlay=handpaintOverlay;
 // Modo seguro usa otro espacio local: nunca sobreescribe el proyecto habitual.
 const flags=new URLSearchParams(location.search);
@@ -2211,10 +2213,10 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.143');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.149');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
-   getTextureAssetUrl});
+   getTextureAssetUrl,getHandpaintTexture:()=>handpaintOverlay.getTexture()});
   window.__terrainTexturePainter=terrainPainter;
   const toggle=$('textureShow');
   toggle.checked=live.settings?.biomeTexturesVisible!==false;
