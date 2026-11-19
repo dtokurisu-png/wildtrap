@@ -1,97 +1,83 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Global hard-light 10K artwork smoke</title></head>
-<body data-result="PENDING"><div id="result">Cargando la capa mundial handpaint 10K…</div>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Single-pass worldwide Overlay 50%</title></head>
+<body data-result="PENDING"><div id="result">Comprobando Superposición 50 % en terreno...</div>
 <script>
-const fail=msg=>{document.body.dataset.result='FAIL';document.querySelector('#result').textContent=String(msg)};
+const fail=message=>{document.body.dataset.result='FAIL';document.getElementById('result').textContent=String(message)};
 try{
  const N=129,H=Array(N*N).fill(0);
  for(let z=0;z<N;z++)for(let x=0;x<N;x++)H[z*N+x]=x<64?35:0;
- const draft={version:3,size:630,resolution:N,heights:H,nodes:[],objectGroups:[],holes:[],cuts3d:[],
-  zones:[{id:'all',name:'Terreno completo',biomeId:'plains',points:[{x:-312,z:-312},{x:312,z:-312},{x:312,z:312},{x:-312,z:312}]}],
-  nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
+ const draft={version:3,size:630,resolution:N,heights:H,nodes:[],holes:[],cuts3d:[],
+  zones:[{id:'all',name:'Pradera',biomeId:'plains',
+    points:[{x:-312,z:-312},{x:312,z:-312},{x:312,z:312},{x:-312,z:312}]}],
+  objectGroups:[],nextId:1,settings:{heightMax:120,biomeTexturesVisible:true}};
  localStorage.setItem('wildtrap-editor-draft-safe-v1',JSON.stringify(draft));
  const frame=document.createElement('iframe');
  frame.width=800;frame.height=580;frame.src='../?safe=1&noShadows=1&handpaint=1';
  document.body.append(frame);
  const started=Date.now();
- let tested=false;
  const timer=setInterval(()=>{
   const w=frame.contentWindow,d=frame.contentDocument;
-  const tool=w?.__terrainHandpaintOverlay;
-  const state=tool?.getState?.();
-  if(!d?.querySelector('#boot[hidden]')||!state?.ready||!w?.__wildtrapDiagnostics){
-   if(state?.error){clearInterval(timer);fail('No se cargó el arte original: '+state.error);return;}
-   if(Date.now()-started>85000){clearInterval(timer);fail('Carga del arte: '+JSON.stringify(state)+' · Boot: '+(d?.getElementById('bootMsg')?.textContent||''));}
+  const tool=w?.__terrainHandpaintOverlay,painter=w?.__terrainTexturePainter;
+  const state=tool?.getState?.(),materials=painter?.getHandpaintState?.();
+  if(!d?.querySelector('#boot[hidden]')||!state?.ready||!materials?.enabled||!materials?.materials){
+   if(state?.error){clearInterval(timer);fail('Carga de imagen: '+state.error);return}
+   if(Date.now()-started>85000){clearInterval(timer);fail('No se activaron materiales de terreno con pintura: '+JSON.stringify({state,materials,boot:d?.getElementById('bootMsg')?.textContent}))}
    return;
   }
-  if(tested)return;tested=true;
+  clearInterval(timer);
   try{
    const {renderer,scene,getCamera}=w.__wildtrapDiagnostics;
-   const camera=getCamera();
-   const canvas=renderer.domElement;
    const gl=renderer.getContext();
+   const camera=getCamera(),canvas=renderer.domElement;
    const W=canvas.width,H=canvas.height;
-   const normal=new Uint8Array(W*H*4),painted=new Uint8Array(W*H*4);
-   renderer.setRenderTarget(null);
-   renderer.render(scene,camera);
-   gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,normal);
-   tool.render(camera);
-   gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,painted);
-   let delta=0,affected=0;
-   for(let i=0;i<normal.length;i+=4){
-    const d=Math.abs(normal[i]-painted[i])+Math.abs(normal[i+1]-painted[i+1])+Math.abs(normal[i+2]-painted[i+2]);
-    if(d>12)affected++;
-    delta+=d;
+   const previousPos=camera.position.clone(),previousQuat=camera.quaternion.clone();
+   function compare(){
+    tool.setActive(false);
+    renderer.render(scene,camera);
+    const normal=new Uint8Array(W*H*4);
+    gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,normal);
+    const unpaintedCalls=renderer.info.render.calls;
+    tool.setActive(true);
+    renderer.render(scene,camera);
+    const painted=new Uint8Array(W*H*4);
+    gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,painted);
+    const paintedCalls=renderer.info.render.calls;
+    let changed=0,delta=0,brightDrop=0;
+    for(let i=0;i<normal.length;i+=4){
+     const diff=Math.abs(normal[i]-painted[i])+Math.abs(normal[i+1]-painted[i+1])+Math.abs(normal[i+2]-painted[i+2]);
+     delta+=diff;
+     if(diff>3){changed++;brightDrop+=(normal[i]-painted[i])+(normal[i+1]-painted[i+1])+(normal[i+2]-painted[i+2]);}
+    }
+    return {changed,delta,unpaintedCalls,paintedCalls,brightDrop};
    }
+   const overhead=compare();
+   camera.position.set(90,14,125);
+   camera.lookAt(90,0,-70);camera.updateMatrixWorld(true);
+   const low=compare();
+   camera.position.copy(previousPos);camera.quaternion.copy(previousQuat);camera.updateMatrixWorld(true);
    let programErrors=[];
    try{
     programErrors=(renderer.info.programs||[]).map(p=>({
-     name:p.name||'anon',id:p.id,linked:gl.getProgramParameter(p.program,gl.LINK_STATUS),
-     error:gl.getProgramInfoLog(p.program),
+     name:p.name||'unnamed',id:p.id,linked:gl.getProgramParameter(p.program,gl.LINK_STATUS),
+     message:gl.getProgramInfoLog(p.program),
      fragmentError:p.fragmentShader?gl.getShaderInfoLog(p.fragmentShader):''
-    })).filter(p=>!p.linked||p.error);
+    })).filter(p=>!p.linked||p.message);
    }catch(e){programErrors=[{exception:String(e)}]}
-   // Reproduce a near-player viewpoint, rather than only checking overhead.
-   const oldPosition=camera.position.clone(),oldQuaternion=camera.quaternion.clone();
-   camera.position.set(90,14,125);
-   camera.lookAt(90,0,-70);
-   camera.updateMatrixWorld(true);
-   const lowNormal=new Uint8Array(W*H*4),lowPainted=new Uint8Array(W*H*4);
-   renderer.render(scene,camera);
-   gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,lowNormal);
-   tool.render(camera);
-   gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,lowPainted);
-   let lowAffected=0,lowDelta=0;
-   for(let i=0;i<lowNormal.length;i+=4){
-    const d=Math.abs(lowNormal[i]-lowPainted[i])+
-      Math.abs(lowNormal[i+1]-lowPainted[i+1])+
-      Math.abs(lowNormal[i+2]-lowPainted[i+2]);
-    if(d>12)lowAffected++;
-    lowDelta+=d;
-   }
-   camera.position.copy(oldPosition);
-   camera.quaternion.copy(oldQuaternion);
-   camera.updateMatrixWorld(true);
-   const ready=tool.getState();
-   const pass=ready.mode==='dark-only'&&ready.whiteIsNeutral===true&&
-    ready.cliffsExcluded===true&&ready.grazingAngleDepthTolerance===true&&
-    ready.edgeFadeFraction===.06&&ready.transparency===.35&&ready.opacity===.65&&
-    ready.gpuWidth>0&&ready.gpuWidth<=4096&&ready.gpuHeight>0&&ready.gpuHeight<=4096&&
-    Math.max(ready.sourceWidth,ready.sourceHeight)>=4096&&
-    ready.loadedSource.includes('terreno_handpaint_4K.webp')&&
-    ready.depthOcclusion&&ready.terrainGeometryLinked&&
-    ready.frames>0&&programErrors.length===0&&
-    delta>W*H*4&&affected>W*H*0.08&&
-    lowDelta>W*H*0.25&&lowAffected>W*H*0.008;
-   clearInterval(timer);
+   const final=tool.getState(),detail=painter.getHandpaintState();
+   const pass=programErrors.length===0&&
+    final.mode==='overlay'&&final.opacity===.5&&final.singleSceneRender&&
+    final.extraRenderTargets===0&&final.loadedSource.includes('terreno_handpaint_4K.webp')&&
+    detail.enabled&&detail.materials>0&&
+    overhead.changed>W*H*.008&&low.changed>W*H*.001&&
+    overhead.paintedCalls===overhead.unpaintedCalls&&low.paintedCalls===low.unpaintedCalls;
    document.body.dataset.result=pass?'PASS':'FAIL';
-   document.querySelector('#result').textContent=(pass?'PASS':'FAIL')+
-    ': arte '+ready.sourceWidth+'×'+ready.sourceHeight+
-    ', GPU '+ready.gpuWidth+'×'+ready.gpuHeight+
-    ', transparencia '+Math.round(ready.transparency*100)+
-    '%, pixeles modificados '+affected+', delta '+delta+
-    ', cobertura '+Math.round(100*affected/(W*H))+'%, cámara baja '+Math.round(100*lowAffected/(W*H))+
-    '% ('+lowAffected+' píxeles, delta '+lowDelta+'), pant. '+W+'×'+H+', programs '+JSON.stringify(programErrors)+', error '+ready.error;
-  }catch(e){clearInterval(timer);fail(e.stack||e)}
+   document.getElementById('result').textContent=(pass?'PASS':'FAIL')+
+    ': materiales '+detail.materials+
+    ', vista normal '+overhead.changed+' píxeles (delta '+overhead.delta+')'+
+    ', cámara baja '+low.changed+' píxeles (delta '+low.delta+')'+
+    ', draws normal/con efecto '+overhead.unpaintedCalls+'/'+overhead.paintedCalls+
+    ', GPU '+final.gpuWidth+'x'+final.gpuHeight+
+    ', error de shader '+JSON.stringify(programErrors);
+  }catch(e){fail(e.stack||e)}
  },500);
 }catch(e){fail(e.stack||e)}
 </script></body></html>
