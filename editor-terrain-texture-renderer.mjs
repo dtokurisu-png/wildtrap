@@ -1,11 +1,11 @@
 import {createTerrainGPULayers} from './editor-terrain-gpu-layers.mjs?v=0.9.155';
 import {BIOMES,ensureBiomeTextureDefaults} from './editor-biome-textures.mjs?v=0.9.123';
-export function createTerrainTexturePainter({scene,terrain,material,intangibleMaterial,live,toast,isTesting=()=>false,getTextureAssetUrl=url=>url,getHandpaintTexture=()=>null}){
- const status=document.getElementById('textureRenderStatus'),gpuLayers=createTerrainGPULayers({scene,terrain});
+export function createTerrainTexturePainter({scene,terrain,renderer,material,intangibleMaterial,live,toast,isTesting=()=>false,getTextureAssetUrl=url=>url,getHandpaintTexture=()=>null}){
+ const status=document.getElementById('textureRenderStatus'),gpuLayers=createTerrainGPULayers({scene,terrain,renderer});
  gpuLayers.setHandpaintTexture(getHandpaintTexture());
  const cache=new Map(),loaded=new Map();let enabled=true,timer=0,generation=0;
  function decode(url){if(!url)return Promise.resolve(null);if(cache.has(url))return cache.get(url);
-  const result=new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>resolve(null);img.src=getTextureAssetUrl(url)});cache.set(url,result);return result}
+  const result=new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>{console.warn('WildTrap: imagen de terreno inaccesible:',url);resolve(null)};img.src=getTextureAssetUrl(url)});cache.set(url,result);return result}
  async function bake(){const ticket=++generation;if(!enabled)return;
   // Restore missing texture slot defaults before GPU layer construction.
   if(!live.biomeMaterials||!BIOMES.every(b=>live.biomeMaterials[b.id]?.slots?.ground))
