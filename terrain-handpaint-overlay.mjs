@@ -19,7 +19,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,getTextureAssetUrl
  let error='',loadedSource='',frames=0;
 
  report(enabled?
-  'Capa hand-painted · Superposición 50 %: preparando material del terreno…':
+  'Capa hand-painted: preparando material del terreno…':
   'Capa hand-painted: desactivada (modo seguro o comparación)');
 
  function notify(){
@@ -67,7 +67,7 @@ export function createTerrainHandpaintOverlay({renderer,scene,getTextureAssetUrl
     paintTexture.needsUpdate=true;
     ready=true;
     notify(); // Existing biome materials receive the texture immediately.
-    report('Capa hand-painted: ACTIVA · Superposición 50 % · sin acantilados');
+    report('Capa hand-painted: ACTIVA · opacidad y rotación ajustables · sin acantilados');
    }catch(err){
     error=err?.message||String(err);
     report('Capa hand-painted: error al preparar el material');
@@ -98,8 +98,8 @@ export function createTerrainHandpaintOverlay({renderer,scene,getTextureAssetUrl
   active=Boolean(value);
   notify();
   report(!active?'Capa hand-painted: desactivada temporalmente (comparación)':
-   ready?'Capa hand-painted: ACTIVA · Superposición 50 % · sin acantilados':
-   'Capa hand-painted · Superposición 50 %: preparando material del terreno…');
+   ready?'Capa hand-painted: ACTIVA · opacidad y rotación ajustables · sin acantilados':
+   'Capa hand-painted: preparando material del terreno…');
  }
  function getState(){
   return {enabled,ready,active,mode:'overlay',opacity:HANDPAINT_OPACITY,transparency:1-HANDPAINT_OPACITY,
