@@ -145,6 +145,39 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 </section>
 
 <section id="playerSpawnsPanel">
+<h2>Spawns</h2>
+<div class="grid2">
+<button id="spawnCreatePoint" data-tool="spawnPoint" type="button">⌖ Personaje</button>
+<button id="spawnCreateArea" data-tool="spawnArea" type="button">◇ Área</button>
+</div>
+<div class="grid2" style="margin-top:6px">
+<button id="spawnCancelArea" type="button">Cancelar contorno</button>
+<button id="spawnDeleteSelected" type="button">Eliminar seleccionado</button>
+</div>
+<small id="spawnDrawingStatus">Sin spawns.</small>
+<h2>Spawns de personajes</h2>
+<div id="spawnPointList"></div>
+<div id="spawnPointProperties" hidden>
+<label>Tipo<select id="spawnPointType"><option value="player">Jugador</option><option value="npc">NPC</option></select></label>
+<div id="spawnNpcPicker" hidden><label>NPC<select id="spawnNpcType" disabled><option value="">No hay NPC registrados</option></select></label></div>
+</div>
+<h2>Áreas de spawn</h2>
+<div id="spawnAreaList"></div>
+<div id="spawnAreaProperties" hidden>
+<label>Nombre<input id="spawnAreaName" maxlength="80"></label>
+<label>Tipo<select id="spawnAreaType">
+<optgroup label="Normales">
+<option value="trees">Árboles</option><option value="grass">Hierbas y monte</option><option value="plants">Plantas</option><option value="rocks">Rocas</option><option value="objects">Objetos</option>
+</optgroup><optgroup label="Especiales">
+<option value="river">Río</option><option value="swamp">Pantano</option><option value="lake">Lago</option><option value="oasis">Oasis</option><option value="dune">Duna</option><option value="mountain">Montaña</option>
+</optgroup></select></label>
+<label>Bioma<select id="spawnAreaBiome">
+<option value="any">Todos los biomas</option><option value="forest">Bosque</option><option value="plains">Llanura</option><option value="desert">Desierto</option><option value="swamp">Pantano</option><option value="mountain">Montañoso</option>
+</select></label>
+<label>Intensidad <output id="spawnAreaDensityValue">40%</output>
+<input id="spawnAreaDensity" type="range" min="0" max="100" step="5" value="40"></label>
+</div>
+<div hidden id="legacySpawnControls">
 <h2>⌖ Spawns y enemigos</h2>
 <button data-tool="playerSpawn" type="button" style="width:100%">⌖ Colocar spawn del jugador</button>
 <p class="hint">Define hasta seis puntos de aparición. Los marcadores son posiciones de referencia: cada personaje se crea al entrar a la partida, no durante la edición.</p>
@@ -177,6 +210,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
 <p class="hint">Spawn árbol, Spawn muro y Respawn ahora están aquí. El modo Probar prioriza la posición del jugador 1; si todavía no existe, conserva el Respawn antiguo.</p>
 <h2>Enemigos</h2>
 <p class="hint">Las reglas de enemigos por bioma se configurarán al completar el biosistema. Los spawns de jugadores ya pueden utilizarse para explorar el mapa.</p>
+</div>
 </section>
 <button data-tool="textures" type="button" hidden aria-hidden="true" tabindex="-1"></button>
 <section id="texturePanel">
@@ -450,5 +484,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.161').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.163').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
