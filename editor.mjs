@@ -2213,11 +2213,30 @@ async function initializeCliffHeightTool(){
 void initializeCliffHeightTool();
 async function initializeTerrainPainter(){
  try{
-  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.149');
+  const {createTerrainTexturePainter}=await import('./editor-terrain-texture-renderer.mjs?v=0.9.150');
   terrainPainter=createTerrainTexturePainter({scene,terrain,terrainGeo,material,intangibleMaterial:intangibleTerrainMaterial,live,toast,
    isTesting:()=>testingScene,isHoleAt:(x,y,z)=>holesEditor?.isHoleAt(x,z,y)||false,
    getTextureAssetUrl,getHandpaintTexture:()=>handpaintOverlay.getTexture()});
   window.__terrainTexturePainter=terrainPainter;
+  // World painting controls update the shared biome shader uniforms directly,
+  // with no rebuild, extra draw pass, or change to project geometry.
+  const rotationInput=$('handpaintRotation'),opacityInput=$('handpaintOpacity');
+  let savedPainting={};
+  try{savedPainting=JSON.parse(localStorage.getItem('wildtrap-handpaint-controls-v1')||'{}')||{}}catch(_){}
+  if(rotationInput&&opacityInput){
+   rotationInput.value=String(Math.max(0,Math.min(360,Number(savedPainting.rotation) || 180)));
+   opacityInput.value=String(Math.max(0,Math.min(100,Number.isFinite(Number(savedPainting.opacity))?Number(savedPainting.opacity):90)));
+   const applyPainting=()=>{
+    const rotation=Number(rotationInput.value),opacity=Number(opacityInput.value);
+    $('handpaintRotationValue').textContent=rotation+'°';
+    $('handpaintOpacityValue').textContent=opacity+' %';
+    terrainPainter?.setHandpaintSettings({rotation,opacity:opacity/100});
+    try{localStorage.setItem('wildtrap-handpaint-controls-v1',JSON.stringify({rotation,opacity}))}catch(_){}
+   };
+   rotationInput.addEventListener('input',applyPainting);
+   opacityInput.addEventListener('input',applyPainting);
+   applyPainting();
+  }
   const toggle=$('textureShow');
   toggle.checked=live.settings?.biomeTexturesVisible!==false;
   toggle.onchange=()=>{snapshot();live.settings.biomeTexturesVisible=toggle.checked;terrainPainter?.setEnabled(toggle.checked);cliffHeightTool?.setColorsVisible(toggle.checked);persist();draw()};
