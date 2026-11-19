@@ -173,6 +173,7 @@ body.testing #toast{left:16px;bottom:75px;z-index:9}
  <div style="display:flex;align-items:center;justify-content:space-between"><strong>Capa pintada</strong><button type="button" class="infoHelp" title="Rotación: orienta la imagen sobre el mapa. Opacidad: intensidad de la superposición en el terreno, sin alterar las texturas originales." aria-label="Ayuda de capa pintada" style="padding:2px 7px">ⓘ</button></div>
  <label style="display:flex;align-items:center;gap:8px;margin-top:7px">Rotación <input id="handpaintRotation" type="range" min="0" max="360" step="1" value="180" style="flex:1;min-width:65px"><output id="handpaintRotationValue" for="handpaintRotation" style="min-width:39px;text-align:right">180°</output></label>
  <label style="display:flex;align-items:center;gap:8px;margin-top:7px">Opacidad <input id="handpaintOpacity" type="range" min="0" max="100" step="1" value="90" style="flex:1;min-width:65px"><output id="handpaintOpacityValue" for="handpaintOpacity" style="min-width:39px;text-align:right">90 %</output></label>
+ <label style="display:flex;align-items:center;gap:8px;margin-top:7px">Mezcla <select id="handpaintBlendMode" style="flex:1;min-width:65px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px;padding:5px"><option value="0">Normal (pintura)</option><option value="1">Multiplicar</option><option value="2">Trama (aclarar)</option><option value="3" selected>Superponer</option><option value="4">Luz suave</option><option value="5">Luz fuerte</option><option value="6">Color</option><option value="7">Luminosidad</option></select></label>
 </div>
 
 <label>Bioma<select id="textureBiome" style="width:100%;padding:7px;color:#fff;background:#1e4034;border:1px solid #598071;border-radius:6px"></select></label>
@@ -449,5 +450,5 @@ window.addEventListener('error',e=>window.__editorError(e.message));
 window.addEventListener('unhandledrejection',e=>window.__editorError(e.reason?.message||e.reason));
 setTimeout(()=>{if(!document.getElementById('boot').hidden&&!window.__editorBootError)window.__editorError('El editor no ha terminado de iniciar. Abre el modo seguro de abajo, sin borrar tu borrador.')},14000);
 </script>
-<script type="module">import('./editor.mjs?v=0.9.150').catch(e=>window.__editorError(e.message||e));</script>
+<script type="module">import('./editor.mjs?v=0.9.151').catch(e=>window.__editorError(e.message||e));</script>
 </body></html>
