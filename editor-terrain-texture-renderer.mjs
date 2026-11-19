@@ -4,8 +4,33 @@ export function createTerrainTexturePainter({scene,terrain,renderer,material,int
  const status=document.getElementById('textureRenderStatus'),gpuLayers=createTerrainGPULayers({scene,terrain,renderer});
  gpuLayers.setHandpaintTexture(getHandpaintTexture());
  const cache=new Map(),loaded=new Map();let enabled=true,timer=0,generation=0;
- function decode(url){if(!url)return Promise.resolve(null);if(cache.has(url))return cache.get(url);
-  const result=new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>{console.warn('WildTrap: imagen de terreno inaccesible:',url);resolve(null)};img.src=getTextureAssetUrl(url)});cache.set(url,result);return result}
+ function decode(url){
+  if(!url)return Promise.resolve(null);
+  if(cache.has(url))return cache.get(url);
+  const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||location.pathname.endsWith('/mobile.html');
+  const result=new Promise(resolve=>{
+   const img=new Image();
+   img.onload=()=>{
+    if(mobile){
+     try{
+      const longest=Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height,1);
+      const maxSize=Math.max(512,Math.min(renderer?.capabilities?.maxTextureSize||1024,1024));
+      const ratio=Math.min(1,maxSize/longest);
+      const small=document.createElement('canvas');
+      small.width=Math.max(1,Math.round((img.naturalWidth||img.width)*ratio));
+      small.height=Math.max(1,Math.round((img.naturalHeight||img.height)*ratio));
+      const ctx=small.getContext('2d',{alpha:true});
+      if(!ctx)throw Error('Sin Canvas2D');
+      ctx.drawImage(img,0,0,small.width,small.height);
+      resolve(small);
+     }catch(error){console.warn('WildTrap: no se pudo reducir textura:',url,error);resolve(null)}
+    }else resolve(img);
+   };
+   img.onerror=()=>{console.warn('WildTrap: imagen de terreno inaccesible:',url);resolve(null)};
+   img.src=getTextureAssetUrl(url);
+  });
+  cache.set(url,result);return result;
+ }
  async function bake(){const ticket=++generation;if(!enabled)return;
   // Restore missing texture slot defaults before GPU layer construction.
   if(!live.biomeMaterials||!BIOMES.every(b=>live.biomeMaterials[b.id]?.slots?.ground))
