@@ -44,7 +44,10 @@ void main(){
  float visibleDepth=texture2D(sceneDepth,screenUV).r;
  // Do not paint across nearer objects or scene openings. The terrain here is
  // the exact original mesh, with the same cuts and heightmapped geometry.
- if((debugMode<0.5||debugMode>2.5) && (visibleDepth>=0.999999||abs(gl_FragCoord.z-visibleDepth)>0.00006))discard;
+ // One-sided depth comparison: only a surface genuinely CLOSER to the
+ // camera may occlude the terrain paint. Exact depth-equality wrongly rejects
+ // terrain because the biome overlays and depth buffer differ in precision.
+ if((debugMode<0.5||debugMode>2.5) && visibleDepth+0.00005<gl_FragCoord.z)discard;
  if(debugMode>2.5){gl_FragColor=vec4(1.0,0.0,1.0,1.0);return;}
  if(vArtUV.x<0.0||vArtUV.y<0.0||vArtUV.x>1.0||vArtUV.y>1.0)discard;
  vec4 art=texture2D(artTexture,vArtUV);
