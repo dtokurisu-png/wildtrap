@@ -66,9 +66,9 @@ vec3 paintOverlayColor(vec3 terrainColor){
  // and relief, never its original hue. White paper is fully neutral.
  float ink=clamp((1.0-artLuma)*globalHandpaintContrast,0.0,1.0);
  float coverage=1.0-smoothstep(0.985,0.999,artLuma);
- float strength=clamp(globalHandpaintOpacity*art.a*edgeFade*flatMask*coverage,0.0,1.0);
+ float strength=clamp(globalHandpaintOpacity*art.a*edgeFade*flatMask*coverage*ink,0.0,1.0);
  if(strength<0.0001||ink<0.0001)return terrainColor;
- vec3 paintedUnderlay=vec3(1.0-ink);
+ vec3 paintedUnderlay=vec3(0.5-0.5*ink);
  // Apply the BIOME base color as foreground to the grayscale underlay.
  vec3 mixed=handpaintBlend(paintedUnderlay,terrainColor,globalHandpaintBlendMode);
  // The resulting luminance changes, but the biome texture retains its hue.
