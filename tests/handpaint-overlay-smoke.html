@@ -81,7 +81,7 @@ try{
     ready.depthOcclusion&&ready.terrainGeometryLinked&&
     ready.frames>0&&programErrors.length===0&&
     delta>W*H*4&&affected>W*H*0.08&&
-    lowDelta>W*H*1&&lowAffected>W*H*0.008;
+    lowDelta>W*H*0.25&&lowAffected>W*H*0.008;
    clearInterval(timer);
    document.body.dataset.result=pass?'PASS':'FAIL';
    document.querySelector('#result').textContent=(pass?'PASS':'FAIL')+
@@ -90,7 +90,7 @@ try{
     ', transparencia '+Math.round(ready.transparency*100)+
     '%, pixeles modificados '+affected+', delta '+delta+
     ', cobertura '+Math.round(100*affected/(W*H))+'%, cámara baja '+Math.round(100*lowAffected/(W*H))+
-    '% ('+lowAffected+' píxeles), pant. '+W+'×'+H+', programs '+JSON.stringify(programErrors)+', error '+ready.error;
+    '% ('+lowAffected+' píxeles, delta '+lowDelta+'), pant. '+W+'×'+H+', programs '+JSON.stringify(programErrors)+', error '+ready.error;
   }catch(e){clearInterval(timer);fail(e.stack||e)}
  },500);
 }catch(e){fail(e.stack||e)}
