@@ -6,7 +6,7 @@ import {normalizedVertexAnchors,normalAnchorRootPoint,cleanSculptStamps,sculptRo
 
 // WILDTRAP EDITOR: published 3D assets are read-only. Each placement is an
 // independent transform, retained in the scenario JSON for the future game.
-import {PREFABS,prefabById,isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.7';
+import {PREFABS,prefabById,isFreeCave,prefabWorldY} from './prefab-catalog.mjs?v=0.9.160';
 export {PREFABS,prefabById};
 export function createPrefabLibrary(onChange=()=>{}){
  const loader=new GLTFLoader();
