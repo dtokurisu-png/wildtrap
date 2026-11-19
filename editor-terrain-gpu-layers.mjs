@@ -194,10 +194,10 @@ void main(){
  #include <colorspace_fragment>
  #include <fog_fragment>
 }`;
-function fullResolutionSource(image){
- if(Math.max(image.width||0,image.height||0)<=4096)return image;
- // Cap extremely large PNGs to keep GPU texture allocations reasonable.
- const ratio=4096/Math.max(image.width,image.height);
+function fullResolutionSource(image,limit=4096){
+ if(Math.max(image.width||0,image.height||0)<=limit)return image;
+ // Respect actual GPU limit and cap mobile GPU uploads and staging canvases.
+ const ratio=limit/Math.max(image.width,image.height);
  const canvas=document.createElement('canvas');
  canvas.width=Math.max(1,Math.round(image.width*ratio));
  canvas.height=Math.max(1,Math.round(image.height*ratio));
@@ -206,7 +206,9 @@ function fullResolutionSource(image){
  ctx.drawImage(image,0,0,canvas.width,canvas.height);
  return canvas;
 }
-export function createTerrainGPULayers({scene,terrain}){
+export function createTerrainGPULayers({scene,terrain,renderer}){
+ const maxSize=renderer?.capabilities?.maxTextureSize||4096;
+ const textureLimit=Math.max(512,Math.min(maxSize,(typeof navigator!=='undefined'&&(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)))?1024:4096));
  let records=[],shadowMesh=null,shadowMaterial=null;
  // A single shared art GPU texture/uniform group for all biome materials.
  const artUniforms={
@@ -264,7 +266,7 @@ export function createTerrainGPULayers({scene,terrain}){
    const image=loaded.get(slot.image);
    if(!image)continue;
    const mask=createFeatheredZoneMask(areas,{featherWorld:limit(transitionWorld,10,45),expandWorld:4});
-   const texture=new THREE.Texture(fullResolutionSource(image));
+   const texture=new THREE.Texture(fullResolutionSource(image,textureLimit));
    texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
    texture.colorSpace=THREE.SRGBColorSpace;
    texture.minFilter=THREE.LinearMipmapLinearFilter;
@@ -305,7 +307,7 @@ export function createTerrainGPULayers({scene,terrain}){
     if(!detailImage)continue;
     const opacity=limit(Number(detailSlot?.opacity??.5),0,1);
     if(opacity<=0)continue;
-    const detailTexture=new THREE.Texture(fullResolutionSource(detailImage));
+    const detailTexture=new THREE.Texture(fullResolutionSource(detailImage,textureLimit));
     detailTexture.wrapS=detailTexture.wrapT=THREE.ClampToEdgeWrapping;
     detailTexture.colorSpace=THREE.SRGBColorSpace;
     detailTexture.minFilter=THREE.LinearMipmapLinearFilter;
