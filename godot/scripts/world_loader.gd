@@ -6,11 +6,7 @@ extends Node3D
 
 const WORLD_PATH := "res://data/world.json"
 const BINARY_PATH := "res://data/terrain.wtmesh"
-const MODEL_FILES := {
-	"stone-cave": "res://assets/models/stone_cave.glb",
-	"rocky-cave": "res://assets/models/rocky_cave.glb",
-	"stylized-cave": "res://assets/models/stylized_cave.glb",
-}
+const MODEL_CATALOG := "res://data/object-catalog.json"
 const BIOMES := ["forest", "desert", "plains", "swamp", "mountain"]
 const BIOME_MASKS = preload("res://addons/wildtrap_editor/biome_masks.gd")
 const DETAIL_MAP := "res://data/detail-textures.json"
@@ -309,6 +305,9 @@ func _apply_material() -> void:
 		var slots: Dictionary=biome_settings.get("slots",{})
 		var ground_settings: Dictionary=slots.get("ground",{})
 		material.set_shader_parameter("repeat_"+biome,float(ground_settings.get("scale",200.0)))
+		material.set_shader_parameter("ground_opacity_"+biome,clampf(float(ground_settings.get("opacity",1.0)),0.0,1.0))
+		material.set_shader_parameter("biome_contrast_"+biome,clampf(float(biome_settings.get("colorContrast",1.0)),0.0,3.0))
+		material.set_shader_parameter("biome_saturation_"+biome,clampf(float(biome_settings.get("colorSaturation",1.0)),0.0,3.0))
 		var own: Dictionary=biome_overrides.get(biome,{})
 		var repeats:=float(own.get("repeats",0.0))
 		if repeats<3.5 or repeats>315.0:
@@ -323,9 +322,12 @@ func _apply_material() -> void:
 	if handpaint_loaded:
 		material.set_shader_parameter("handpaint_texture",painted)
 		material.set_shader_parameter("handpaint_enabled",_editor_handpaint_enabled)
+		var art_settings: Dictionary=source_world.get("handpaintMaterial",{})
+		_editor_handpaint_opacity=clampf(float(art_settings.get("opacity",0.50)),0.0,1.0)
 		material.set_shader_parameter("handpaint_opacity",_editor_handpaint_opacity)
-		material.set_shader_parameter("handpaint_contrast",0.45)
-		material.set_shader_parameter("handpaint_rotation_degrees",180.0)
+		material.set_shader_parameter("handpaint_contrast",clampf(float(art_settings.get("contrast",0.45)),0.0,4.0))
+		material.set_shader_parameter("handpaint_rotation_degrees",float(art_settings.get("rotation",180.0)))
+		material.set_shader_parameter("handpaint_blend_mode",int(art_settings.get("blendMode",3)))
 	else:
 		material.set_shader_parameter("handpaint_enabled",false)
 		push_warning("WildTrap hand-painted terrain image missing")
@@ -422,16 +424,103 @@ func _height_at(x: float, z: float) -> float:
 	var b: float = lerpf(float(heights[az*n+ix]),float(heights[az*n+ax]),u)
 	return lerpf(a,b,v)
 
+func _model_specs() -> Dictionary:
+	var specs: Dictionary={}
+	var parsed: Variant=JSON.parse_string(FileAccess.get_file_as_string(MODEL_CATALOG))
+	if parsed is Array:
+		for item in parsed:
+			if item is Dictionary:
+				specs[str(item.get("id",""))]=item
+	return specs
+
+
+func apply_editor_objects_preview(next_world: Dictionary) -> void:
+	if not Engine.is_editor_hint():
+		return
+	source_world=next_world.duplicate(true)
+	for child in get_children():
+		if child.has_meta("wildtrap_generated") and child.name.begins_with("Prefab_"):
+			remove_child(child)
+			child.queue_free()
+	_add_models()
+
+
+func apply_editor_material_preview(next_world: Dictionary) -> void:
+	if not Engine.is_editor_hint() or not is_instance_valid(terrain):
+		return
+	# Editing numbers must NOT reconstruct 15 × 90k-triangle overlays on every
+	# spinbox tick. Bind texture/uniform changes on existing materials only.
+	source_world=next_world.duplicate(true)
+	var terrain_material:=terrain.material_override as ShaderMaterial
+	if terrain_material==null:
+		return
+	var materials: Dictionary=source_world.get("biomeMaterials",{})
+	var heights: Dictionary=source_world.get("cliffHeightSettings",{})
+	var cliff_biomes: Dictionary=heights.get("biomes",{})
+	var catalog_value: Variant=JSON.parse_string(FileAccess.get_file_as_string(DETAIL_MAP))
+	var catalog: Dictionary=catalog_value if catalog_value is Dictionary else {}
+	for biome in BIOMES:
+		var config: Dictionary=materials.get(biome,{})
+		var ground: Dictionary=(config.get("slots",{}) as Dictionary).get("ground",{})
+		terrain_material.set_shader_parameter("repeat_"+biome,clampf(float(ground.get("scale",200.0)),0.25,1000.0))
+		terrain_material.set_shader_parameter("ground_opacity_"+biome,clampf(float(ground.get("opacity",1.0)),0.0,1.0))
+		terrain_material.set_shader_parameter("biome_contrast_"+biome,clampf(float(config.get("colorContrast",1.0)),0.0,3.0))
+		terrain_material.set_shader_parameter("biome_saturation_"+biome,clampf(float(config.get("colorSaturation",1.0)),0.0,3.0))
+		var own: Dictionary=cliff_biomes.get(biome,{})
+		var repeats:=float(own.get("repeats",0.0))
+		if repeats<3.5 or repeats>315.0:
+			if biome=="plains" and float(heights.get("period",0.0))>=2.0:
+				repeats=630.0/float(heights.get("period",12.6))
+			else:
+				repeats=26.25
+		terrain_material.set_shader_parameter("cliff_repeat_"+biome,repeats)
+		terrain_material.set_shader_parameter("cliff_intensity_"+biome,
+			clampf(float(own.get("intensity",1.0)),0.0,1.0) if _editor_cliff_color_enabled else 0.0)
+	var art: Dictionary=source_world.get("handpaintMaterial",{})
+	_editor_handpaint_opacity=clampf(float(art.get("opacity",0.50)),0.0,1.0)
+	terrain_material.set_shader_parameter("handpaint_opacity",_editor_handpaint_opacity)
+	terrain_material.set_shader_parameter("handpaint_contrast",clampf(float(art.get("contrast",0.45)),0.0,4.0))
+	terrain_material.set_shader_parameter("handpaint_rotation_degrees",float(art.get("rotation",180.0)))
+	terrain_material.set_shader_parameter("handpaint_blend_mode",int(art.get("blendMode",3)))
+	terrain_material.set_shader_parameter("handpaint_enabled",_editor_handpaint_enabled and handpaint_loaded)
+	for item in _detail_materials:
+		var biome:=str(item.get("biome",""))
+		var layer:=int(item.get("layer",1))
+		var layer_mat:=item.get("material") as ShaderMaterial
+		if layer_mat==null:
+			continue
+		var config: Dictionary=materials.get(biome,{})
+		var slot: Dictionary=(config.get("slots",{}) as Dictionary).get("detail"+str(layer),{})
+		layer_mat.set_shader_parameter("repeats",clampf(float(slot.get("scale",200.0)),0.25,1000.0))
+		layer_mat.set_shader_parameter("intensity",clampf(float(slot.get("opacity",0.5)),0.0,1.0))
+		layer_mat.set_shader_parameter("variation_seed",float((config.get("noise",{}) as Dictionary).get("seed",1)))
+		layer_mat.set_shader_parameter("biome_contrast",clampf(float(config.get("colorContrast",1.0)),0.0,3.0))
+		layer_mat.set_shader_parameter("biome_saturation",clampf(float(config.get("colorSaturation",1.0)),0.0,3.0))
+		var filename:=str(slot.get("name",""))
+		var path:=str(catalog.get(filename,""))
+		if path.begins_with("res://assets/textures/details/") and ResourceLoader.exists(path):
+			var image:=load(path) as Texture2D
+			if image!=null:
+				layer_mat.set_shader_parameter("detail_texture",image)
+	set_editor_details_visible(_editor_details_enabled)
+
+
 func _add_models() -> void:
+	var specs: Dictionary=_model_specs()
 	var nodes: Array = source_world.get("nodes", [])
 	for item in nodes:
 		if not (item is Dictionary):
 			continue
 		var data: Dictionary = item
 		var prefab_id: String = str(data.get("prefabId", ""))
-		if str(data.get("kind", "")) != "prefab" or not MODEL_FILES.has(prefab_id):
+		if str(data.get("kind", "")) != "prefab" or not specs.has(prefab_id):
 			continue
-		var packed := load(MODEL_FILES[prefab_id]) as PackedScene
+		var model_data: Dictionary=specs[prefab_id]
+		var glb_path:=str(model_data.get("path",""))
+		if not glb_path.begins_with("res://assets/models/"):
+			push_error("Unsafe prefab path")
+			continue
+		var packed := load(glb_path) as PackedScene
 		if packed == null:
 			push_error("Could not import GLB for " + prefab_id)
 			continue
@@ -461,7 +550,7 @@ func _add_models() -> void:
 		if found:
 			var dimensions: Vector3 = upper-lower
 			var longest: float = maxf(dimensions.x,maxf(dimensions.y,dimensions.z))
-			var scale_factor: float = 46.0/longest if longest > 0.00001 else 1.0
+			var scale_factor: float = float(model_data.get("span",46.0))/longest if longest > 0.00001 else 1.0
 			source.scale = Vector3.ONE*scale_factor
 			source.position = Vector3(-(lower.x+upper.x)*0.5, -lower.y, -(lower.z+upper.z)*0.5)*scale_factor
 		var x: float = float(data.get("x",0))
@@ -471,6 +560,9 @@ func _add_models() -> void:
 		root.rotation_order = EULER_ORDER_YXZ
 		root.rotation = Vector3(float(data.get("rotationX",0)),float(data.get("rotation",0)),float(data.get("rotationZ",0)))
 		root.scale = Vector3.ONE*maxf(0.01,float(data.get("scale",1)))
+		root.visible=not bool(data.get("editorHidden",false)) if Engine.is_editor_hint() else true
 		for mesh_node in source.find_children("*", "MeshInstance3D", true, false):
 			var part := mesh_node as MeshInstance3D
 			part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			if Engine.is_editor_hint() and bool(data.get("editorIntangible",false)):
+				part.transparency=0.76

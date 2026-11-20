@@ -6,6 +6,7 @@ const PATH := "res://data/world.json"
 const RULES = preload("res://addons/wildtrap_editor/biome_rules.gd")
 const MASKS = preload("res://addons/wildtrap_editor/biome_masks.gd")
 const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
+const OBJECTS = preload("res://addons/wildtrap_editor/object_rules.gd")
 const HISTORY_LIMIT := 40
 
 var source_path := PATH
@@ -104,6 +105,123 @@ func spawn_delete_area(id_text: String) -> Dictionary:
 	return _accept_spawn(next_world,SPAWNS.delete_area(next_world,id_text))
 
 
+func _accept_objects(next_world: Dictionary,result: Dictionary) -> Dictionary:
+	if bool(result.get("ok",false)) and bool(result.get("changed",false)):
+		if not OBJECTS.validate_world(next_world):
+			return {"ok":false,"error":"Escena inválida; cambio cancelado."}
+		_record()
+		data=next_world
+		dirty=true
+		last_error=""
+	elif not bool(result.get("ok",false)):
+		last_error=str(result.get("error","Objeto inválido."))
+	return result
+
+
+func object_place(prefab: String,x: float,z: float) -> Dictionary:
+	var next_world: Dictionary=data.duplicate(true)
+	return _accept_objects(next_world,OBJECTS.place(next_world,prefab,x,z))
+
+
+func object_edit(id_num: int,field: String,value: Variant) -> Dictionary:
+	var next_world: Dictionary=data.duplicate(true)
+	return _accept_objects(next_world,OBJECTS.edit(next_world,id_num,field,value))
+
+
+func object_erase(id_num: int) -> Dictionary:
+	var next_world: Dictionary=data.duplicate(true)
+	return _accept_objects(next_world,OBJECTS.erase(next_world,id_num))
+
+
+func _accept_material(next_world: Dictionary,changed: bool) -> bool:
+	if not changed:
+		last_error="Sin cambios."
+		return false
+	_record()
+	data=next_world
+	dirty=true
+	last_error=""
+	return true
+
+
+func set_material_values(biome: String,slot: String,values: Dictionary) -> bool:
+	if not ["forest","desert","plains","swamp","mountain"].has(biome):
+		last_error="Bioma inválido."
+		return false
+	if not ["ground","detail1","detail2","detail3","cliff"].has(slot):
+		last_error="Capa inválida."
+		return false
+	var next_world: Dictionary=data.duplicate(true)
+	var changed:=false
+	if slot=="cliff":
+		var settings: Dictionary=next_world.get("cliffHeightSettings",{})
+		var biomes: Dictionary=settings.get("biomes",{})
+		var own: Dictionary=biomes.get(biome,{})
+		var repeats:=clampf(float(values.get("scale",26.25)),3.5,315.0)
+		var intensity:=clampf(float(values.get("opacity",1.0)),0.0,1.0)
+		for key in ["repeats","intensity"]:
+			var next_value: float=repeats if key=="repeats" else intensity
+			if absf(float(own.get(key,-100))-next_value)>0.000001:
+				own[key]=next_value
+				changed=true
+		biomes[biome]=own
+		settings["biomes"]=biomes
+		next_world["cliffHeightSettings"]=settings
+	else:
+		var all: Dictionary=next_world.get("biomeMaterials",{})
+		var material: Dictionary=all.get(biome,{})
+		var slots: Dictionary=material.get("slots",{})
+		var layer: Dictionary=slots.get(slot,{})
+		var scale:=clampf(float(values.get("scale",200.0)),0.25,1000.0)
+		var opacity:=clampf(float(values.get("opacity",0.5)),0.0,1.0)
+		if not is_equal_approx(float(layer.get("scale",-1)),scale):
+			layer["scale"]=scale
+			changed=true
+		if not is_equal_approx(float(layer.get("opacity",-1)),opacity):
+			layer["opacity"]=opacity
+			changed=true
+		if slot.begins_with("detail"):
+			var name_text:=str(values.get("name",layer.get("name","")))
+			var lib: Variant=JSON.parse_string(FileAccess.get_file_as_string("res://data/detail-textures.json"))
+			if not (lib is Dictionary) or not lib.has(name_text):
+				last_error="Imagen complementaria no registrada."
+				return false
+			if str(layer.get("name",""))!=name_text:
+				layer["name"]=name_text
+				layer["image"]="./assets/terrain/texturas/"+name_text.uri_encode()
+				changed=true
+		slots[slot]=layer
+		material["slots"]=slots
+		for key in ["colorContrast","colorSaturation"]:
+			var v:=clampf(float(values.get(key,material.get(key,1.0))),0.0,3.0)
+			if not is_equal_approx(float(material.get(key,1.0)),v):
+				material[key]=v
+				changed=true
+		all[biome]=material
+		next_world["biomeMaterials"]=all
+	return _accept_material(next_world,changed)
+
+
+func set_handpaint_values(values: Dictionary) -> bool:
+	var next_world: Dictionary=data.duplicate(true)
+	var current: Dictionary=next_world.get("handpaintMaterial",{})
+	var changes:=false
+	var defaults: Dictionary={"opacity":0.50,"contrast":0.45,"rotation":180.0,"blendMode":3}
+	for key in defaults:
+		var old_value:=float(current.get(key,defaults[key]))
+		var new_value:=float(values.get(key,old_value))
+		match key:
+			"opacity": new_value=clampf(new_value,0.0,1.0)
+			"contrast": new_value=clampf(new_value,0.0,4.0)
+			"rotation": new_value=clampf(new_value,-360.0,360.0)
+			"blendMode": new_value=clampf(roundf(new_value),0.0,7.0)
+		if not is_equal_approx(old_value,new_value):
+			current[key]=new_value
+			changes=true
+	next_world["handpaintMaterial"]=current
+	return _accept_material(next_world,changes)
+
+
 func _record() -> void:
 	_undo.append(data.duplicate(true))
 	if _undo.size()>HISTORY_LIMIT:
@@ -141,7 +259,7 @@ func save() -> bool:
 	if not dirty:
 		last_error="No hay cambios pendientes."
 		return false
-	if not _valid_map(data) or not SPAWNS.validate_world(data):
+	if not _valid_map(data) or not SPAWNS.validate_world(data) or not OBJECTS.validate_world(data):
 		last_error="El mapa o los spawns no cumplen el esquema."
 		return false
 	var path := ProjectSettings.globalize_path(source_path)
