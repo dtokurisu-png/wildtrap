@@ -76,6 +76,8 @@ jobs:
           set -o pipefail
           Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --quit-after 5 2>&1 | tee /tmp/wildtrap-dock.log
           grep 'WILDTRAP_EDITOR_PLUGIN_READY' /tmp/wildtrap-dock.log
+      - name: Verify cliff colors, hand-painted artwork and original complementary textures
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/material_migration_test.gd
       - name: Verify native scene nodes
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/smoke_test.gd
       - name: Boot native 3D world
