@@ -22,6 +22,7 @@ var _art_opacity: SpinBox
 var _art_contrast: SpinBox
 var _art_rotation: SpinBox
 var _art_blend: OptionButton
+var _ground_transparency: SpinBox
 var _preview_toggles: Dictionary={}
 var _info: Label
 var _refreshing:=false
@@ -40,56 +41,91 @@ func configure(source_store: RefCounted,source_host: Control) -> void:
 
 
 func _ready() -> void:
-	_biome=_selector(self,NAMES,"MaterialBiome")
-	_slot=_selector(self,SLOT_LABELS,"MaterialLayer")
+	# 1. Per-biome layer controls; only properties belonging to that layer.
+	var materials_section:=VBoxContainer.new()
+	materials_section.name="BiomeLayers"
+	add_child(materials_section)
+	_biome=_selector(materials_section,NAMES,"MaterialBiome")
+	_slot=_selector(materials_section,SLOT_LABELS,"MaterialLayer")
 	_biome.item_selected.connect(_on_selection)
 	_slot.item_selected.connect(_on_selection)
 	_image=TextureRect.new()
 	_image.name="MaterialImage"
-	_image.custom_minimum_size=Vector2(0,110)
+	_image.custom_minimum_size=Vector2(0,115)
 	_image.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
 	_image.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	add_child(_image)
+	materials_section.add_child(_image)
 	_asset=OptionButton.new()
 	_asset.name="DetailAsset"
 	_asset.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	for key in _library.keys():
 		_asset.add_item(str(key).trim_suffix(".png"))
 	_asset.item_selected.connect(_on_texture_changed)
-	add_child(_asset)
-	_scale=_number_row("Repeticiones",0.25,1000.0,0.25)
-	_opacity=_number_row("Intensidad %",0.0,100.0,1.0)
-	_contrast=_number_row("Contraste %",0.0,300.0,1.0)
-	_saturation=_number_row("Saturación %",0.0,300.0,1.0)
-	_button(self,"Aplicar material",_apply_material)
-	var visibility:=VBoxContainer.new()
-	visibility.name="MaterialVisibility"
-	add_child(visibility)
-	for entry in [
-		{"id":"details","name":"Complementarias"},
-		{"id":"handpaint","name":"Hand painting"},
-		{"id":"cliffs","name":"Acantilados"}
-	]:
+	materials_section.add_child(_asset)
+	_scale=_number_row("Repeticiones",0.25,1000.0,0.25,materials_section)
+	_opacity=_number_row("Intensidad %",0.0,100.0,1.0,materials_section)
+	_contrast=_number_row("Contraste %",0.0,300.0,1.0,materials_section)
+	_saturation=_number_row("Saturación %",0.0,300.0,1.0,materials_section)
+	_button(materials_section,"Aplicar material",_apply_material)
+
+	# 2. Shared GROUND blending. Transparency 0% means opaque ground.
+	var ground_section:=VBoxContainer.new()
+	ground_section.name="GroundMix"
+	add_child(ground_section)
+	_heading(ground_section,"Suelo · mezcla")
+	_ground_transparency=_number_row("Transparencia %",0.0,100.0,1.0,ground_section)
+	_art_blend=_selector(ground_section,BLENDS,"HandpaintBlend")
+	_button(ground_section,"Aplicar suelo",_apply_ground_mix)
+	var controls:=HBoxContainer.new()
+	controls.name="MaterialVisibility"
+	ground_section.add_child(controls)
+	for entry in [{"id":"details","name":"Complementarias"},{"id":"cliffs","name":"Acantilados"}]:
 		var check:=CheckButton.new()
 		check.name="Material_"+str(entry["id"])
 		check.text=str(entry["name"])
 		check.set_pressed_no_signal(true)
 		check.toggled.connect(_toggle_visibility.bind(str(entry["id"])))
-		visibility.add_child(check)
+		controls.add_child(check)
 		_preview_toggles[str(entry["id"])]=check
-	_art_opacity=_number_row("Pintura %",0.0,100.0,1.0)
-	_art_contrast=_number_row("Negros %",0.0,400.0,1.0)
-	_art_rotation=_number_row("Rotación °",-360.0,360.0,1.0)
-	_art_blend=_selector(self,BLENDS,"HandpaintBlend")
-	_button(self,"Aplicar hand painting",_apply_handpaint)
+
+	# 3. Original HAND PAINTING image, with its own preview and settings.
+	var art_section:=VBoxContainer.new()
+	art_section.name="Handpainting"
+	add_child(art_section)
+	_heading(art_section,"Hand painting")
+	var art_preview:=TextureRect.new()
+	art_preview.name="HandpaintImage"
+	art_preview.custom_minimum_size=Vector2(0,160)
+	art_preview.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
+	art_preview.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	art_preview.texture=load("res://assets/textures/handpaint_reference.webp") as Texture2D
+	art_section.add_child(art_preview)
+	var art_toggle:=CheckButton.new()
+	art_toggle.name="Material_handpaint"
+	art_toggle.text="Superponer pintura"
+	art_toggle.set_pressed_no_signal(true)
+	art_toggle.toggled.connect(_toggle_visibility.bind("handpaint"))
+	art_section.add_child(art_toggle)
+	_preview_toggles["handpaint"]=art_toggle
+	_art_opacity=_number_row("Pintura %",0.0,100.0,1.0,art_section)
+	_art_contrast=_number_row("Negros %",0.0,400.0,1.0,art_section)
+	_art_rotation=_number_row("Rotación °",-360.0,360.0,1.0,art_section)
+	_button(art_section,"Aplicar pintura",_apply_handpaint)
 	_info=Label.new()
 	_info.name="TextureStatus"
 	_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	add_child(_info)
-	for spin in [_scale,_opacity,_contrast,_saturation,_art_opacity,_art_contrast,_art_rotation]:
+	for spin in [_scale,_opacity,_contrast,_saturation,_ground_transparency,_art_opacity,_art_contrast,_art_rotation]:
 		spin.value_changed.connect(_preview_changes)
 	_art_blend.item_selected.connect(_on_blend_changed)
 	refresh()
+
+
+func _heading(where: Node,title_text: String) -> void:
+	var heading:=Label.new()
+	heading.text=title_text
+	heading.add_theme_font_size_override("font_size",15)
+	where.add_child(heading)
 
 
 func _selector(where: Node,items: Array,identifier: String) -> OptionButton:
@@ -102,9 +138,12 @@ func _selector(where: Node,items: Array,identifier: String) -> OptionButton:
 	return item
 
 
-func _number_row(title: String,min_value: float,max_value: float,step_value: float) -> SpinBox:
+func _number_row(title: String,min_value: float,max_value: float,step_value: float,where: Node=null) -> SpinBox:
 	var row:=HBoxContainer.new()
-	add_child(row)
+	if where==null:
+		add_child(row)
+	else:
+		where.add_child(row)
 	var label:=Label.new()
 	label.text=title
 	label.custom_minimum_size=Vector2(95,0)
@@ -197,7 +236,9 @@ func refresh_fields() -> void:
 	_art_opacity.set_value_no_signal(float(painted.get("opacity",0.50))*100.0)
 	_art_contrast.set_value_no_signal(float(painted.get("contrast",0.45))*100.0)
 	_art_rotation.set_value_no_signal(float(painted.get("rotation",180.0)))
-	_art_blend.select(clampi(int(painted.get("blendMode",3)),0,7))
+	var ground_mix: Dictionary=store.data.get("groundMix",{})
+	_ground_transparency.set_value_no_signal((1.0-clampf(float(ground_mix.get("opacity",1.0)),0.0,1.0))*100.0)
+	_art_blend.select(clampi(int(ground_mix.get("mode",painted.get("blendMode",3))),0,7))
 	_refreshing=false
 
 
@@ -252,13 +293,28 @@ func _assign_values(next: Dictionary) -> void:
 		all[biome]=material
 		next["biomeMaterials"]=all
 	next["handpaintMaterial"]=_handpaint_values()
+	next["groundMix"]=_ground_mix_values()
 
 
 func _handpaint_values() -> Dictionary:
 	return {"opacity":_art_opacity.value/100.0,
 		"contrast":_art_contrast.value/100.0,
-		"rotation":_art_rotation.value,
-		"blendMode":_art_blend.selected}
+		"rotation":_art_rotation.value}
+
+
+func _ground_mix_values() -> Dictionary:
+	return {"opacity":1.0-_ground_transparency.value/100.0,"mode":_art_blend.selected}
+
+
+func _apply_ground_mix() -> void:
+	if store==null:
+		return
+	if store.set_ground_mix(_ground_mix_values()):
+		if host!=null:
+			host.call("external_editor_changed","materials")
+		_info.text="Mezcla del suelo sin guardar."
+	else:
+		_info.text=store.last_error
 
 
 func _apply_material() -> void:
