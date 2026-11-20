@@ -58,3 +58,22 @@ node godot/tools/bake-world.mjs
 
 The GitHub workflow does this and checks import plus native scene boot. Never
 reintroduce local browser storage as the authoritative world source.
+
+## Step 2.1: native world in Godot's editor (without Play)
+
+Open `res://scenes/main.tscn` and select the **3D** tab. The `World`
+node now has an `@tool` script that reconstructs the terrain mesh, biome
+shader and original GLB prefabs **in the editor**, using the same loader as
+the runtime. Select `World` in the scene tree to find the Inspector toggle
+**Vista previa** and its **Actualizar vista del mundo** button.
+
+The mesh and GLB preview nodes are deliberately *transient* (no `owner`);
+they will NOT be silently embedded into `main.tscn` when saving the scene.
+Reopen `main.tscn` if another program changed source assets while the scene
+was open, then click **Actualizar vista del mundo**. Use Godot's 3D orbit
+controls to inspect the terrain. You may select `Camera3D` and enable
+**Preview** to frame the level using the initial game camera.
+
+In-game controls (character movement), procedural painting/gizmo editing,
+spawn tools, and serialized inspector tools remain future milestones.
+The Godot native editor preview does *not* save edits back to JSON yet.

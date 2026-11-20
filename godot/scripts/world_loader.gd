@@ -1,3 +1,4 @@
+@tool
 extends Node3D
 ## Native reader for source-synchronized WildTrap mesh, texture masks and GLB.
 ## Generated mesh is baked from the original geometry algorithms in GitHub CI.
@@ -12,12 +13,50 @@ const MODEL_FILES := {
 }
 const BIOMES := ["forest", "desert", "plains", "swamp", "mountain"]
 
+# Native editor preview: generated children are deliberately NOT assigned owner.
+# They appear in the 3D viewport but are not serialized into main.tscn.
+@export_group("WildTrap · Vista previa")
+@export var preview_in_editor: bool = true:
+	set(value):
+		preview_in_editor = value
+		if Engine.is_editor_hint() and is_inside_tree():
+			call_deferred("_rebuild_world")
+
+@export_tool_button("Actualizar vista del mundo", "Reload") var refresh_world: Callable = _refresh_editor_preview
+
+func _refresh_editor_preview() -> void:
+	if Engine.is_editor_hint() and is_inside_tree():
+		call_deferred("_rebuild_world")
+
+
+func _clear_generated() -> void:
+	for child in get_children():
+		if child.has_meta("wildtrap_generated"):
+			remove_child(child)
+			child.queue_free()
+	terrain = null
+	vertex_count = 0
+	triangle_count = 0
+
+
 var source_world: Dictionary = {}
 var vertex_count: int = 0
 var triangle_count: int = 0
 var terrain: MeshInstance3D
 
 func _ready() -> void:
+	# The 3D editor needs the same visual terrain as the running game.
+	# Defer editor rebuild until imported GLBs, textures and scene tree are ready.
+	if Engine.is_editor_hint():
+		call_deferred("_rebuild_world")
+	else:
+		_rebuild_world()
+
+
+func _rebuild_world() -> void:
+	_clear_generated()
+	if Engine.is_editor_hint() and not preview_in_editor:
+		return
 	if not FileAccess.file_exists(WORLD_PATH) or not FileAccess.file_exists(BINARY_PATH):
 		push_error("WildTrap: native world data missing. Check the migration build.")
 		return
@@ -37,7 +76,7 @@ func _ready() -> void:
 	_add_models()
 	print("WILDTRAP_GODOT_WORLD_IMPORTED vertices=", vertex_count,
 		" triangles=", triangle_count, " zones=", (source_world.get("zones", []) as Array).size(),
-		" source=published_snapshot_partial")
+		" source=published_snapshot_partial editor=", Engine.is_editor_hint())
 
 func _read_mesh() -> bool:
 	var f := FileAccess.open(BINARY_PATH, FileAccess.READ)
@@ -87,6 +126,7 @@ func _read_mesh() -> bool:
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var instance := MeshInstance3D.new()
 	instance.name = "WildTrapTerrain"
+	instance.set_meta("wildtrap_generated", true)
 	instance.mesh = mesh
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	add_child(instance)
@@ -154,6 +194,7 @@ func _add_models() -> void:
 			continue
 		var root := Node3D.new()
 		root.name = "Prefab_%s_%s" % [prefab_id,str(data.get("id", ""))]
+		root.set_meta("wildtrap_generated", true)
 		add_child(root)
 		root.add_child(source)
 		var found := false
