@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: godot-migration-native
+  group: godot-migration-native-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
