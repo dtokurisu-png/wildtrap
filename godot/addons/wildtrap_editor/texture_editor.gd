@@ -33,6 +33,9 @@ func configure(source_store: RefCounted,source_host: Control) -> void:
 	var parsed: Variant=JSON.parse_string(FileAccess.get_file_as_string("res://data/detail-textures.json"))
 	_library=parsed if parsed is Dictionary else {}
 	if is_inside_tree():
+		_asset.clear()
+		for key in _library.keys():
+			_asset.add_item(str(key).trim_suffix(".png"))
 		refresh()
 
 

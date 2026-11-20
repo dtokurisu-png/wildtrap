@@ -28,6 +28,9 @@ func configure(source_store: RefCounted,source_host: Control) -> void:
 	host=source_host
 	_catalog=OBJECTS.catalog()
 	if is_inside_tree():
+		_palette.clear()
+		for entry in _catalog:
+			_palette.add_item(str(entry.get("name","")))
 		refresh()
 
 
@@ -264,8 +267,14 @@ func handle_terrain_hit(hit: Vector3) -> bool:
 		_commit(result)
 		return true
 	if _mode=="move":
-		if _commit(store.object_edit(_selected_id,"x",x)):
-			_commit(store.object_edit(_selected_id,"z",z))
+		var first: Dictionary=store.object_edit(_selected_id,"x",x)
+		var second: Dictionary=store.object_edit(_selected_id,"z",z)
+		if bool(first.get("changed",false)) or bool(second.get("changed",false)):
+			if host!=null:
+				host.call("external_editor_changed","objects")
+			refresh()
+		elif not bool(first.get("ok",false)) or not bool(second.get("ok",false)):
+			_status.text="No se pudo mover."
 		_mode="select"
 		return true
 	if _mode=="select":
