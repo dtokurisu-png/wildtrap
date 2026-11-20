@@ -331,6 +331,7 @@ func refresh_scene() -> void:
 	_update_save_buttons()
 	if _get_world()!=null:
 		_apply_preview()
+	_redraw_spawn_overlay()
 
 
 func _apply_preview() -> void:
@@ -542,7 +543,9 @@ func _after_history_change(status_text: String) -> void:
 	_update_zone_info()
 	_recalculate_distributions()
 	_update_save_buttons()
+	_rebuild_spawn_buttons()
 	_apply_preview()
+	_redraw_spawn_overlay()
 	_status.text=status_text
 
 
@@ -561,6 +564,8 @@ func _reload_world() -> void:
 		_status.text="Guarda o deshaz antes de recargar."
 		return
 	if _store.open():
+		_pending_spawn_area.clear()
+		_spawn_mode=""
 		refresh_scene()
 		_status.text="Datos de Godot recargados."
 	else:
@@ -568,36 +573,72 @@ func _reload_world() -> void:
 
 
 func _rebuild_spawn_buttons() -> void:
-	var body := find_child("SpawnList",true,false) as VBoxContainer
-	if body==null:
-		return
-	for child in body.get_children():
-		body.remove_child(child)
-		child.queue_free()
+	for row in _spawn_list.get_children():
+		_spawn_list.remove_child(row)
+		row.queue_free()
 	_spawn_buttons.clear()
 	for entry in _source.get("nodes",[]):
-		if not (entry is Dictionary) or str(entry.get("kind",""))!="playerSpawn":
+		if not (entry is Dictionary) or not SPAWNS.is_spawn_node(entry):
 			continue
 		var id_num := int(entry.get("id",-1))
-		var button := _button(body,"Jugador "+str(entry.get("playerSlot","?"))+" · "+str(id_num),_select_spawn.bind(id_num))
+		var category: String = SPAWNS.point_category(entry)
+		var label_text := "J"+str(entry.get("playerSlot","?")) if category=="player" else str(SPAWN_NAMES.get(category,category))+" "+str(id_num)
+		var button := _button(_spawn_list,label_text,_select_spawn.bind(id_num))
+		button.toggle_mode=true
+		button.set_pressed_no_signal(_selected_spawn_kind=="point" and _current_spawn_id==id_num)
 		_spawn_buttons.append(button)
 	if _current_spawn_id==-1 and not _spawn_buttons.is_empty():
 		for entry in _source.get("nodes",[]):
-			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn":
+			if entry is Dictionary and SPAWNS.is_spawn_node(entry):
 				_current_spawn_id=int(entry.get("id",-1))
 				break
+	for row in _spawn_area_list.get_children():
+		_spawn_area_list.remove_child(row)
+		row.queue_free()
+	for area in _source.get("spawnAreas",[]):
+		if not (area is Dictionary):
+			continue
+		var id_text := str(area.get("id",""))
+		var title_text := str(area.get("name","Área"))
+		var button := _button(_spawn_area_list,title_text,_select_spawn_area.bind(id_text))
+		button.toggle_mode=true
+		button.set_pressed_no_signal(_selected_spawn_kind=="area" and _selected_spawn_area_id==id_text)
 	_update_spawn_info()
 
 
 func _select_spawn(id_num: int) -> void:
 	_current_spawn_id=id_num
+	_selected_spawn_kind="point"
+	_selected_spawn_area_id=""
+	_pending_spawn_area.clear()
+	_spawn_mode="select"
+	_rebuild_spawn_buttons()
 	_update_spawn_info()
+	_redraw_spawn_overlay()
 	_highlight_spawn()
+
+
+func _select_spawn_area(id_text: String) -> void:
+	_selected_spawn_area_id=id_text
+	_selected_spawn_kind="area"
+	_pending_spawn_area.clear()
+	_spawn_mode="select"
+	_spawn_selected_vertex=0
+	_rebuild_spawn_buttons()
+	_update_spawn_info()
+	_redraw_spawn_overlay()
 
 
 func _selected_spawn() -> Dictionary:
 	for entry in _source.get("nodes",[]):
-		if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("id",-1))==_current_spawn_id:
+		if entry is Dictionary and SPAWNS.is_spawn_node(entry) and int(entry.get("id",-1))==_current_spawn_id:
+			return entry
+	return {}
+
+
+func _selected_spawn_area() -> Dictionary:
+	for entry in _source.get("spawnAreas",[]):
+		if entry is Dictionary and str(entry.get("id",""))==_selected_spawn_area_id:
 			return entry
 	return {}
 
@@ -605,14 +646,271 @@ func _selected_spawn() -> Dictionary:
 func _update_spawn_info() -> void:
 	if _spawn_info==null:
 		return
-	var spawn := _selected_spawn()
-	if spawn.is_empty():
-		_spawn_info.text="No hay un spawn seleccionado."
+	var point := _selected_spawn()
+	var area := _selected_spawn_area()
+	_spawn_point_form.visible=_selected_spawn_kind=="point" and not point.is_empty()
+	_spawn_area_form.visible=_selected_spawn_kind=="area" and not area.is_empty()
+	_updating_spawn_controls=true
+	if _spawn_point_form.visible:
+		_spawn_point_x.set_value_no_signal(float(point.get("x",0)))
+		_spawn_point_z.set_value_no_signal(float(point.get("z",0)))
+		_spawn_info.text=str(SPAWN_NAMES.get(SPAWNS.point_category(point),"Punto"))
+	elif _spawn_area_form.visible:
+		_spawn_area_name.text=str(area.get("name",""))
+		var type_index := SPAWNS.AREA_CATEGORIES.find(str(area.get("type","trees")))
+		if type_index>=0:
+			_spawn_area_type.select(type_index)
+		var biome_index := SPAWNS.BIOME_IDS.find(str(area.get("biome","any")))
+		if biome_index>=0:
+			_spawn_area_biome.select(biome_index)
+		_spawn_density.set_value_no_signal(float(area.get("density",40)))
+		_spawn_density_label.text=str(int(area.get("density",40)))+"%"
+		_spawn_area_hidden.set_pressed_no_signal(bool(area.get("hidden",false)))
+		_spawn_vertex_picker.clear()
+		var points: Array = area.get("points",[])
+		_spawn_selected_vertex=clampi(_spawn_selected_vertex,0,maxi(0,points.size()-1))
+		for i in range(points.size()):
+			_spawn_vertex_picker.add_item("V"+str(i+1))
+		if not points.is_empty():
+			_spawn_vertex_picker.select(_spawn_selected_vertex)
+			_spawn_vertex_x.set_value_no_signal(float(points[_spawn_selected_vertex].get("x",0)))
+			_spawn_vertex_z.set_value_no_signal(float(points[_spawn_selected_vertex].get("z",0)))
+		_spawn_info.text=""
 	else:
-		_spawn_info.text="Jugador %s\nX: %.2f | Z: %.2f\nÁreas: %d" % [
-			str(spawn.get("playerSlot","?")),float(spawn.get("x",0)),
-			float(spawn.get("z",0)),(_source.get("spawnAreas",[]) as Array).size()
-		]
+		_spawn_info.text=""
+	_updating_spawn_controls=false
+
+
+func _on_spawn_category_selected(_index: int) -> void:
+	if _spawn_point_category==null:
+		return
+	var cat: String = SPAWNS.POINT_CATEGORIES[_spawn_point_category.selected]
+	_spawn_slot.visible=cat=="player"
+
+
+func _set_spawn_mode(mode: String) -> void:
+	if _get_world()==null:
+		_status.text="Abre el escenario 3D primero."
+		return
+	if mode=="move_point" and _selected_spawn().is_empty():
+		_status.text="Selecciona un punto."
+		return
+	if mode=="move_vertex" and _selected_spawn_area().is_empty():
+		_status.text="Selecciona un área."
+		return
+	_spawn_mode=mode
+	if mode=="area":
+		_pending_spawn_area.clear()
+		_status.text="Marca vértices y cierra el área."
+	elif mode=="point":
+		_status.text="Clic en el terreno para colocar."
+	elif mode=="select":
+		_status.text="Clic en un punto o dentro de un área."
+	else:
+		_status.text="Clic para mover."
+	_redraw_spawn_overlay()
+
+
+func _cancel_spawn_tool() -> void:
+	_spawn_mode=""
+	_pending_spawn_area.clear()
+	_status.text=""
+	_redraw_spawn_overlay()
+
+
+func clear_spawn_preview() -> void:
+	var world := _get_world()
+	if world!=null:
+		var overlay := world.get_node_or_null(SPAWN_VIEW.OVERLAY_NAME)
+		if overlay!=null:
+			world.remove_child(overlay)
+			overlay.queue_free()
+
+
+func _redraw_spawn_overlay() -> void:
+	if _tabs==null or _tabs.current_tab!=2:
+		clear_spawn_preview()
+		return
+	var world := _get_world()
+	if world==null or _source.is_empty():
+		return
+	SPAWN_VIEW.refresh(world,_source,_pending_spawn_area,_selected_spawn_kind,
+		_current_spawn_id if _selected_spawn_kind=="point" else _selected_spawn_area_id,
+		_spawn_selected_vertex)
+
+
+func _commit_spawn(result: Dictionary, success_text: String) -> bool:
+	if not bool(result.get("ok",false)):
+		_status.text=str(result.get("error","No se pudo aplicar."))
+		return false
+	if not bool(result.get("changed",false)):
+		_status.text="Sin cambios."
+		return false
+	_source=_store.data
+	_update_save_buttons()
+	_rebuild_spawn_buttons()
+	_redraw_spawn_overlay()
+	_status.text=success_text
+	return true
+
+
+func handle_spawn_viewport_input(camera: Camera3D, event: InputEvent) -> bool:
+	if _tabs==null or _tabs.current_tab!=2 or _spawn_mode.is_empty():
+		return false
+	if not (event is InputEventMouseButton):
+		return false
+	var mouse := event as InputEventMouseButton
+	if mouse.button_index!=MOUSE_BUTTON_LEFT or not mouse.pressed or mouse.alt_pressed or mouse.ctrl_pressed or mouse.shift_pressed:
+		return false
+	var world := _get_world()
+	if world==null:
+		return false
+	var hit: Variant = SPAWN_VIEW.pick_terrain(camera,mouse.position,world)
+	if not (hit is Vector3):
+		_status.text="No se encontró terreno bajo el cursor."
+		return false
+	var near_first := false
+	if _spawn_mode=="area" and _pending_spawn_area.size()>=3:
+		var first: Dictionary = _pending_spawn_area[0]
+		var px := float(first.get("x",0))
+		var pz := float(first.get("z",0))
+		var pixel: Vector2 = camera.unproject_position(Vector3(px,_terrain_y(px,pz)+2,pz))
+		near_first=pixel.distance_to(mouse.position)<17.0
+	return spawn_world_click(hit,near_first)
+
+
+func spawn_world_click(hit: Vector3, near_first: bool = false) -> bool:
+	# Direct-call entry is also used by headless tests. No scene writes here.
+	if _spawn_mode.is_empty():
+		return false
+	var x := clampf(hit.x,-315.0,315.0)
+	var z := clampf(hit.z,-315.0,315.0)
+	if _spawn_mode=="point":
+		var cat: String = SPAWNS.POINT_CATEGORIES[_spawn_point_category.selected]
+		var slot: int = _spawn_slot.selected+1
+		var result: Dictionary = _store.spawn_place_point(cat,x,z,slot)
+		if _commit_spawn(result,"Punto colocado."):
+			_current_spawn_id=int(result.get("id",-1))
+			_selected_spawn_kind="point"
+			_selected_spawn_area_id=""
+			_rebuild_spawn_buttons()
+		return true
+	if _spawn_mode=="area":
+		if near_first:
+			_close_spawn_polygon()
+			return true
+		if not _pending_spawn_area.is_empty():
+			var last: Dictionary = _pending_spawn_area.back()
+			if Vector2(float(last.get("x",0))-x,float(last.get("z",0))-z).length()<0.3:
+				return true
+		if _pending_spawn_area.size()>=128:
+			_status.text="Máximo 128 vértices."
+			return true
+		_pending_spawn_area.append({"x":x,"z":z})
+		_status.text=str(_pending_spawn_area.size())+" puntos"
+		_redraw_spawn_overlay()
+		return true
+	if _spawn_mode=="select":
+		var found: Dictionary = SPAWN_VIEW.closest_point(_source,x,z)
+		if not found.is_empty():
+			_select_spawn(int(found.get("id",-1)))
+		else:
+			var area: Dictionary = SPAWN_VIEW.containing_area(_source,x,z)
+			if not area.is_empty():
+				_select_spawn_area(str(area.get("id","")))
+		return true
+	if _spawn_mode=="move_point":
+		if _commit_spawn(_store.spawn_move_point(_current_spawn_id,x,z),"Punto movido."):
+			_spawn_mode="select"
+		return true
+	if _spawn_mode=="move_vertex":
+		if _commit_spawn(_store.spawn_move_vertex(_selected_spawn_area_id,_spawn_selected_vertex,x,z),"Vértice movido."):
+			_spawn_mode="select"
+		return true
+	return false
+
+
+func _close_spawn_polygon() -> void:
+	if _spawn_mode!="area":
+		return
+	var result: Dictionary = _store.spawn_create_area(_pending_spawn_area)
+	if _commit_spawn(result,"Área creada."):
+		_selected_spawn_area_id=str(result.get("id",""))
+		_selected_spawn_kind="area"
+		_pending_spawn_area.clear()
+		_spawn_selected_vertex=0
+		_spawn_mode="select"
+		_rebuild_spawn_buttons()
+		_redraw_spawn_overlay()
+
+
+func _apply_point_coordinates() -> void:
+	_commit_spawn(_store.spawn_move_point(_current_spawn_id,_spawn_point_x.value,_spawn_point_z.value),"Punto movido.")
+
+
+func _apply_vertex_coordinates() -> void:
+	_commit_spawn(_store.spawn_move_vertex(_selected_spawn_area_id,_spawn_selected_vertex,_spawn_vertex_x.value,_spawn_vertex_z.value),"Vértice movido.")
+
+
+func _on_vertex_selected(index: int) -> void:
+	if _updating_spawn_controls:
+		return
+	_spawn_selected_vertex=index
+	_update_spawn_info()
+	_redraw_spawn_overlay()
+
+
+func _on_area_name_submitted(value: String) -> void:
+	_edit_area("name",value)
+
+
+func _on_area_name_focus_exited() -> void:
+	if not _updating_spawn_controls:
+		_edit_area("name",_spawn_area_name.text)
+
+
+func _on_area_type_selected(index: int) -> void:
+	if not _updating_spawn_controls:
+		_edit_area("type",SPAWNS.AREA_CATEGORIES[index])
+
+
+func _on_area_biome_selected(index: int) -> void:
+	if not _updating_spawn_controls:
+		_edit_area("biome",SPAWNS.BIOME_IDS[index])
+
+
+func _on_density_preview(value: float) -> void:
+	if _spawn_density_label!=null:
+		_spawn_density_label.text=str(int(value))+"%"
+
+
+func _on_density_committed(_value_changed: bool) -> void:
+	if not _updating_spawn_controls:
+		_edit_area("density",int(_spawn_density.value))
+
+
+func _on_area_hidden_toggled(checked: bool) -> void:
+	if not _updating_spawn_controls:
+		_edit_area("hidden",checked)
+
+
+func _edit_area(field: String, value: Variant) -> void:
+	if _selected_spawn_area_id.is_empty():
+		return
+	_commit_spawn(_store.spawn_change_area(_selected_spawn_area_id,field,value),"Área actualizada.")
+
+
+func _delete_selected_spawn() -> void:
+	if _selected_spawn_kind=="area" and not _selected_spawn_area_id.is_empty():
+		if _commit_spawn(_store.spawn_delete_area(_selected_spawn_area_id),"Área eliminada."):
+			_selected_spawn_area_id=""
+			_spawn_mode=""
+	elif _selected_spawn_kind=="point" and _current_spawn_id>=0:
+		if _commit_spawn(_store.spawn_delete_point(_current_spawn_id),"Punto eliminado."):
+			_current_spawn_id=-1
+			_spawn_mode=""
+	_rebuild_spawn_buttons()
+	_redraw_spawn_overlay()
 
 
 func _clear_marker() -> void:
