@@ -44,6 +44,42 @@ func _check() -> void:
 	if int(info.get("animation_count",0))<5:
 		_fail("Explorer original idle/run clips not imported: "+JSON.stringify(info))
 		return
+	# Regression: one-shot source GLB clips must loop forever during movement.
+	var animator: AnimationPlayer=player.animation_player
+	if animator==null:
+		_fail("AnimationPlayer was not imported")
+		return
+	var idle_clip:=animator.get_animation(player.idle_name)
+	var run_clip:=animator.get_animation(player.run_name)
+	if idle_clip==null or run_clip==null:
+		_fail("Idle or Run loop was not registered")
+		return
+	if idle_clip.loop_mode!=Animation.LOOP_LINEAR or run_clip.loop_mode!=Animation.LOOP_LINEAR:
+		_fail("Idle and Run must both be looping animations")
+		return
+	player.call("_update_animation",true)
+	animator.advance(0.0)
+	if animator.current_animation!=player.run_name:
+		_fail("Moving did not start Run")
+		return
+	animator.advance(maxf(0.2,run_clip.length*2.25))
+	if not animator.is_playing() or animator.current_animation!=player.run_name:
+		_fail("Run stopped after its first cycle")
+		return
+	var progress_before:=animator.current_animation_position
+	player.call("_update_animation",true)
+	if not is_equal_approx(animator.current_animation_position,progress_before):
+		_fail("Movement restarted the running clip instead of letting it loop")
+		return
+	player.call("_update_animation",false)
+	animator.advance(0.0)
+	if animator.current_animation!=player.idle_name:
+		_fail("Stopping did not return to Idle")
+		return
+	animator.advance(maxf(0.2,idle_clip.length*2.25))
+	if not animator.is_playing() or animator.current_animation!=player.idle_name:
+		_fail("Idle stopped after its first cycle")
+		return
 	var spawn: Vector3 = info.get("spawn",Vector3.ZERO)
 	if absf(spawn.x-float(expected_spawn.get("x",0)))>0.05 or absf(spawn.z-float(expected_spawn.get("z",0)))>0.05:
 		_fail("Started outside player J1 spawn")
@@ -67,7 +103,7 @@ func _check() -> void:
 	if FileAccess.get_file_as_string(world_path)!=original:
 		_fail("Play rewrote editor's saved world")
 		return
-	print("WILDTRAP_EXPLORER_PLAY_OK meshes=",info.get("meshes")," animations=",info.get("animation_count")," spawn=",spawn," chase=true physics=true")
+	print("WILDTRAP_EXPLORER_PLAY_OK meshes=",info.get("meshes")," animations=",info.get("animation_count")," spawn=",spawn," chase=true physics=true animation_loop=true")
 	scene.queue_free()
 	await process_frame
 	quit(0)
