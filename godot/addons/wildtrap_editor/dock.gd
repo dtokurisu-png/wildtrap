@@ -51,6 +51,8 @@ var _prev_button: Button
 var _next_button: Button
 var _cliff_toggle: Button
 var _tab_scrolls: Dictionary = {}
+var _material_visibility := {"details":true,"handpaint":true,"cliffs":true}
+var _handpaint_preview_opacity := 0.50
 var _tabs: TabContainer
 var _spawn_mode := ""
 var _pending_spawn_area: Array = []
@@ -171,6 +173,29 @@ func _build_panel() -> void:
 		item.name="Biome_"+biome
 		_biome_buttons[biome]=item
 	_button(biome_tab,"Quitar selección",_clear_biome)
+	for entry in [
+		{"id":"details","label":"Complementarias"},
+		{"id":"handpaint","label":"Hand painting"},
+		{"id":"cliffs","label":"Acantilados (textura)"}
+	]:
+		var check := CheckButton.new()
+		check.name="Material_"+str(entry["id"])
+		check.text=str(entry["label"])
+		check.set_pressed_no_signal(true)
+		check.toggled.connect(_set_material_visible.bind(str(entry["id"])))
+		biome_tab.add_child(check)
+	var opacity_row := HBoxContainer.new()
+	biome_tab.add_child(opacity_row)
+	_label(opacity_row,"Opacidad pintura")
+	var opacity_slider := HSlider.new()
+	opacity_slider.name="HandpaintOpacity"
+	opacity_slider.min_value=0
+	opacity_slider.max_value=100
+	opacity_slider.step=1
+	opacity_slider.value=50
+	opacity_slider.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	opacity_slider.value_changed.connect(_set_handpaint_preview_opacity)
+	opacity_row.add_child(opacity_slider)
 	_biome_info=_label(biome_tab,"")
 
 	var zones_tab := _tab(tabs,"Zonas")
@@ -334,6 +359,30 @@ func refresh_scene() -> void:
 	_redraw_spawn_overlay()
 
 
+func _set_material_visible(enabled: bool, key: String) -> void:
+	_material_visibility[key]=enabled
+	_update_material_preview()
+
+
+func _set_handpaint_preview_opacity(value: float) -> void:
+	_handpaint_preview_opacity=clampf(value/100.0,0.0,1.0)
+	_update_material_preview()
+
+
+func _update_material_preview() -> void:
+	var world:=_get_world()
+	if world==null:
+		return
+	if world.has_method("set_editor_details_visible"):
+		world.call("set_editor_details_visible",bool(_material_visibility["details"]))
+	if world.has_method("set_editor_handpaint_visible"):
+		world.call("set_editor_handpaint_visible",bool(_material_visibility["handpaint"]))
+	if world.has_method("set_editor_cliff_colors_visible"):
+		world.call("set_editor_cliff_colors_visible",bool(_material_visibility["cliffs"]))
+	if world.has_method("set_editor_handpaint_opacity"):
+		world.call("set_editor_handpaint_opacity",_handpaint_preview_opacity)
+
+
 func _apply_preview() -> void:
 	var world := _get_world()
 	if world==null:
@@ -346,6 +395,7 @@ func _apply_preview() -> void:
 		world.call("set_editor_zone_selection",_selected_zone() if _zone_selection_active else {})
 	if world.has_method("set_editor_cliffs_visible"):
 		world.call("set_editor_cliffs_visible",_show_cliff_areas)
+	_update_material_preview()
 
 
 func _update_save_buttons() -> void:
