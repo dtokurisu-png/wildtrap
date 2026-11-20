@@ -13,6 +13,8 @@ const MODEL_FILES := {
 }
 const BIOMES := ["forest", "desert", "plains", "swamp", "mountain"]
 const BIOME_MASKS = preload("res://addons/wildtrap_editor/biome_masks.gd")
+const DETAIL_MAP := "res://data/detail-textures.json"
+const HANDPAINT_IMAGE := "res://assets/textures/handpaint_reference.webp"
 
 # Native editor preview: generated children are deliberately NOT assigned owner.
 # They appear in the 3D viewport but are not serialized into main.tscn.
@@ -38,11 +40,19 @@ func _clear_generated() -> void:
 	terrain = null
 	vertex_count = 0
 	triangle_count = 0
+	detail_layer_count = 0
+	cliff_masks_loaded = 0
+	handpaint_loaded = false
+	_detail_materials.clear()
 
 
 var source_world: Dictionary = {}
 var vertex_count: int = 0
 var triangle_count: int = 0
+var detail_layer_count: int = 0
+var _detail_materials: Array = []
+var handpaint_loaded := false
+var cliff_masks_loaded := 0
 var terrain: MeshInstance3D
 var _editor_selected_biome := ""
 var _editor_selected_zone: Dictionary = {}
@@ -108,10 +118,23 @@ func apply_editor_biome_preview(next_source: Dictionary, biome: String = "") -> 
 		return
 	# Use one native polygon rasterizer for editor preview AND saved PNG masks.
 	var images: Dictionary = BIOME_MASKS.make(source_world)
+	var cliffs: Dictionary = BIOME_MASKS.make_cliff_biome_masks(source_world)
+	var preview_masks: Dictionary = {}
 	for id_biome in BIOMES:
 		var image: Image = images.get(id_biome)
 		if image != null:
-			shader_mat.set_shader_parameter("mask_"+id_biome,ImageTexture.create_from_image(image))
+			var texture := ImageTexture.create_from_image(image)
+			preview_masks[id_biome]=texture
+			shader_mat.set_shader_parameter("mask_"+id_biome,texture)
+		var cliff_image: Image=cliffs.get(id_biome)
+		if cliff_image!=null:
+			shader_mat.set_shader_parameter("cliff_mask_"+id_biome,ImageTexture.create_from_image(cliff_image))
+	for entry in _detail_materials:
+		var mask: Texture2D = preview_masks.get(str(entry.get("biome","")))
+		if mask != null:
+			var layer_mat: ShaderMaterial=entry.get("material")
+			if layer_mat!=null:
+				layer_mat.set_shader_parameter("region_mask",mask)
 	set_editor_biome_selection(biome)
 	_update_editor_zone_mask()
 	_update_editor_cliff_mask()
@@ -206,37 +229,144 @@ func _read_mesh() -> bool:
 	add_child(instance)
 	terrain = instance
 	_apply_material()
+	_add_detail_layers()
 	vertex_count = n
 	triangle_count = indices_n/3
 	return true
 
 func _apply_material() -> void:
 	var shader := load("res://shaders/terrain.gdshader") as Shader
-	if shader == null:
-		push_error("WildTrap terrain shader could not load")
+	if shader==null:
+		push_error("WildTrap: cannot load terrain shader")
 		return
 	var material := ShaderMaterial.new()
-	material.shader = shader
+	material.shader=shader
+	var cliff_settings: Dictionary=source_world.get("cliffHeightSettings",{})
+	var biome_overrides: Dictionary=cliff_settings.get("biomes",{})
+	var cliff_images: Dictionary={}
 	for biome in BIOMES:
+		var fallback: Image = null
 		var mask := load("res://data/masks/%s.png" % biome) as Texture2D
 		var ground := load("res://assets/textures/ground_%s.png" % biome) as Texture2D
 		var cliff := load("res://assets/textures/cliff_%s.png" % biome) as Texture2D
-		if mask == null or ground == null or cliff == null:
-			push_error("Missing biome resource: " + biome)
+		if mask==null or ground==null or cliff==null:
+			push_error("Missing ground/cliff biome resource: "+biome)
 			continue
-		material.set_shader_parameter("mask_%s" % biome, mask)
-		material.set_shader_parameter("ground_%s" % biome, ground)
-		material.set_shader_parameter("cliff_%s" % biome, cliff)
-		var settings: Dictionary = source_world.get("biomeMaterials", {})
-		var biome_settings: Dictionary = settings.get(biome, {})
-		var slots: Dictionary = biome_settings.get("slots", {})
-		var ground_settings: Dictionary = slots.get("ground", {})
-		material.set_shader_parameter("repeat_%s" % biome, float(ground_settings.get("scale", 200.0)))
-	terrain.material_override = material
+		material.set_shader_parameter("mask_"+biome,mask)
+		material.set_shader_parameter("ground_"+biome,ground)
+		material.set_shader_parameter("cliff_"+biome,cliff)
+		var cliff_mask := load("res://data/masks/cliff_%s.png" % biome) as Texture2D
+		if cliff_mask==null:
+			# This allows the native inspector to render an unsaved local world
+			# before its first CI bake, but the bake will produce PNG masks.
+			if cliff_images.is_empty():
+				cliff_images=BIOME_MASKS.make_cliff_biome_masks(source_world)
+			fallback=cliff_images.get(biome)
+			if fallback!=null:
+				cliff_mask=ImageTexture.create_from_image(fallback)
+		if cliff_mask!=null:
+			material.set_shader_parameter("cliff_mask_"+biome,cliff_mask)
+			cliff_masks_loaded+=1
+		var settings: Dictionary=source_world.get("biomeMaterials",{})
+		var biome_settings: Dictionary=settings.get(biome,{})
+		var slots: Dictionary=biome_settings.get("slots",{})
+		var ground_settings: Dictionary=slots.get("ground",{})
+		material.set_shader_parameter("repeat_"+biome,float(ground_settings.get("scale",200.0)))
+		var own: Dictionary=biome_overrides.get(biome,{})
+		var repeats:=float(own.get("repeats",0.0))
+		if repeats<3.5 or repeats>315.0:
+			if biome=="plains" and float(cliff_settings.get("period",0.0))>=2.0:
+				repeats=630.0/float(cliff_settings.get("period",12.6))
+			else:
+				repeats=26.25
+		material.set_shader_parameter("cliff_repeat_"+biome,repeats)
+		material.set_shader_parameter("cliff_intensity_"+biome,clampf(float(own.get("intensity",1.0)),0.0,1.0))
+	var painted:=load(HANDPAINT_IMAGE) as Texture2D
+	handpaint_loaded=painted!=null
+	if handpaint_loaded:
+		material.set_shader_parameter("handpaint_texture",painted)
+		material.set_shader_parameter("handpaint_enabled",true)
+		material.set_shader_parameter("handpaint_opacity",0.50)
+		material.set_shader_parameter("handpaint_contrast",0.45)
+		material.set_shader_parameter("handpaint_rotation_degrees",180.0)
+	else:
+		material.set_shader_parameter("handpaint_enabled",false)
+		push_warning("WildTrap hand-painted terrain image missing")
+	terrain.material_override=material
 	if Engine.is_editor_hint():
 		set_editor_biome_selection(_editor_selected_biome)
 		_update_editor_zone_mask()
 		_update_editor_cliff_mask()
+
+
+func _add_detail_layers() -> void:
+	if not FileAccess.file_exists(DETAIL_MAP) or not is_instance_valid(terrain):
+		push_warning("WildTrap: native complementary image catalogue is missing.")
+		return
+	var catalog_value: Variant=JSON.parse_string(FileAccess.get_file_as_string(DETAIL_MAP))
+	if not (catalog_value is Dictionary):
+		push_error("WildTrap: complementary image catalogue is invalid")
+		return
+	var catalog: Dictionary=catalog_value
+	var detail_shader:=load("res://shaders/detail_layer.gdshader") as Shader
+	if detail_shader==null:
+		push_error("WildTrap: cannot load detail shader")
+		return
+	var materials: Dictionary=source_world.get("biomeMaterials",{})
+	for biome in BIOMES:
+		var config: Dictionary=materials.get(biome,{})
+		var slots: Dictionary=config.get("slots",{})
+		var mask:=load("res://data/masks/%s.png" % biome) as Texture2D
+		if mask==null:
+			continue
+		for layer in range(1,4):
+			var slot: Dictionary=slots.get("detail"+str(layer),{})
+			var name_text:=str(slot.get("name",""))
+			if name_text.is_empty() or not catalog.has(name_text):
+				continue
+			var asset_path:=str(catalog[name_text])
+			if not asset_path.begins_with("res://assets/textures/details/"):
+				push_error("WildTrap detail resource outside permitted asset directory")
+				continue
+			var art:=load(asset_path) as Texture2D
+			if art==null:
+				push_warning("WildTrap complementary texture not imported: "+name_text)
+				continue
+			var strength:=clampf(float(slot.get("opacity",0.5)),0.0,1.0)
+			if strength<=0.0:
+				continue
+			var layer_material:=ShaderMaterial.new()
+			layer_material.shader=detail_shader
+			layer_material.render_priority=layer
+			layer_material.set_shader_parameter("region_mask",mask)
+			layer_material.set_shader_parameter("detail_texture",art)
+			layer_material.set_shader_parameter("repeats",clampf(float(slot.get("scale",200.0)),0.25,1000.0))
+			layer_material.set_shader_parameter("intensity",strength)
+			layer_material.set_shader_parameter("variation_seed",float((config.get("noise",{}) as Dictionary).get("seed",1)))
+			layer_material.set_shader_parameter("layer_number",float(layer))
+			layer_material.set_shader_parameter("biome_contrast",clampf(float(config.get("colorContrast",1.0)),0.0,3.0))
+			layer_material.set_shader_parameter("biome_saturation",clampf(float(config.get("colorSaturation",1.0)),0.0,3.0))
+			var instance:=MeshInstance3D.new()
+			instance.name="WildTrapDetail_%s_%d" % [biome,layer]
+			instance.set_meta("wildtrap_generated",true)
+			instance.mesh=terrain.mesh
+			instance.material_override=layer_material
+			instance.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(instance)
+			_detail_materials.append({"biome":biome,"layer":layer,"material":layer_material})
+			detail_layer_count+=1
+	print("WILDTRAP_TEXTURE_MIGRATION detail_layers=",detail_layer_count,
+		" cliff_masks=",cliff_masks_loaded," handpaint=",handpaint_loaded)
+
+
+func get_material_migration_summary() -> Dictionary:
+	return {
+		"detail_layers":detail_layer_count,
+		"cliff_masks":cliff_masks_loaded,
+		"handpaint":handpaint_loaded,
+		"handpaint_alpha":(terrain.material_override as ShaderMaterial).get_shader_parameter("handpaint_opacity") if is_instance_valid(terrain) and terrain.material_override is ShaderMaterial else 0.0
+	}
+
 
 func _height_at(x: float, z: float) -> float:
 	var n: int = int(source_world.get("resolution", 129))
