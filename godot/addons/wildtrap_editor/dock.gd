@@ -10,7 +10,7 @@ const LABELS := {
 	"swamp":"Pantano","mountain":"Montaña"
 }
 const PAGE_SIZE := 12
-const MARKER_COLOR := Color(0.0,1.0,0.86,1.0)
+const MARKER_COLOR := Color(0.40,0.70,0.56,1.0)
 
 var _editor_interface: EditorInterface
 var _scene_root: Node
@@ -20,6 +20,8 @@ var _marker: Node3D
 var _current_zone_id := ""
 var _current_spawn_id := -1
 var _selected_biome := ""
+var _show_cliff_areas := false
+var _zone_selection_active := false
 var _options: Array = []
 var _page := 0
 
@@ -38,10 +40,12 @@ var _undo_button: Button
 var _redo_button: Button
 var _prev_button: Button
 var _next_button: Button
+var _cliff_toggle: Button
+var _tab_scrolls: Dictionary = {}
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(300,350)
+	custom_minimum_size = Vector2(280,220)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 
@@ -87,12 +91,19 @@ func _button(parent: Node, title: String, callback: Callable) -> Button:
 
 
 func _tab(tabs: TabContainer, name_text: String) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.name=name_text
+	scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_SHOW_ALWAYS
+	scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	tabs.add_child(scroll)
+	_tab_scrolls[name_text]=scroll
 	var body := VBoxContainer.new()
-	body.name=name_text
+	body.name=name_text+"Content"
 	body.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	tabs.add_child(body)
+	scroll.add_child(body)
 	return body
-
 
 func _build_panel() -> void:
 	var header := _label(self,"WILDTRAP EDITOR")
@@ -110,7 +121,6 @@ func _build_panel() -> void:
 	add_child(tabs)
 
 	var biome_tab := _tab(tabs,"Biomas")
-	_label(biome_tab,"Selecciona un bioma para colorear sus superficies en 3D.")
 	var grid := GridContainer.new()
 	grid.columns=2
 	grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL
@@ -120,35 +130,30 @@ func _build_panel() -> void:
 		item.toggle_mode=true
 		item.name="Biome_"+biome
 		_biome_buttons[biome]=item
-	_button(biome_tab,"Ver todos sin resaltado",_clear_biome)
+	_button(biome_tab,"Quitar selección",_clear_biome)
 	_biome_info=_label(biome_tab,"")
 
 	var zones_tab := _tab(tabs,"Zonas")
 	_label(zones_tab,"Regiones y acantilados existentes")
-	var zone_scroll := ScrollContainer.new()
-	zone_scroll.custom_minimum_size=Vector2(0,240)
-	zone_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	zones_tab.add_child(zone_scroll)
+	_cliff_toggle=_button(zones_tab,"Mostrar acantilados",_toggle_cliffs)
+	_cliff_toggle.name="ShowCliffs"
+	_cliff_toggle.toggle_mode=true
 	_zone_list=VBoxContainer.new()
 	_zone_list.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	zone_scroll.add_child(_zone_list)
+	zones_tab.add_child(_zone_list)
 	_zone_info=_label(zones_tab,"")
-	_label(zones_tab,"Distribuciones por zona · Zona Este: Montaña prohibida")
-	_distribution_label=_label(zones_tab,"")
-	var distribution_scroll := ScrollContainer.new()
-	distribution_scroll.custom_minimum_size=Vector2(0,260)
-	distribution_scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	zones_tab.add_child(distribution_scroll)
+	_zone_info.visible=false
+	_label(zones_tab,"Distribuciones posibles")
 	_distribution_list=VBoxContainer.new()
 	_distribution_list.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	distribution_scroll.add_child(_distribution_list)
+	zones_tab.add_child(_distribution_list)
 	var pager := HBoxContainer.new()
 	zones_tab.add_child(pager)
 	_prev_button=_button(pager,"Anterior",_previous_page)
+	_distribution_label=_label(pager,"")
 	_next_button=_button(pager,"Siguiente",_next_page)
 
 	var spawns_tab := _tab(tabs,"Spawns")
-	_label(spawns_tab,"Spawns existentes (edición de posiciones en la siguiente fase)")
 	var spawn_list := VBoxContainer.new()
 	spawn_list.name="SpawnList"
 	spawns_tab.add_child(spawn_list)
@@ -182,6 +187,10 @@ func _apply_preview() -> void:
 		world.call("apply_editor_biome_preview",_source,_selected_biome)
 	elif world.has_method("set_editor_biome_selection"):
 		world.call("set_editor_biome_selection",_selected_biome)
+	if world.has_method("set_editor_zone_selection"):
+		world.call("set_editor_zone_selection",_selected_zone() if _zone_selection_active else {})
+	if world.has_method("set_editor_cliffs_visible"):
+		world.call("set_editor_cliffs_visible",_show_cliff_areas)
 
 
 func _update_save_buttons() -> void:
@@ -194,20 +203,37 @@ func _update_save_buttons() -> void:
 
 func _select_biome(biome: String) -> void:
 	_selected_biome=biome
+	_zone_selection_active=false
+	_clear_marker()
 	_update_biome_buttons()
 	var world := _get_world()
-	if world!=null and world.has_method("set_editor_biome_selection"):
-		world.call("set_editor_biome_selection",biome)
-	_status.text="Bioma seleccionado: "+str(LABELS.get(biome,biome))
+	if world!=null:
+		if world.has_method("set_editor_zone_selection"):
+			world.call("set_editor_zone_selection",{})
+		if world.has_method("set_editor_biome_selection"):
+			world.call("set_editor_biome_selection",biome)
+	_status.text="Bioma: "+str(LABELS.get(biome,biome))
 
 
 func _clear_biome() -> void:
 	_selected_biome=""
+	_zone_selection_active=false
 	_update_biome_buttons()
 	var world := _get_world()
-	if world!=null and world.has_method("set_editor_biome_selection"):
-		world.call("set_editor_biome_selection","")
+	if world!=null:
+		if world.has_method("set_editor_biome_selection"):
+			world.call("set_editor_biome_selection","")
+		if world.has_method("set_editor_zone_selection"):
+			world.call("set_editor_zone_selection",{})
 
+
+func _toggle_cliffs() -> void:
+	_show_cliff_areas=not _show_cliff_areas
+	_cliff_toggle.set_pressed_no_signal(_show_cliff_areas)
+	_cliff_toggle.text="Ocultar acantilados" if _show_cliff_areas else "Mostrar acantilados"
+	var world := _get_world()
+	if world!=null and world.has_method("set_editor_cliffs_visible"):
+		world.call("set_editor_cliffs_visible",_show_cliff_areas)
 
 func _update_biome_buttons() -> void:
 	var counts: Dictionary = {}
@@ -221,7 +247,7 @@ func _update_biome_buttons() -> void:
 		var button: Button = _biome_buttons[biome]
 		button.set_pressed_no_signal(_selected_biome==biome)
 		button.text=str(LABELS[biome])+" · "+str(counts[biome])
-	_biome_info.text="Cinco biomas · %d regiones principales" % RULES.regions(_source).size()
+	_biome_info.text=""
 
 
 func _rebuild_zone_buttons() -> void:
@@ -238,8 +264,9 @@ func _rebuild_zone_buttons() -> void:
 			continue
 		var biome := str(zone.get("biomeId",""))
 		var mark := "⛰ " if bool(zone.get("isCliff",false)) else "◉ "
-		var title := mark+str(zone.get("name",id_text))+" · "+str(LABELS.get(biome,biome))
+		var title := mark+str(zone.get("name",id_text))
 		var button := _button(_zone_list,title,_choose_zone.bind(id_text))
+		button.tooltip_text=str(LABELS.get(biome,biome))
 		button.toggle_mode=true
 		button.set_pressed_no_signal(_current_zone_id==id_text)
 		_zone_buttons.append(button)
@@ -257,14 +284,18 @@ func _repaint_zone_selection() -> void:
 
 func _choose_zone(identifier: String) -> void:
 	_current_zone_id=identifier
+	_zone_selection_active=true
+	_selected_biome=""
+	_update_biome_buttons()
 	_repaint_zone_selection()
 	_update_zone_info()
-	var zone := _selected_zone()
-	var biome := str(zone.get("biomeId",""))
-	if BIOMES.has(biome):
-		_select_biome(biome)
+	var world := _get_world()
+	if world!=null:
+		if world.has_method("set_editor_biome_selection"):
+			world.call("set_editor_biome_selection","")
+		if world.has_method("set_editor_zone_selection"):
+			world.call("set_editor_zone_selection",_selected_zone())
 	_highlight_zone()
-
 
 func _selected_zone() -> Dictionary:
 	for zone in _source.get("zones",[]):
@@ -277,17 +308,7 @@ func _update_zone_info() -> void:
 	if _zone_info==null:
 		return
 	var zone := _selected_zone()
-	if zone.is_empty():
-		_zone_info.text="Selecciona una zona."
-		return
-	var biome := str(zone.get("biomeId",""))
-	_zone_info.text="%s · %s\nBioma: %s · %d puntos" % [
-		str(zone.get("name","")),
-		"Acantilado" if bool(zone.get("isCliff",false)) else "Terreno",
-		str(LABELS.get(biome,biome)),
-		(zone.get("points",[]) as Array).size()
-	]
-
+	_zone_info.text=str(zone.get("name","")) if not zone.is_empty() else ""
 
 func _recalculate_distributions() -> void:
 	var result: Dictionary = RULES.enumerate(_source)
@@ -296,7 +317,7 @@ func _recalculate_distributions() -> void:
 		_distribution_label.text=str(result.get("error","Sin distribuciones"))
 	else:
 		_options=result.get("options",[])
-		_distribution_label.text="%d posibilidades válidas" % _options.size()
+		_distribution_label.text=""
 	_page=clampi(_page,0,maxi(0,int(ceil(float(_options.size())/PAGE_SIZE))-1))
 	_render_distributions()
 
@@ -319,7 +340,7 @@ func _render_distributions() -> void:
 		button.tooltip_text=" | ".join(description)
 	_prev_button.disabled=_page<=0
 	_next_button.disabled=(_page+1)*PAGE_SIZE>=_options.size()
-	_distribution_label.text+=" · Página %d/%d" % [_page+1,maxi(1,int(ceil(float(_options.size())/PAGE_SIZE)))]
+	_distribution_label.text="%d/%d" % [_page+1,maxi(1,int(ceil(float(_options.size())/PAGE_SIZE)))] if not _options.is_empty() else "0/0"
 
 
 func _previous_page() -> void:
@@ -346,7 +367,7 @@ func _choose_distribution(index: int) -> void:
 	_recalculate_distributions()
 	_update_save_buttons()
 	_apply_preview()
-	_status.text="Distribución aplicada. Guarda para escribir en Git."
+	_status.text="Distribución sin guardar."
 
 
 func _undo_edit() -> void:
@@ -376,14 +397,14 @@ func _save_world() -> void:
 		_update_save_buttons()
 		if _editor_interface!=null:
 			_editor_interface.get_resource_filesystem().scan()
-		_status.text="Guardado en godot/data/world.json + cinco máscaras PNG. Haz Commit y Push en GitHub Desktop."
+		_status.text="Guardado correctamente."
 	else:
 		_status.text="No guardado: "+_store.last_error
 
 
 func _reload_world() -> void:
 	if _store.dirty:
-		_status.text="Hay cambios pendientes. Usa Deshacer o Guardar; no se recargó."
+		_status.text="Guarda o deshaz antes de recargar."
 		return
 	if _store.open():
 		refresh_scene()
