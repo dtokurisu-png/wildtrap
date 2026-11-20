@@ -67,6 +67,11 @@ func _ready() -> void:
 	_rotation=_spin(transforms,-360.0,360.0,1.0)
 	_scale=_spin(transforms,0.01,30.0,0.05)
 	_height=_spin(_props,-1000.0,2000.0,0.25)
+	_position_x.prefix="X "
+	_position_z.prefix="Z "
+	_rotation.prefix="Y° "
+	_scale.prefix="× "
+	_height.prefix="Y "
 	_button(_props,"Aplicar posición, rotación y escala",_apply_transform)
 	_hidden=CheckButton.new()
 	_hidden.text="Ocultar en editor"
@@ -183,7 +188,12 @@ func _update_form() -> void:
 	_position_z.set_value_no_signal(float(record.get("z",0)))
 	_rotation.set_value_no_signal(rad_to_deg(float(record.get("rotation",0))))
 	_scale.set_value_no_signal(float(record.get("scale",1)))
-	_height.set_value_no_signal(float(record.get("y",0)))
+	var actual_height:=float(record.get("y",0))
+	if not record.has("y") and host!=null:
+		var world:=host.call("_get_world") as Node3D
+		if world!=null and world.has_method("_height_at"):
+			actual_height=float(world.call("_height_at",float(record.get("x",0)),float(record.get("z",0))))+float(record.get("offsetY",0))
+	_height.set_value_no_signal(actual_height)
 	_height.visible=bool(OBJECTS.by_id(str(record.get("prefabId",""))).get("freeCave",false))
 	_hidden.set_pressed_no_signal(bool(record.get("editorHidden",false)))
 	_intangible.set_pressed_no_signal(bool(record.get("editorIntangible",false)))

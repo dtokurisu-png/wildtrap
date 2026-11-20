@@ -86,7 +86,7 @@ var _preview_signature := ""
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(280,220)
+	custom_minimum_size = Vector2(380,220)
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 
