@@ -102,6 +102,42 @@ static func _paint_polygon(img: Image, poly: Array, world_size: float) -> void:
 				img.set_pixel(px,py,Color(1,1,1,1))
 
 
+## Parent-biome attribution matches cliff-zone-bindings.mjs / original renderer.
+static func make_cliff_biome_masks(source: Dictionary) -> Dictionary:
+	var result: Dictionary={}
+	var parents: Dictionary={}
+	for zone in source.get("zones",[]):
+		if not (zone is Dictionary):
+			continue
+		if not bool(zone.get("isCliff",false)):
+			parents[str(zone.get("id",""))]=str(zone.get("biomeId",""))
+	for biome in BIOMES:
+		var image := Image.create_empty(RESOLUTION,RESOLUTION,false,Image.FORMAT_RGBA8)
+		image.fill(Color(0,0,0,0))
+		result[biome]=image
+	for zone in source.get("zones",[]):
+		if not (zone is Dictionary) or not bool(zone.get("isCliff",false)) or bool(zone.get("hidden",false)):
+			continue
+		var biome := str(parents.get(str(zone.get("cliffParentId","")),""))
+		if not result.has(biome):
+			continue
+		var img: Image=result[biome]
+		_paint_polygon(img,zone.get("points",[]),float(source.get("size",630)))
+	return result
+
+
+static func save_cliff_pngs(images: Dictionary) -> bool:
+	for biome in BIOMES:
+		var image: Image=images.get(biome)
+		if image==null:
+			return false
+		var dest:=ProjectSettings.globalize_path("res://data/masks/cliff_%s.png" % biome)
+		if image.save_png(dest)!=OK:
+			push_error("No se pudo guardar la máscara de acantilados "+biome)
+			return false
+	return true
+
+
 static func save_pngs(images: Dictionary) -> bool:
 	for biome in BIOMES:
 		var image: Image = images.get(biome)

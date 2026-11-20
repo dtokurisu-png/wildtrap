@@ -132,6 +132,33 @@ for(const biome of biomes){
  }
  write('godot/data/masks/'+biome+'.png',PNG.sync.write(img));
 }
+// Cliff-color masks belong to the PARENT region's biome, never the saved
+// cliff polygon's own biomeId (which may differ intentionally).
+const mainById=new Map((world.zones||[]).filter(z=>!z.isCliff).map(z=>[z.id,z]));
+const cliffPixels={};
+for(const biome of biomes)cliffPixels[biome]=new PNG({width:maskRes,height:maskRes});
+for(const zone of (world.zones||[])){
+ if(!zone.isCliff||zone.hidden||!Array.isArray(zone.points)||zone.points.length<3)continue;
+ const parent=mainById.get(zone.cliffParentId);
+ const biome=parent?.biomeId;
+ if(!cliffPixels[biome])continue;
+ const xs=zone.points.map(p=>p.x),zs=zone.points.map(p=>p.z);
+ const x0=Math.max(0,Math.floor((Math.min(...xs)+size/2)/size*maskRes)-1);
+ const x1=Math.min(maskRes-1,Math.ceil((Math.max(...xs)+size/2)/size*maskRes)+1);
+ const y0=Math.max(0,Math.floor((size/2-Math.max(...zs))/size*maskRes)-1);
+ const y1=Math.min(maskRes-1,Math.ceil((size/2-Math.min(...zs))/size*maskRes)+1);
+ const img=cliffPixels[biome];
+ for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+  const wx=(x+.5)/maskRes*size-size/2,wz=size/2-(y+.5)/maskRes*size;
+  if(inside(wx,wz,zone.points)){
+   const k=(y*maskRes+x)*4;img.data[k]=img.data[k+1]=img.data[k+2]=img.data[k+3]=255;
+  }
+ }
+}
+for(const biome of biomes){
+ const img=cliffPixels[biome];
+ write('godot/data/masks/cliff_'+biome+'.png',PNG.sync.write(img));
+}
 const summary={
  source:'godot/data/world.json (canonical native project; historical import from published snapshot)',
  size,resolution:n,heightSamples:count,offsets:Object.keys(world.terrainVertexOffsets||{}).length,

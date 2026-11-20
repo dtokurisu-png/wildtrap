@@ -169,11 +169,13 @@ func save() -> bool:
 		DirAccess.remove_absolute(temp_path)
 		last_error="Error de verificación del JSON temporal."
 		return false
-	var masks: Dictionary = MASKS.make(data)
-	if save_masks and not MASKS.save_pngs(masks):
-		DirAccess.remove_absolute(temp_path)
-		last_error="No se pudieron guardar todas las máscaras."
-		return false
+	if save_masks:
+		var masks: Dictionary = MASKS.make(data)
+		var cliffs: Dictionary = MASKS.make_cliff_biome_masks(data)
+		if not MASKS.save_pngs(masks) or not MASKS.save_cliff_pngs(cliffs):
+			DirAccess.remove_absolute(temp_path)
+			last_error="No se pudieron guardar las máscaras del terreno."
+			return false
 	var moved := DirAccess.rename_absolute(temp_path,path)
 	if moved!=OK:
 		DirAccess.remove_absolute(temp_path)
