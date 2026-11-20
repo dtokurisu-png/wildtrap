@@ -1,24 +1,29 @@
 @tool
 extends VBoxContainer
-## Native Godot editor object palette; 15 exact legacy prefab IDs.
+## Drag original 3D thumbnails to the native editor viewport. No placement
+## action buttons, no separate cave dropdown; select existing models directly.
 const OBJECTS=preload("res://addons/wildtrap_editor/object_rules.gd")
 const PICK=preload("res://addons/wildtrap_editor/spawn_viewport.gd")
+const GHOST_NAME="__WT_ObjectDragGhost"
+
 var host: Control
 var store: RefCounted
-var _mode: String=""
 var _catalog: Array=[]
+var _tiles: Dictionary={}
+var _palette: GridContainer
+var _previewer: EditorResourcePreview
+var _mode: String=""
 var _active_prefab: String=""
 var _selected_id: int=-1
-var _palette: ItemList
-var _instances: OptionButton
+var _dragging:=false
+var _over_3d:=false
+var _ghost: Node3D
+var _drag_position:=Vector3.ZERO
+var _props: VBoxContainer
 var _position_x: SpinBox
 var _position_z: SpinBox
 var _rotation: SpinBox
 var _scale: SpinBox
-var _height: SpinBox
-var _hidden: CheckButton
-var _intangible: CheckButton
-var _props: VBoxContainer
 var _status: Label
 var _updating:=false
 
@@ -27,282 +32,423 @@ func configure(source_store: RefCounted,source_host: Control) -> void:
 	store=source_store
 	host=source_host
 	_catalog=OBJECTS.catalog()
-	if is_inside_tree():
-		_palette.clear()
-		for entry in _catalog:
-			_palette.add_item(str(entry.get("name","")))
+	if is_node_ready():
+		_fill_gallery()
 		refresh()
 
 
 func _ready() -> void:
-	_palette=ItemList.new()
+	_palette=GridContainer.new()
 	_palette.name="ObjectPalette"
-	_palette.custom_minimum_size=Vector2(0,220)
+	_palette.columns=3
 	_palette.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	_palette.item_selected.connect(_on_palette_selected)
 	add_child(_palette)
-	for item in _catalog:
-		_palette.add_item(str(item.get("name","")))
-	var actions:=HBoxContainer.new()
-	add_child(actions)
-	_button(actions,"Colocar",_set_mode.bind("place"))
-	_button(actions,"Seleccionar",_set_mode.bind("select"))
-	_button(actions,"Mover",_set_mode.bind("move"))
-	_button(actions,"Cancelar",_cancel)
-	_status=_label(self,"")
-	_instances=OptionButton.new()
-	_instances.name="SceneObjects"
-	_instances.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	_instances.item_selected.connect(_on_instance_selected)
-	add_child(_instances)
+	_status=Label.new()
+	_status.name="ObjectStatus"
+	_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	add_child(_status)
 	_props=VBoxContainer.new()
 	_props.name="ObjectProperties"
 	add_child(_props)
-	var coords:=HBoxContainer.new()
-	_props.add_child(coords)
-	_position_x=_spin(coords,-315.0,315.0,0.25)
-	_position_z=_spin(coords,-315.0,315.0,0.25)
-	var transforms:=HBoxContainer.new()
-	_props.add_child(transforms)
-	_rotation=_spin(transforms,-360.0,360.0,1.0)
-	_scale=_spin(transforms,0.01,30.0,0.05)
-	_height=_spin(_props,-1000.0,2000.0,0.25)
-	_position_x.prefix="X "
-	_position_z.prefix="Z "
-	_rotation.prefix="Y° "
-	_scale.prefix="× "
-	_height.prefix="Y "
-	_button(_props,"Aplicar posición, rotación y escala",_apply_transform)
-	_hidden=CheckButton.new()
-	_hidden.text="Ocultar en editor"
-	_hidden.toggled.connect(_on_hidden)
-	_props.add_child(_hidden)
-	_intangible=CheckButton.new()
-	_intangible.text="Intangible en editor"
-	_intangible.toggled.connect(_on_intangible)
-	_props.add_child(_intangible)
-	_button(_props,"Eliminar objeto",_delete)
+	var transform_row:=HBoxContainer.new()
+	_props.add_child(transform_row)
+	_position_x=_spin(transform_row,-315.0,315.0,"X")
+	_position_z=_spin(transform_row,-315.0,315.0,"Z")
+	var other_row:=HBoxContainer.new()
+	_props.add_child(other_row)
+	_rotation=_spin(other_row,-360.0,360.0,"Y°")
+	_scale=_spin(other_row,0.01,30.0,"×")
+	var apply_button:=Button.new()
+	apply_button.text="Aplicar"
+	apply_button.pressed.connect(_apply_transform)
+	_props.add_child(apply_button)
+	var controls:=HBoxContainer.new()
+	_props.add_child(controls)
+	var hide:=Button.new()
+	hide.name="HideObject"
+	hide.text="Ocultar/mostrar"
+	hide.pressed.connect(_toggle_hidden)
+	controls.add_child(hide)
+	var delete:=Button.new()
+	delete.text="Eliminar"
+	delete.pressed.connect(_delete)
+	controls.add_child(delete)
 	_props.visible=false
+	if Engine.is_editor_hint():
+		_previewer=EditorInterface.get_resource_previewer()
+	_fill_gallery()
 	refresh()
 
 
-func _label(where: Node,label_text: String) -> Label:
-	var l:=Label.new()
-	l.text=label_text
-	l.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	where.add_child(l)
-	return l
+func _spin(parent: Node,min_value: float,max_value: float,prefix_text: String) -> SpinBox:
+	var s:=SpinBox.new()
+	s.min_value=min_value
+	s.max_value=max_value
+	s.step=0.05
+	s.prefix=prefix_text
+	s.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	parent.add_child(s)
+	return s
 
 
-func _button(where: Node,label_text: String,callback: Callable) -> Button:
-	var button:=Button.new()
-	button.text=label_text
-	button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	button.pressed.connect(callback)
-	where.add_child(button)
-	return button
+func _fill_gallery() -> void:
+	if _palette==null:
+		return
+	for child in _palette.get_children():
+		child.queue_free()
+	_tiles.clear()
+	for item in _catalog:
+		if not (item is Dictionary):
+			continue
+		var id_text:=str(item.get("id",""))
+		var tile:=Button.new()
+		tile.name="Model_"+id_text.replace("-","_")
+		tile.text=str(item.get("name",""))
+		tile.tooltip_text=str(item.get("name",""))
+		tile.custom_minimum_size=Vector2(107,104)
+		tile.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		tile.expand_icon=true
+		tile.icon_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		tile.vertical_icon_alignment=VERTICAL_ALIGNMENT_TOP
+		tile.alignment=HORIZONTAL_ALIGNMENT_CENTER
+		tile.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+		tile.gui_input.connect(_tile_input.bind(id_text))
+		_palette.add_child(tile)
+		_tiles[id_text]=tile
+		if _previewer!=null:
+			var path:=str(item.get("path",""))
+			if ResourceLoader.exists(path):
+				_previewer.queue_resource_preview(path,self,"_thumbnail_ready",id_text)
 
 
-func _spin(where: Node,minimum: float,maximum: float,step_value: float) -> SpinBox:
-	var input:=SpinBox.new()
-	input.min_value=minimum
-	input.max_value=maximum
-	input.step=step_value
-	input.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	where.add_child(input)
-	return input
+func _thumbnail_ready(_path: String,preview: Texture2D,thumbnail: Texture2D,id_text: String) -> void:
+	if not is_inside_tree() or not _tiles.has(id_text):
+		return
+	var tile:=_tiles[id_text] as Button
+	if not is_instance_valid(tile):
+		return
+	if thumbnail!=null or preview!=null:
+		tile.icon=thumbnail if thumbnail!=null else preview
+	else:
+		# Some Godot importers do not supply a ready preview for .glb.
+		# Render a thumbnail of an actual mesh instead of a generic symbol.
+		_make_mesh_thumbnail(tile,id_text)
+
+
+func _make_mesh_thumbnail(tile: Button,id_text: String) -> void:
+	var spec:=OBJECTS.by_id(id_text)
+	var packed:=load(str(spec.get("path",""))) as PackedScene
+	if packed==null:
+		return
+	var root:=packed.instantiate() as Node3D
+	if root==null:
+		return
+	var best: Mesh
+	var max_vertices:=0
+	for item in root.find_children("*","MeshInstance3D",true,false):
+		var mesh_instance:=item as MeshInstance3D
+		if mesh_instance.mesh==null:
+			continue
+		var count:=0
+		for surf in range(mesh_instance.mesh.get_surface_count()):
+			var arrays:=mesh_instance.mesh.surface_get_arrays(surf)
+			if arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array:
+				count+=(arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+		if count>max_vertices:
+			max_vertices=count
+			best=mesh_instance.mesh
+	if best!=null:
+		var meshes: Array[Mesh]=[best]
+		var rendered: Array[Texture2D]=EditorInterface.make_mesh_previews(meshes,96)
+		if rendered.size()>0 and rendered[0]!=null:
+			tile.icon=rendered[0]
+	root.free()
+
+
+func _tile_input(event: InputEvent,id_text: String) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var click:=event as InputEventMouseButton
+	if click.button_index!=MOUSE_BUTTON_LEFT:
+		return
+	if click.pressed:
+		_active_prefab=id_text
+		_mode="place"
+		_dragging=true
+		_over_3d=false
+		_start_ghost()
+		_status.text=str(OBJECTS.by_id(id_text).get("name",id_text))
+	elif _dragging and not _over_3d:
+		# If released in the panel, simply cancel; do not place at a guess.
+		_cancel_ghost()
+		_dragging=false
+		_mode=""
 
 
 func _on_palette_selected(index: int) -> void:
-	if index<0 or index>=_catalog.size():
-		return
-	_active_prefab=str(_catalog[index].get("id",""))
-	_status.text=str(_catalog[index].get("name",""))
+	# Compatible with earlier headless integration tests, not exposed as UI.
+	if index>=0 and index<_catalog.size():
+		_active_prefab=str(_catalog[index].get("id",""))
 
 
-func _set_mode(action: String) -> void:
-	if store==null or host==null or host.call("_get_world")==null:
-		_status.text="Abre scenes/main.tscn."
-		return
-	if action=="place" and _active_prefab.is_empty():
-		_status.text="Selecciona un modelo."
-		return
-	if action=="move" and _selected_id<0:
-		_status.text="Selecciona un objeto."
-		return
-	_mode=action
-	_status.text="Clic en el terreno."
+func _set_mode(mode: String) -> void:
+	# Test hook. In actual UI drag starts from a thumbnail mouse-down.
+	_mode=mode
 
 
-func _cancel() -> void:
-	_mode=""
-	_status.text=""
+func _world() -> Node3D:
+	if host==null:
+		return null
+	return host.call("_get_world") as Node3D
+
+
+func _start_ghost() -> void:
+	_cancel_ghost()
+	var world:=_world()
+	var data:=OBJECTS.by_id(_active_prefab)
+	if world==null or data.is_empty():
+		return
+	var packed:=load(str(data.get("path",""))) as PackedScene
+	if packed==null:
+		return
+	var root:=Node3D.new()
+	root.name=GHOST_NAME
+	root.set_meta("wildtrap_editor_marker",true)
+	root.visible=false
+	world.add_child(root)
+	var source:=packed.instantiate() as Node3D
+	if source==null:
+		root.queue_free()
+		return
+	root.add_child(source)
+	var low:=Vector3(INF,INF,INF)
+	var high:=Vector3(-INF,-INF,-INF)
+	var count:=0
+	for child in source.find_children("*","MeshInstance3D",true,false):
+		var model:=child as MeshInstance3D
+		if model.mesh==null:
+			continue
+		var b:=model.get_aabb()
+		var mat:=source.global_transform.affine_inverse()*model.global_transform
+		for ix in range(2):
+			for iy in range(2):
+				for iz in range(2):
+					var xyz:=b.position+b.size*Vector3(float(ix),float(iy),float(iz))
+					var transformed:=mat*xyz
+					low=low.min(transformed)
+					high=high.max(transformed)
+		count+=1
+		model.transparency=0.5
+		model.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if count>0:
+		var size:=high-low
+		var longest:=maxf(size.x,maxf(size.y,size.z))
+		if longest>0.0001:
+			var scalar:=float(data.get("span",46))/longest
+			source.scale=Vector3.ONE*scalar
+			source.position=Vector3(-(low.x+high.x)*0.5,-low.y,-(low.z+high.z)*0.5)*scalar
+	_ghost=root
+
+
+func _cancel_ghost() -> void:
+	if is_instance_valid(_ghost):
+		var parent:=_ghost.get_parent()
+		if parent!=null:
+			parent.remove_child(_ghost)
+		_ghost.queue_free()
+	_ghost=null
 
 
 func deactivate() -> void:
 	_mode=""
+	_dragging=false
+	_over_3d=false
+	_cancel_ghost()
 
 
 func refresh() -> void:
-	if not is_node_ready() or store==null or _instances==null:
+	if not is_node_ready() or store==null or _props==null:
 		return
-	var previous_id:=_selected_id
-	_instances.clear()
-	var ids: Array[int]=[]
-	for node in store.data.get("nodes",[]):
-		if not (node is Dictionary) or str(node.get("kind",""))!="prefab":
-			continue
-		var identifier:=int(node.get("id",-1))
-		var name_text:=str(OBJECTS.by_id(str(node.get("prefabId",""))).get("name",node.get("prefabId","Objeto")))
-		_instances.add_item(name_text+" #"+str(identifier))
-		ids.append(identifier)
-	if ids.is_empty():
-		_selected_id=-1
-	else:
-		var index:=ids.find(previous_id)
-		if index<0:
-			index=0
-		_selected_id=ids[index]
-		_instances.select(index)
-	_instances.set_meta("ids",ids)
-	_update_form()
-
-
-func _on_instance_selected(index: int) -> void:
-	var ids: Array=_instances.get_meta("ids",[])
-	if index<0 or index>=ids.size():
-		return
-	_selected_id=int(ids[index])
-	_update_form()
-
-
-func _update_form() -> void:
-	if _props==null:
-		return
-	var record: Dictionary=OBJECTS.find_node(store.data,_selected_id) if store!=null else {}
-	_props.visible=not record.is_empty()
-	if record.is_empty():
+	var obj:=OBJECTS.find_node(store.data,_selected_id)
+	_props.visible=not obj.is_empty()
+	if obj.is_empty():
 		return
 	_updating=true
-	_position_x.set_value_no_signal(float(record.get("x",0)))
-	_position_z.set_value_no_signal(float(record.get("z",0)))
-	_rotation.set_value_no_signal(rad_to_deg(float(record.get("rotation",0))))
-	_scale.set_value_no_signal(float(record.get("scale",1)))
-	var actual_height:=float(record.get("y",0))
-	if not record.has("y") and host!=null:
-		var world:=host.call("_get_world") as Node3D
-		if world!=null and world.has_method("_height_at"):
-			actual_height=float(world.call("_height_at",float(record.get("x",0)),float(record.get("z",0))))+float(record.get("offsetY",0))
-	_height.set_value_no_signal(actual_height)
-	_height.visible=bool(OBJECTS.by_id(str(record.get("prefabId",""))).get("freeCave",false))
-	_hidden.set_pressed_no_signal(bool(record.get("editorHidden",false)))
-	_intangible.set_pressed_no_signal(bool(record.get("editorIntangible",false)))
+	_position_x.set_value_no_signal(float(obj.get("x",0)))
+	_position_z.set_value_no_signal(float(obj.get("z",0)))
+	_rotation.set_value_no_signal(rad_to_deg(float(obj.get("rotation",0))))
+	_scale.set_value_no_signal(float(obj.get("scale",1)))
 	_updating=false
 
 
 func _commit(result: Dictionary) -> bool:
 	if not bool(result.get("ok",false)):
-		_status.text=str(result.get("error","No se pudo editar."))
+		_status.text=str(result.get("error","Operación inválida."))
 		return false
 	if not bool(result.get("changed",false)):
 		return false
 	if host!=null:
 		host.call("external_editor_changed","objects")
 	refresh()
-	_status.text="Cambio sin guardar."
 	return true
 
 
 func _apply_transform() -> void:
 	if store==null or _selected_id<0:
 		return
-	var fields: Dictionary={
-		"x":_position_x.value,
-		"z":_position_z.value,
-		"rotation":deg_to_rad(_rotation.value),
-		"scale":_scale.value
-	}
-	var current:=OBJECTS.find_node(store.data,_selected_id)
-	if bool(OBJECTS.by_id(str(current.get("prefabId",""))).get("freeCave",false)):
-		fields["y"]=_height.value
-	for key in fields:
-		var result: Dictionary=store.object_edit(_selected_id,str(key),fields[key])
+	for change in [
+		{"property":"x","value":_position_x.value},
+		{"property":"z","value":_position_z.value},
+		{"property":"rotation","value":deg_to_rad(_rotation.value)},
+		{"property":"scale","value":_scale.value}
+	]:
+		var result: Dictionary=store.object_edit(_selected_id,str(change["property"]),change["value"])
 		if not bool(result.get("ok",false)):
 			_status.text=str(result.get("error",""))
-			break
+			return
 	if host!=null:
 		host.call("external_editor_changed","objects")
 	refresh()
 
 
-func _on_hidden(enabled: bool) -> void:
-	if not _updating and store!=null and _selected_id>=0:
-		_commit(store.object_edit(_selected_id,"editorHidden",enabled))
-
-
-func _on_intangible(enabled: bool) -> void:
-	if not _updating and store!=null and _selected_id>=0:
-		_commit(store.object_edit(_selected_id,"editorIntangible",enabled))
+func _toggle_hidden() -> void:
+	if store!=null and _selected_id>=0:
+		var node:=OBJECTS.find_node(store.data,_selected_id)
+		_commit(store.object_edit(_selected_id,"editorHidden",not bool(node.get("editorHidden",false))))
 
 
 func _delete() -> void:
 	if store!=null and _selected_id>=0:
-		_commit(store.object_erase(_selected_id))
+		if _commit(store.object_erase(_selected_id)):
+			_selected_id=-1
+			refresh()
+
+
+func _closest_existing(hit: Vector3, radius: float=15.0) -> int:
+	if store==null:
+		return -1
+	var best:=radius*radius
+	var selected:=-1
+	for entry in store.data.get("nodes",[]):
+		if not (entry is Dictionary) or str(entry.get("kind",""))!="prefab":
+			continue
+		var d:=Vector2(float(entry.get("x",0))-hit.x,float(entry.get("z",0))-hit.z).length_squared()
+		if d<best:
+			best=d
+			selected=int(entry.get("id",-1))
+	return selected
+
+
+func _hit_existing_model(camera: Camera3D,screen_position: Vector2) -> int:
+	# The cave can be clicked anywhere on its geometry, not just at its
+	# center footprint. Bounding boxes are a fast broad-phase approximation.
+	var world:=_world()
+	if world==null or store==null:
+		return -1
+	var ray_origin:=camera.project_ray_origin(screen_position)
+	var ray_dir:=camera.project_ray_normal(screen_position).normalized()
+	var closest:=INF
+	var picked:=-1
+	for record in store.data.get("nodes",[]):
+		if not (record is Dictionary) or str(record.get("kind",""))!="prefab":
+			continue
+		var prefab:=str(record.get("prefabId",""))
+		var id_num:=int(record.get("id",-1))
+		var root:=world.get_node_or_null("Prefab_%s_%d" % [prefab,id_num]) as Node3D
+		if root==null or not root.visible:
+			continue
+		var low:=Vector3(INF,INF,INF)
+		var high:=Vector3(-INF,-INF,-INF)
+		for entry in root.find_children("*","MeshInstance3D",true,false):
+			var part:=entry as MeshInstance3D
+			if part.mesh==null:
+				continue
+			var box:=part.get_aabb()
+			for i in range(2):
+				for j in range(2):
+					for k in range(2):
+						var v:=box.position+box.size*Vector3(float(i),float(j),float(k))
+						var w:=part.global_transform*v
+						low=low.min(w)
+						high=high.max(w)
+		if not is_finite(low.x):
+			continue
+		var tmin:=0.0
+		var tmax:=5000.0
+		for axis in range(3):
+			var start:=ray_origin[axis]
+			var direction:=ray_dir[axis]
+			if absf(direction)<0.00000001:
+				if start<low[axis] or start>high[axis]:
+					tmax=-1.0
+					break
+			else:
+				var t0: float=(low[axis]-start)/direction
+				var t1: float=(high[axis]-start)/direction
+				tmin=maxf(tmin,minf(t0,t1))
+				tmax=minf(tmax,maxf(t0,t1))
+		if tmax>=tmin and tmin<closest:
+			closest=tmin
+			picked=id_num
+	return picked
 
 
 func handle_3d_input(camera: Camera3D,event: InputEvent) -> bool:
-	if _mode.is_empty() or host==null or store==null:
+	if host==null or store==null:
 		return false
-	if not (event is InputEventMouseButton):
+	if _dragging:
+		if event is InputEventMouseMotion:
+			_over_3d=true
+			var point: Variant=PICK.pick_terrain(camera,(event as InputEventMouseMotion).position,_world())
+			if point is Vector3:
+				_drag_position=point
+				if is_instance_valid(_ghost):
+					_ghost.global_position=point
+					_ghost.visible=true
+			return true
+		if event is InputEventMouseButton:
+			var click:=event as InputEventMouseButton
+			if click.button_index==MOUSE_BUTTON_LEFT and not click.pressed:
+				var point: Variant=PICK.pick_terrain(camera,click.position,_world())
+				var result:=false
+				if point is Vector3:
+					result=handle_terrain_hit(point)
+				deactivate()
+				return result
 		return false
-	var mouse:=event as InputEventMouseButton
-	if not mouse.pressed or mouse.button_index!=MOUSE_BUTTON_LEFT or mouse.alt_pressed or mouse.ctrl_pressed or mouse.shift_pressed:
-		return false
-	var world:=host.call("_get_world") as Node3D
-	var hit: Variant=PICK.pick_terrain(camera,mouse.position,world)
-	if not (hit is Vector3):
-		return false
-	return handle_terrain_hit(hit)
+	if event is InputEventMouseButton:
+		var click:=event as InputEventMouseButton
+		if click.button_index==MOUSE_BUTTON_LEFT and click.pressed and not click.alt_pressed and not click.shift_pressed:
+			# Pick a GLB by its true world-space bounds, including cave roofs.
+			var id_num:=_hit_existing_model(camera,click.position)
+			if id_num<0:
+				var hit: Variant=PICK.pick_terrain(camera,click.position,_world())
+				if hit is Vector3:
+					id_num=_closest_existing(hit)
+			if id_num>=0:
+				_selected_id=id_num
+				refresh()
+				return true
+	return false
 
 
 func handle_terrain_hit(hit: Vector3) -> bool:
-	if _mode.is_empty() or store==null:
+	if store==null:
 		return false
-	var x:=clampf(hit.x,-315.0,315.0)
-	var z:=clampf(hit.z,-315.0,315.0)
 	if _mode=="place":
-		var result: Dictionary=store.object_place(_active_prefab,x,z)
+		if _active_prefab.is_empty():
+			return false
+		var result: Dictionary=store.object_place(_active_prefab,clampf(hit.x,-315,315),clampf(hit.z,-315,315))
 		if bool(result.get("ok",false)):
 			_selected_id=int(result.get("id",-1))
-		_commit(result)
-		return true
-	if _mode=="move":
-		var first: Dictionary=store.object_edit(_selected_id,"x",x)
-		var second: Dictionary=store.object_edit(_selected_id,"z",z)
-		if bool(first.get("changed",false)) or bool(second.get("changed",false)):
-			if host!=null:
-				host.call("external_editor_changed","objects")
-			refresh()
-		elif not bool(first.get("ok",false)) or not bool(second.get("ok",false)):
-			_status.text="No se pudo mover."
-		_mode="select"
-		return true
-	if _mode=="select":
-		var best:=18.0*18.0
-		var closest:=-1
-		for item in store.data.get("nodes",[]):
-			if not (item is Dictionary) or str(item.get("kind",""))!="prefab":
-				continue
-			var d:=Vector2(float(item.get("x",0))-x,float(item.get("z",0))-z).length_squared()
-			if d<best:
-				best=d
-				closest=int(item.get("id",-1))
-		if closest>=0:
-			_selected_id=closest
-			refresh()
-		return true
+		return _commit(result)
 	return false
 
 
 func summary() -> Dictionary:
-	return {"catalog":_catalog.size(),"placed":_instances.item_count if _instances!=null else 0,"selected_id":_selected_id}
+	var placed:=0
+	if store!=null:
+		for node in store.data.get("nodes",[]):
+			if node is Dictionary and str(node.get("kind",""))=="prefab":
+				placed+=1
+	return {"catalog":_catalog.size(),"placed":placed,"selected_id":_selected_id,"tiles":_tiles.size()}

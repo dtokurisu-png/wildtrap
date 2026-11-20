@@ -238,3 +238,53 @@ Hand painting and Cliff colors without changing the saved world data.
 Push in GitHub Desktop. Do not modify the original browser files to edit
 the new Godot version. The native scene view still uses the stock Godot
 editor camera; it is not automatically terrain-collision constrained.
+
+## Native playable Explorer 1 WT (F5)
+
+The Godot editor still previews the saved World without pressing Play.
+Press **F5** to start `scenes/main.tscn` in gameplay mode: the exact
+`assets/explorador 1 wt.glb` is imported as
+`godot/assets/models/explorador_1_wt.glb`; the Play-only controller
+starts at the saved J1 `playerSpawn`, uses a 0.90m visual character and
+capsule collision (radius 0.21, height 0.875).
+Movement and third-person camera settings come from the existing
+`playtest.mjs`: **WASD** and arrows camera-relative, **Shift** accelerates
+from 1.90 to 3.00 units/sec, hold mouse button and drag to orbit,
+and the camera follows ~2.55 units behind with shoulder offset 0.28.
+The idle (source clip 3) and running (source clip 5) animation use in-place
+root motion and blend in 0.16 sec. Terrain cuts and placed cave mesh
+surfaces provide temporary Play-only physics colliders; these colliders
+are not saved into main.tscn.
+
+This is a first playable validation of the native Explorer. The separately
+corrected Web animation encoded in `assets/animations/explorer-run-corrected.b64`
+still needs a Godot-compatible retargeting/export step; the controller
+currently uses the original fifth GLB animation rather than silently
+substituting any other character. Advanced cave occlusion, mobile joystick,
+and multiplayer are not part of this step.
+
+## Explorer playtest and 3D object/texture editor refinements
+
+**F5** now starts the original 0.90-unit Explorer 1 WT at player spawn J1,
+with 1.9/3.0 unit/s walk/run, WASD camera-relative motion, animations 3/5,
+mouse orbit, native following camera and generated Play-only collisions.
+
+**Objetos** no longer has a cave dropdown or Colocar/Seleccionar/Mover/
+Cancelar actions. The 15 imported GLB resources appear in a three-column
+**thumbnail gallery**, using Godot's editor resource previewer. Press and
+hold a thumbnail, move to the 3D view, and release on the terrain: the
+translucent model follows the real surface while dragging, and placement
+is committed on release. Existing caves are independent models, selectable
+on the native 3D viewport by their actual geometry bounds. Contextual
+transform settings appear only for a selected model.
+
+**Texturas** has three separated sections: the selected biome's material
+and its original image; shared **Suelo · mezcla** controls for ground
+transparency (0%=fully opaque), blending mode and transition feather
+(default 5m); and the **Hand painting** section, with its own original
+4K preview, overlay toggle, paint opacity, black intensity and rotation.
+The ground applies the blend mode, never by recoloring the art file.
+The biome masks, cliff wall masks and complementary detail masks share
+the same 5-tap spatial cross-fade at biome boundaries, including between
+the ground and the cliffs. Width is adjustable 0–20m, without changing
+stored polygons or rebaking mesh geometry.

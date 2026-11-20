@@ -11,6 +11,7 @@ uniform float layer_number=1.0;
 uniform float intensity : hint_range(0.0,1.0)=0.5;
 uniform float biome_contrast=1.0;
 uniform float biome_saturation=1.0;
+uniform float region_feather_world=5.0;
 
 varying vec3 wt_pos;
 varying vec3 wt_normal;
@@ -31,7 +32,15 @@ vec3 adjust_color(vec3 color){
 }
 void fragment(){
  vec2 mask_uv=vec2(wt_pos.x/630.0+0.5,0.5-wt_pos.z/630.0);
+ float radius=region_feather_world/630.0;
  float inside=texture(region_mask,mask_uv).r;
+ if(radius>0.000001){
+   inside=inside*0.5;
+   inside+=0.125*texture(region_mask,clamp(mask_uv+vec2(radius,0.0),vec2(0.0),vec2(1.0))).r;
+   inside+=0.125*texture(region_mask,clamp(mask_uv-vec2(radius,0.0),vec2(0.0),vec2(1.0))).r;
+   inside+=0.125*texture(region_mask,clamp(mask_uv+vec2(0.0,radius),vec2(0.0),vec2(1.0))).r;
+   inside+=0.125*texture(region_mask,clamp(mask_uv-vec2(0.0,radius),vec2(0.0),vec2(1.0))).r;
+ }
  float flatness=smoothstep(0.65,0.85,abs(wt_normal.y));
  if(inside<0.01||flatness<0.01||intensity<=0.0)discard;
  float columns=max(1.0,floor(repeats+0.5));
