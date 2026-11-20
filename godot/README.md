@@ -172,3 +172,35 @@ The actual procedural population of trees, objects, NPC actors or creatures
 is **not** implemented by this stage; placing a spawn defines where that
 future game system may generate them. All spawn previews are transient editor
 nodes, not game-world objects serialized to main.tscn.
+
+## Source material parity: detail decals, cliff painting, handpaint underlay
+
+The migration now copies 15 exact source **complementary** PNG blobs from the
+unchanged `main` branch into `godot/assets/textures/details/`. All 15
+saved detail1/detail2/detail3 slots are bound to a separate native transparent
+material pass (seeded 3x3-cell spatial decals, preserving slot repeat/opacity,
+biome contrast and saturation). The original terrain base remains separate
+and unaffected if a decal texture is absent.
+
+The five cliff PNGs use fresh **parent-biome cliff polygon masks** from
+`godot/data/masks/cliff_<biome>.png`. Cliff walls are painted only on
+steep geometry inside the saved cliff polygons, with individual saved color
+repetition and intensity. Mountain may correctly have no such mask pixels
+when no cliff belongs to the Mountain *parent* region.
+
+`res://assets/textures/handpaint_reference.webp` is the original global
+4K art, composited once across the terrain at 50% default strength with
+grayscale overlay and white-paper suppression. Cliff walls are excluded via
+slope blending. Open the **Biomas** tab to compare **Complementarias**,
+**Hand painting** and **Acantilados (textura)** independently. The slider
+changes handpaint preview opacity from 0–100%. These switches are
+nonpersistent visual comparisons and do not alter world.json. More detailed
+material settings/editing can be migrated after visual parity tests.
+
+**Camera:** The Godot editor's own 3D orbit camera is *not* the game's
+`Camera3D` in `bootstrap.gd`; it has no automatic terrain collider.
+Use Godot editor's RMB free-look / Shift+F then WASD/Q/E and Alt to move
+slowly near the ground, or Shift+middle mouse to pan the orbit target.
+This lets you inspect patches at close range without relying on the large
+orbit step distance. Full third-person player camera/collision is a separate
+step, and does not yet exist in the native project.

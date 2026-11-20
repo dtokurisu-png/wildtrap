@@ -91,7 +91,35 @@ func _check() -> void:
 			if material==null or material.get_shader_parameter("detail_texture")==null:
 				_fail("No actual image bound to "+node_name)
 				return
-	print("WILDTRAP_MATERIAL_MIGRATION_OK detail=15 cliff=5 originals=15 handpaint=4k opacity=0.50")
+	# Independent editor comparisons: each switch must affect real render data.
+	world.call("set_editor_details_visible",false)
+	var first_detail:=world.get_node_or_null("WildTrapDetail_forest_1") as MeshInstance3D
+	if first_detail==null or first_detail.visible:
+		_fail("Complementary details cannot be hidden for comparison")
+		return
+	world.call("set_editor_details_visible",true)
+	if not first_detail.visible:
+		_fail("Complementary detail restore failed")
+		return
+	world.call("set_editor_handpaint_visible",false)
+	if bool(surface_material.get_shader_parameter("handpaint_enabled")):
+		_fail("Hand painting cannot be disabled")
+		return
+	world.call("set_editor_handpaint_visible",true)
+	world.call("set_editor_handpaint_opacity",0.73)
+	if absf(float(surface_material.get_shader_parameter("handpaint_opacity"))-0.73)>0.001:
+		_fail("Handpainting opacity slider is not reaching material")
+		return
+	world.call("set_editor_handpaint_opacity",0.50)
+	world.call("set_editor_cliff_colors_visible",false)
+	if float(surface_material.get_shader_parameter("cliff_intensity_plains"))>0.001:
+		_fail("Cliff colors cannot be disabled")
+		return
+	world.call("set_editor_cliff_colors_visible",true)
+	if float(surface_material.get_shader_parameter("cliff_intensity_plains"))<0.80:
+		_fail("Original cliff intensity did not restore")
+		return
+	print("WILDTRAP_MATERIAL_MIGRATION_OK detail=15 cliff=5 originals=15 handpaint=4k opacity=0.50 toggles=true")
 	scene.queue_free()
 	await process_frame
 	quit(0)
