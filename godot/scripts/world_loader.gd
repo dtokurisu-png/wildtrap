@@ -6,11 +6,7 @@ extends Node3D
 
 const WORLD_PATH := "res://data/world.json"
 const BINARY_PATH := "res://data/terrain.wtmesh"
-const MODEL_FILES := {
-	"stone-cave": "res://assets/models/stone_cave.glb",
-	"rocky-cave": "res://assets/models/rocky_cave.glb",
-	"stylized-cave": "res://assets/models/stylized_cave.glb",
-}
+const MODEL_CATALOG := "res://data/object-catalog.json"
 const BIOMES := ["forest", "desert", "plains", "swamp", "mountain"]
 const BIOME_MASKS = preload("res://addons/wildtrap_editor/biome_masks.gd")
 const DETAIL_MAP := "res://data/detail-textures.json"
@@ -309,6 +305,9 @@ func _apply_material() -> void:
 		var slots: Dictionary=biome_settings.get("slots",{})
 		var ground_settings: Dictionary=slots.get("ground",{})
 		material.set_shader_parameter("repeat_"+biome,float(ground_settings.get("scale",200.0)))
+		material.set_shader_parameter("ground_opacity_"+biome,clampf(float(ground_settings.get("opacity",1.0)),0.0,1.0))
+		material.set_shader_parameter("biome_contrast_"+biome,clampf(float(biome_settings.get("colorContrast",1.0)),0.0,3.0))
+		material.set_shader_parameter("biome_saturation_"+biome,clampf(float(biome_settings.get("colorSaturation",1.0)),0.0,3.0))
 		var own: Dictionary=biome_overrides.get(biome,{})
 		var repeats:=float(own.get("repeats",0.0))
 		if repeats<3.5 or repeats>315.0:
@@ -323,9 +322,12 @@ func _apply_material() -> void:
 	if handpaint_loaded:
 		material.set_shader_parameter("handpaint_texture",painted)
 		material.set_shader_parameter("handpaint_enabled",_editor_handpaint_enabled)
+		var art_settings: Dictionary=source_world.get("handpaintMaterial",{})
+		_editor_handpaint_opacity=clampf(float(art_settings.get("opacity",0.50)),0.0,1.0)
 		material.set_shader_parameter("handpaint_opacity",_editor_handpaint_opacity)
-		material.set_shader_parameter("handpaint_contrast",0.45)
-		material.set_shader_parameter("handpaint_rotation_degrees",180.0)
+		material.set_shader_parameter("handpaint_contrast",clampf(float(art_settings.get("contrast",0.45)),0.0,4.0))
+		material.set_shader_parameter("handpaint_rotation_degrees",float(art_settings.get("rotation",180.0)))
+		material.set_shader_parameter("handpaint_blend_mode",int(art_settings.get("blendMode",3)))
 	else:
 		material.set_shader_parameter("handpaint_enabled",false)
 		push_warning("WildTrap hand-painted terrain image missing")
@@ -422,16 +424,59 @@ func _height_at(x: float, z: float) -> float:
 	var b: float = lerpf(float(heights[az*n+ix]),float(heights[az*n+ax]),u)
 	return lerpf(a,b,v)
 
+func _model_specs() -> Dictionary:
+	var specs: Dictionary={}
+	var parsed: Variant=JSON.parse_string(FileAccess.get_file_as_string(MODEL_CATALOG))
+	if parsed is Array:
+		for item in parsed:
+			if item is Dictionary:
+				specs[str(item.get("id",""))]=item
+	return specs
+
+
+func apply_editor_objects_preview(next_world: Dictionary) -> void:
+	if not Engine.is_editor_hint():
+		return
+	source_world=next_world.duplicate(true)
+	for child in get_children():
+		if child.has_meta("wildtrap_generated") and child.name.begins_with("Prefab_"):
+			remove_child(child)
+			child.queue_free()
+	_add_models()
+
+
+func apply_editor_material_preview(next_world: Dictionary) -> void:
+	if not Engine.is_editor_hint():
+		return
+	source_world=next_world.duplicate(true)
+	for child in get_children():
+		if child.has_meta("wildtrap_generated") and child.name.begins_with("WildTrapDetail_"):
+			remove_child(child)
+			child.queue_free()
+	_detail_materials.clear()
+	detail_layer_count=0
+	_apply_material()
+	_add_detail_layers()
+	apply_editor_biome_preview(source_world,_editor_selected_biome)
+	set_editor_details_visible(_editor_details_enabled)
+
+
 func _add_models() -> void:
+	var specs: Dictionary=_model_specs()
 	var nodes: Array = source_world.get("nodes", [])
 	for item in nodes:
 		if not (item is Dictionary):
 			continue
 		var data: Dictionary = item
 		var prefab_id: String = str(data.get("prefabId", ""))
-		if str(data.get("kind", "")) != "prefab" or not MODEL_FILES.has(prefab_id):
+		if str(data.get("kind", "")) != "prefab" or not specs.has(prefab_id):
 			continue
-		var packed := load(MODEL_FILES[prefab_id]) as PackedScene
+		var model_data: Dictionary=specs[prefab_id]
+		var glb_path:=str(model_data.get("path",""))
+		if not glb_path.begins_with("res://assets/models/"):
+			push_error("Unsafe prefab path")
+			continue
+		var packed := load(glb_path) as PackedScene
 		if packed == null:
 			push_error("Could not import GLB for " + prefab_id)
 			continue
@@ -461,7 +506,7 @@ func _add_models() -> void:
 		if found:
 			var dimensions: Vector3 = upper-lower
 			var longest: float = maxf(dimensions.x,maxf(dimensions.y,dimensions.z))
-			var scale_factor: float = 46.0/longest if longest > 0.00001 else 1.0
+			var scale_factor: float = float(model_data.get("span",46.0))/longest if longest > 0.00001 else 1.0
 			source.scale = Vector3.ONE*scale_factor
 			source.position = Vector3(-(lower.x+upper.x)*0.5, -lower.y, -(lower.z+upper.z)*0.5)*scale_factor
 		var x: float = float(data.get("x",0))
@@ -471,6 +516,9 @@ func _add_models() -> void:
 		root.rotation_order = EULER_ORDER_YXZ
 		root.rotation = Vector3(float(data.get("rotationX",0)),float(data.get("rotation",0)),float(data.get("rotationZ",0)))
 		root.scale = Vector3.ONE*maxf(0.01,float(data.get("scale",1)))
+		root.visible=not bool(data.get("editorHidden",false)) if Engine.is_editor_hint() else true
 		for mesh_node in source.find_children("*", "MeshInstance3D", true, false):
 			var part := mesh_node as MeshInstance3D
 			part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			if Engine.is_editor_hint() and bool(data.get("editorIntangible",false)):
+				part.transparency=0.76
