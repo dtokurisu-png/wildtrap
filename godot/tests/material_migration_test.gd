@@ -45,6 +45,7 @@ func _check() -> void:
 		if not bool(zone.get("isCliff",false)):
 			parent_ids[str(zone.get("id",""))]=str(zone.get("biomeId",""))
 	var cliff_areas:=0
+	var per_biome: Dictionary={}
 	for cliff in source.get("zones",[]):
 		if not bool(cliff.get("isCliff",false)):
 			continue
@@ -53,6 +54,7 @@ func _check() -> void:
 		if biome.is_empty() or not actual.has(biome):
 			_fail("Unassigned cliff parent biome: "+str(cliff.get("id","")))
 			return
+		per_biome[biome]=int(per_biome.get(biome,0))+1
 	if cliff_areas!=11:
 		_fail("Not all original cliff areas are present")
 		return
@@ -73,9 +75,10 @@ func _check() -> void:
 				if pixels.get_pixel(x,y).r>0.9:
 					has_pixels=true
 					break
-		# All five biomes currently have at least one parent cliff region.
-		if not has_pixels:
-			_fail("Cliff mask was not painted for "+biome)
+		# If a parent biome has no cliffs, its mask MUST stay empty.
+		var should_have:=int(per_biome.get(biome,0))>0
+		if has_pixels!=should_have:
+			_fail("Cliff mask classification mismatch "+biome+" parents="+str(per_biome.get(biome,0)))
 			return
 	for biome in ["forest","desert","plains","swamp","mountain"]:
 		for layer in range(1,4):
