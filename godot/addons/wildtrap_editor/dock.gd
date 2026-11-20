@@ -410,8 +410,6 @@ func _update_material_preview() -> void:
 		world.call("set_editor_handpaint_visible",bool(_material_visibility["handpaint"]))
 	if world.has_method("set_editor_cliff_colors_visible"):
 		world.call("set_editor_cliff_colors_visible",bool(_material_visibility["cliffs"]))
-	if world.has_method("set_editor_handpaint_opacity"):
-		world.call("set_editor_handpaint_opacity",_handpaint_preview_opacity)
 
 
 func _apply_preview() -> void:
