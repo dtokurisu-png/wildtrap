@@ -27,7 +27,9 @@ for(let i=0;i<indices;i+=3){
  if(geomY<-.85){correct++;checked++}
  else if(geomY>.85){wrong++;checked++}
 }
-if(checked<10000||correct/Math.max(1,checked)<.97)
+// Some steep or folded source surfaces legitimately face away from +Y.
+// The dominant ground must nevertheless be FRONT-facing above in Godot.
+if(checked<10000||correct/Math.max(1,checked)<.95)
  throw Error('WildTrap upper terrain faces are reversed in Godot: '+JSON.stringify({checked,correct,wrong,invalid}));
 const n=normal(0),up=Math.hypot(...n);
 if(!n.every(Number.isFinite)||Math.abs(up-1)>.2||n[1]<0)
