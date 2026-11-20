@@ -25,6 +25,13 @@ func _on_scene_changed(root: Node) -> void:
 		wildtrap_dock.on_scene_changed(root)
 
 
+func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
+	if wildtrap_dock != null and is_instance_valid(wildtrap_dock):
+		if wildtrap_dock.has_method("handle_spawn_viewport_input") and wildtrap_dock.handle_spawn_viewport_input(viewport_camera,event):
+			return AFTER_GUI_INPUT_STOP
+	return AFTER_GUI_INPUT_PASS
+
+
 func _exit_tree() -> void:
 	if wildtrap_dock != null and is_instance_valid(wildtrap_dock):
 		remove_control_from_docks(wildtrap_dock)
