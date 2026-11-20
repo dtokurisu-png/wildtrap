@@ -92,7 +92,7 @@ func save() -> bool:
 	if not _valid_map(data):
 		last_error="El mapa no cumple el esquema original."
 		return false
-	var path := ProjectSettings.globalize_path(PATH)
+	var path := ProjectSettings.globalize_path(source_path)
 	if FileAccess.get_sha256(path)!=_disk_hash:
 		last_error="El archivo cambió fuera de Godot. No se sobrescribió; revisa GitHub Desktop antes de recargar."
 		return false
