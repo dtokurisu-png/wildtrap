@@ -95,3 +95,33 @@ These tools inspect data and display non-persistent marker nodes (no scene
 owner). No JSON, GLB or mesh file is written by panel controls. **Editing
 and saving** biome/spawn properties is the next development phase. Never
 treat selection or a preview marker as a saved change to the source.
+
+## Native editor — persistent biome/zone distributions
+
+Godot `godot/data/world.json` is now the canonical project world.
+The earlier `assets/terrain/wildtrap-mobile-world.json` is a historical
+web-editor snapshot, **not** a synchronisation target. Do not overwrite
+Godot edits with it. The native geometry baker reads only the Godot JSON.
+
+In **WildTrap Editor**, the **Biomas** buttons select all surfaces for that
+biome with a temporary teal overlay. The **Zonas** tab lists all 16 saved
+regions and cliff zones and provides the original five-biome permutations,
+including the **Mountain is forbidden in Zona Este** rule and the original
+neighbor restrictions. Click a possibility to change its biome masks in
+the editor without pressing Play.
+
+Changes remain **unsaved** until pressing **Guardar**. Save writes
+`godot/data/world.json` and the five regenerated `godot/data/masks/*.png`
+files directly into your cloned repository. Godot supports **Deshacer** and
+**Rehacer** within the panel until save. Then commit/push from GitHub Desktop.
+
+The canonical JSON is protected against an external change since the panel
+loaded it. Reload (after resolving local changes) rather than overwriting
+someone else's changes. GitHub Actions rebakes native cliff geometry after
+you push. Changes to the cliff biome heightmap may therefore require that
+GitHub bake before Play has the final updated geometry.
+
+Spawn inspection is still read-only. Object placement, painting, editing of
+the five polygon borders, geometry displacement in-editor, and native
+player controls are separate stages. Original unknown JSON keys, geometry,
+caves and sculpt metadata are not intentionally deleted.

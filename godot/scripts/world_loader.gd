@@ -12,6 +12,7 @@ const MODEL_FILES := {
 	"stylized-cave": "res://assets/models/stylized_cave.glb",
 }
 const BIOMES := ["forest", "desert", "plains", "swamp", "mountain"]
+const BIOME_MASKS = preload("res://addons/wildtrap_editor/biome_masks.gd")
 
 # Native editor preview: generated children are deliberately NOT assigned owner.
 # They appear in the 3D viewport but are not serialized into main.tscn.
@@ -43,6 +44,34 @@ var source_world: Dictionary = {}
 var vertex_count: int = 0
 var triangle_count: int = 0
 var terrain: MeshInstance3D
+var _editor_selected_biome := ""
+
+
+func set_editor_biome_selection(biome: String) -> void:
+	_editor_selected_biome=biome
+	if is_instance_valid(terrain) and terrain.material_override is ShaderMaterial:
+		terrain.material_override.set_shader_parameter("selected_biome",BIOMES.find(biome))
+
+
+func apply_editor_biome_preview(next_source: Dictionary, biome: String = "") -> void:
+	if not Engine.is_editor_hint():
+		return
+	source_world=next_source.duplicate(true)
+	_editor_selected_biome=biome
+	if not is_instance_valid(terrain):
+		return
+	var shader_mat := terrain.material_override as ShaderMaterial
+	if shader_mat == null:
+		return
+	# Use one native polygon rasterizer for editor preview AND saved PNG masks.
+	var images: Dictionary = BIOME_MASKS.make(source_world)
+	for id_biome in BIOMES:
+		var image: Image = images.get(id_biome)
+		if image != null:
+			shader_mat.set_shader_parameter("mask_"+id_biome,ImageTexture.create_from_image(image))
+	set_editor_biome_selection(biome)
+
+
 
 func _ready() -> void:
 	# The 3D editor needs the same visual terrain as the running game.
@@ -159,6 +188,8 @@ func _apply_material() -> void:
 		var ground_settings: Dictionary = slots.get("ground", {})
 		material.set_shader_parameter("repeat_%s" % biome, float(ground_settings.get("scale", 200.0)))
 	terrain.material_override = material
+	if Engine.is_editor_hint():
+		set_editor_biome_selection(_editor_selected_biome)
 
 func _height_at(x: float, z: float) -> float:
 	var n: int = int(source_world.get("resolution", 129))

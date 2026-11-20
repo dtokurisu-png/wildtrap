@@ -133,7 +133,7 @@ for(const biome of biomes){
  write('godot/data/masks/'+biome+'.png',PNG.sync.write(img));
 }
 const summary={
- source:'assets/terrain/wildtrap-mobile-world.json (published repository snapshot, not verified as escenario (4))',
+ source:'godot/data/world.json (canonical native project; historical import from published snapshot)',
  size,resolution:n,heightSamples:count,offsets:Object.keys(world.terrainVertexOffsets||{}).length,
  zones:world.zones?.length||0,cliffs:(world.zones||[]).filter(z=>z.isCliff).length,
  cuts:world.cuts3d?.length||0,vertices:vc,triangles:idx.length/3,cutStats,heightmapStats,disabledHeightmaps,
