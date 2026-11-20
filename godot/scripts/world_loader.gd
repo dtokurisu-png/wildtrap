@@ -53,6 +53,43 @@ var detail_layer_count: int = 0
 var _detail_materials: Array = []
 var handpaint_loaded := false
 var cliff_masks_loaded := 0
+var _editor_details_enabled := true
+var _editor_handpaint_enabled := true
+var _editor_cliff_color_enabled := true
+var _editor_handpaint_opacity := 0.50
+
+func set_editor_details_visible(enabled: bool) -> void:
+	_editor_details_enabled=enabled
+	for child in get_children():
+		if child is MeshInstance3D and child.name.begins_with("WildTrapDetail_"):
+			child.visible=enabled
+
+
+func set_editor_handpaint_visible(enabled: bool) -> void:
+	_editor_handpaint_enabled=enabled
+	if is_instance_valid(terrain) and terrain.material_override is ShaderMaterial:
+		terrain.material_override.set_shader_parameter("handpaint_enabled",enabled)
+
+
+func set_editor_handpaint_opacity(value: float) -> void:
+	_editor_handpaint_opacity=clampf(value,0.0,1.0)
+	if is_instance_valid(terrain) and terrain.material_override is ShaderMaterial:
+		terrain.material_override.set_shader_parameter("handpaint_opacity",_editor_handpaint_opacity)
+
+
+func set_editor_cliff_colors_visible(enabled: bool) -> void:
+	_editor_cliff_color_enabled=enabled
+	if not is_instance_valid(terrain) or not (terrain.material_override is ShaderMaterial):
+		return
+	var mat:=terrain.material_override as ShaderMaterial
+	var cliff_settings: Dictionary=source_world.get("cliffHeightSettings",{})
+	var biome_overrides: Dictionary=cliff_settings.get("biomes",{})
+	for biome in BIOMES:
+		var own: Dictionary=biome_overrides.get(biome,{})
+		var strength:=clampf(float(own.get("intensity",1.0)),0.0,1.0) if enabled else 0.0
+		mat.set_shader_parameter("cliff_intensity_"+biome,strength)
+
+
 var terrain: MeshInstance3D
 var _editor_selected_biome := ""
 var _editor_selected_zone: Dictionary = {}
@@ -280,13 +317,13 @@ func _apply_material() -> void:
 			else:
 				repeats=26.25
 		material.set_shader_parameter("cliff_repeat_"+biome,repeats)
-		material.set_shader_parameter("cliff_intensity_"+biome,clampf(float(own.get("intensity",1.0)),0.0,1.0))
+		material.set_shader_parameter("cliff_intensity_"+biome,clampf(float(own.get("intensity",1.0)),0.0,1.0) if _editor_cliff_color_enabled else 0.0)
 	var painted:=load(HANDPAINT_IMAGE) as Texture2D
 	handpaint_loaded=painted!=null
 	if handpaint_loaded:
 		material.set_shader_parameter("handpaint_texture",painted)
-		material.set_shader_parameter("handpaint_enabled",true)
-		material.set_shader_parameter("handpaint_opacity",0.50)
+		material.set_shader_parameter("handpaint_enabled",_editor_handpaint_enabled)
+		material.set_shader_parameter("handpaint_opacity",_editor_handpaint_opacity)
 		material.set_shader_parameter("handpaint_contrast",0.45)
 		material.set_shader_parameter("handpaint_rotation_degrees",180.0)
 	else:
@@ -352,6 +389,7 @@ func _add_detail_layers() -> void:
 			instance.mesh=terrain.mesh
 			instance.material_override=layer_material
 			instance.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			instance.visible=_editor_details_enabled
 			add_child(instance)
 			_detail_materials.append({"biome":biome,"layer":layer,"material":layer_material})
 			detail_layer_count+=1
