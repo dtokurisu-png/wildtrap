@@ -35,6 +35,8 @@ jobs:
         run: cmp godot/data/world.json assets/terrain/wildtrap-mobile-world.json
       - name: Bake original cut/cliff geometry into native Godot terrain
         run: node godot/tools/bake-world.mjs
+      - name: Check Godot-clockwise terrain faces and normals
+        run: node godot/tests/terrain_winding.test.mjs
       - name: Record reproducible native terrain assets
         if: github.event_name != 'pull_request'
         run: |
