@@ -238,3 +238,27 @@ Hand painting and Cliff colors without changing the saved world data.
 Push in GitHub Desktop. Do not modify the original browser files to edit
 the new Godot version. The native scene view still uses the stock Godot
 editor camera; it is not automatically terrain-collision constrained.
+
+## Native playable Explorer 1 WT (F5)
+
+The Godot editor still previews the saved World without pressing Play.
+Press **F5** to start `scenes/main.tscn` in gameplay mode: the exact
+`assets/explorador 1 wt.glb` is imported as
+`godot/assets/models/explorador_1_wt.glb`; the Play-only controller
+starts at the saved J1 `playerSpawn`, uses a 0.90m visual character and
+capsule collision (radius 0.21, height 0.875).
+Movement and third-person camera settings come from the existing
+`playtest.mjs`: **WASD** and arrows camera-relative, **Shift** accelerates
+from 1.90 to 3.00 units/sec, hold mouse button and drag to orbit,
+and the camera follows ~2.55 units behind with shoulder offset 0.28.
+The idle (source clip 3) and running (source clip 5) animation use in-place
+root motion and blend in 0.16 sec. Terrain cuts and placed cave mesh
+surfaces provide temporary Play-only physics colliders; these colliders
+are not saved into main.tscn.
+
+This is a first playable validation of the native Explorer. The separately
+corrected Web animation encoded in `assets/animations/explorer-run-corrected.b64`
+still needs a Godot-compatible retargeting/export step; the controller
+currently uses the original fifth GLB animation rather than silently
+substituting any other character. Advanced cave occlusion, mobile joystick,
+and multiplayer are not part of this step.
