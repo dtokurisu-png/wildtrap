@@ -27,7 +27,8 @@ static func _inside(poly: Array, px: float, pz: float) -> bool:
 	for i in range(poly.size()):
 		var a: Dictionary = poly[i]
 		var b: Dictionary = poly[j]
-		var az := float(a.get("z", 0)), bz := float(b.get("z", 0))
+		var az := float(a.get("z", 0))
+		var bz := float(b.get("z", 0))
 		if (az > pz) != (bz > pz):
 			var crossing := (float(b.get("x", 0))-float(a.get("x", 0)))*(pz-az)/(bz-az)+float(a.get("x", 0))
 			if px < crossing:
@@ -37,8 +38,10 @@ static func _inside(poly: Array, px: float, pz: float) -> bool:
 
 
 static func _point_segment(px: float, pz: float, a: Dictionary, b: Dictionary) -> float:
-	var ax := float(a.get("x", 0)), az := float(a.get("z", 0))
-	var dx := float(b.get("x", 0))-ax, dz := float(b.get("z", 0))-az
+	var ax := float(a.get("x", 0))
+	var az := float(a.get("z", 0))
+	var dx := float(b.get("x", 0))-ax
+	var dz := float(b.get("z", 0))-az
 	var length2 := dx*dx+dz*dz
 	var t := clampf(((px-ax)*dx+(pz-az)*dz)/length2,0.0,1.0) if length2>0.0 else 0.0
 	return Vector2(px-ax-dx*t, pz-az-dz*t).length()

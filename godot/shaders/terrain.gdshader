@@ -28,6 +28,9 @@ uniform float repeat_plains = 200.0;
 uniform float repeat_swamp = 200.0;
 uniform float repeat_mountain = 200.0;
 uniform float cliff_repeat = 26.25;
+uniform int selected_biome = -1;
+uniform vec4 editor_tint : source_color = vec4(0.0, 1.0, 0.86, 1.0);
+uniform float editor_tint_strength : hint_range(0.0,1.0) = 0.42;
 
 varying vec3 wt_pos;
 varying vec3 wt_normal;
@@ -74,5 +77,12 @@ void fragment() {
  }
  vec3 unassigned=vec3(0.30,0.40,0.34);
  ALBEDO=total>0.001?mix(unassigned,accum/max(total,0.001),clamp(total,0.0,1.0)):unassigned;
+ float active = 0.0;
+ if(selected_biome==0){active=mf;}
+ else if(selected_biome==1){active=md;}
+ else if(selected_biome==2){active=mp;}
+ else if(selected_biome==3){active=ms;}
+ else if(selected_biome==4){active=mm;}
+ ALBEDO=mix(ALBEDO,editor_tint.rgb,clamp(active,0.0,1.0)*editor_tint_strength);
  ROUGHNESS=1.0;
 }

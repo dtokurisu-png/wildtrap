@@ -7,6 +7,8 @@ const RULES = preload("res://addons/wildtrap_editor/biome_rules.gd")
 const MASKS = preload("res://addons/wildtrap_editor/biome_masks.gd")
 const HISTORY_LIMIT := 40
 
+var source_path := PATH
+var save_masks := true
 var data: Dictionary = {}
 var _disk_hash := ""
 var _undo: Array = []
@@ -16,7 +18,7 @@ var last_error := ""
 
 
 func open() -> bool:
-	var path := ProjectSettings.globalize_path(PATH)
+	var path := ProjectSettings.globalize_path(source_path)
 	if not FileAccess.file_exists(path):
 		last_error="Falta el mapa de Godot: "+PATH
 		return false
@@ -114,7 +116,7 @@ func save() -> bool:
 		last_error="Error de verificación del JSON temporal."
 		return false
 	var masks: Dictionary = MASKS.make(data)
-	if not MASKS.save_pngs(masks):
+	if save_masks and not MASKS.save_pngs(masks):
 		DirAccess.remove_absolute(temp_path)
 		last_error="No se pudieron guardar todas las máscaras."
 		return false

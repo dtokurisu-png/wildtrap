@@ -12,7 +12,8 @@ static func _inside(poly: Array, x: float, z: float) -> bool:
 	for i in range(poly.size()):
 		var a: Dictionary = poly[i]
 		var b: Dictionary = poly[prev]
-		var az := float(a.get("z",0)),bz := float(b.get("z",0))
+		var az := float(a.get("z",0))
+		var bz := float(b.get("z",0))
 		if (az > z)!=(bz > z) and x < (float(b.get("x",0))-float(a.get("x",0)))*(z-az)/(bz-az)+float(a.get("x",0)):
 			hit=not hit
 		prev=i

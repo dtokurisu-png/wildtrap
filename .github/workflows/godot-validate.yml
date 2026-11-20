@@ -31,8 +31,8 @@ jobs:
           node-version: '22'
       - name: Install geometry bake dependency
         run: npm install --no-save --prefix godot/tools pngjs@7.0.0
-      - name: Verify source JSON equals repository publication
-        run: cmp godot/data/world.json assets/terrain/wildtrap-mobile-world.json
+      - name: Validate independent canonical Godot map
+        run: node godot/tests/native_world_source.test.mjs
       - name: Bake original cut/cliff geometry into native Godot terrain
         run: node godot/tools/bake-world.mjs
       - name: Check Godot-clockwise terrain faces and normals
