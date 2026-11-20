@@ -5,6 +5,7 @@ extends RefCounted
 const PATH := "res://data/world.json"
 const RULES = preload("res://addons/wildtrap_editor/biome_rules.gd")
 const MASKS = preload("res://addons/wildtrap_editor/biome_masks.gd")
+const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
 const HISTORY_LIMIT := 40
 
 var source_path := PATH
@@ -52,6 +53,57 @@ func apply_distribution(distribution: Array) -> bool:
 	return true
 
 
+
+# All spawn edits work on deep copies of the full source JSON. Other nodes,
+# terrain, zones and original unknown keys are never rewritten by a tool.
+func _accept_spawn(next_world: Dictionary, result: Dictionary) -> Dictionary:
+	if bool(result.get("ok",false)) and bool(result.get("changed",false)):
+		if not SPAWNS.validate_world(next_world):
+			return {"ok":false,"error":"Spawn inválido; cambio cancelado."}
+		_record()
+		data=next_world
+		dirty=true
+		last_error=""
+	elif not bool(result.get("ok",false)):
+		last_error=str(result.get("error","Operación inválida."))
+	return result
+
+
+func spawn_place_point(category: String, x: float, z: float, player_slot: int = 1) -> Dictionary:
+	var next_world: Dictionary = data.duplicate(true)
+	return _accept_spawn(next_world,SPAWNS.place_point(next_world,category,x,z,player_slot))
+
+
+func spawn_move_point(id_num: int, x: float, z: float) -> Dictionary:
+	var next_world: Dictionary = data.duplicate(true)
+	return _accept_spawn(next_world,SPAWNS.move_point(next_world,id_num,x,z))
+
+
+func spawn_delete_point(id_num: int) -> Dictionary:
+	var next_world: Dictionary = data.duplicate(true)
+	return _accept_spawn(next_world,SPAWNS.delete_point(next_world,id_num))
+
+
+func spawn_create_area(points: Array, area_type: String = "trees", biome: String = "any", density: int = 40, name_text: String = "") -> Dictionary:
+	var next_world: Dictionary = data.duplicate(true)
+	return _accept_spawn(next_world,SPAWNS.create_area(next_world,points,area_type,biome,density,name_text))
+
+
+func spawn_change_area(id_text: String, field: String, value: Variant) -> Dictionary:
+	var next_world: Dictionary = data.duplicate(true)
+	return _accept_spawn(next_world,SPAWNS.change_area(next_world,id_text,field,value))
+
+
+func spawn_move_vertex(id_text: String, index: int, x: float, z: float) -> Dictionary:
+	var next_world: Dictionary = data.duplicate(true)
+	return _accept_spawn(next_world,SPAWNS.move_area_vertex(next_world,id_text,index,x,z))
+
+
+func spawn_delete_area(id_text: String) -> Dictionary:
+	var next_world: Dictionary = data.duplicate(true)
+	return _accept_spawn(next_world,SPAWNS.delete_area(next_world,id_text))
+
+
 func _record() -> void:
 	_undo.append(data.duplicate(true))
 	if _undo.size()>HISTORY_LIMIT:
@@ -89,8 +141,8 @@ func save() -> bool:
 	if not dirty:
 		last_error="No hay cambios pendientes."
 		return false
-	if not _valid_map(data):
-		last_error="El mapa no cumple el esquema original."
+	if not _valid_map(data) or not SPAWNS.validate_world(data):
+		last_error="El mapa o los spawns no cumplen el esquema."
 		return false
 	var path := ProjectSettings.globalize_path(source_path)
 	if FileAccess.get_sha256(path)!=_disk_hash:
