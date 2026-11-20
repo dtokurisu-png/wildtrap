@@ -1,0 +1,41 @@
+name: Validate WildTrap Godot base
+
+on:
+  push:
+    branches: [godot-migration]
+    paths:
+      - "godot/**"
+      - ".github/workflows/godot-validate.yml"
+  pull_request:
+    paths:
+      - "godot/**"
+      - ".github/workflows/godot-validate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install official Godot 4.7.2
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 \
+            --output godot-linux.zip \
+            "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          mkdir -p /tmp/wildtrap-godot
+          unzip -q godot-linux.zip -d /tmp/wildtrap-godot
+          chmod +x /tmp/wildtrap-godot/Godot_v4.7.2-stable_linux.x86_64
+          echo "/tmp/wildtrap-godot" >> "$GITHUB_PATH"
+          /tmp/wildtrap-godot/Godot_v4.7.2-stable_linux.x86_64 --headless --version
+      - name: Import native project
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --import
+      - name: Check scene and resources
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/smoke_test.gd
+      - name: Boot game in headless mode
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --quit-after 4
