@@ -40,6 +40,6 @@ offset_left = 18.0
 offset_top = 14.0
 offset_right = 1250.0
 offset_bottom = 86.0
-text = "WILDTRAP / GODOT  |  Inspeccion del escenario publicado (migracion parcial)\\nClic derecho: girar  |  Rueda: acercar  |  WASD: mover vista  |  F: activar/desactivar niebla"
+text = "WILDTRAP / GODOT  |  Inspeccion del escenario publicado (migracion parcial)\nClic derecho: girar  |  Rueda: acercar  |  WASD: mover vista  |  F: activar/desactivar niebla"
 theme_override_colors/font_color = Color(0.13, 0.20, 0.17, 1)
 theme_override_font_sizes/font_size = 16
