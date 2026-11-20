@@ -1,49 +1,79 @@
 extends Node3D
-## Visual review camera only. Player movement is not part of step 2.
+## Play mode: Explorer 1 WT with original chase camera. In Godot editor mode
+## this script never creates player or collisions and does not affect the scene.
+const EXPLORER = preload("res://scripts/explorer_controller.gd")
 
 @onready var camera: Camera3D = $Camera3D
+@onready var world: Node3D = $World
 @onready var world_environment: WorldEnvironment = $WorldEnvironment
-var yaw := 0.0
-var pitch := -0.43
-var distance := 420.0
-var target := Vector3(0.0, 65.0, 0.0)
-var dragging := false
+@onready var status: Label = $CanvasLayer/StatusLabel
+
+var player: CharacterBody3D
+var collision_count: int = 0
+
 
 func _ready() -> void:
-	camera.far = 3200.0
-	_update_camera()
+	camera.far = 1400.0
+	_install_play_colliders()
+	call_deferred("_start_explorer")
 	print("WILDTRAP_GODOT_BOOT_OK")
 
-func _process(_delta: float) -> void:
-	_update_camera()
+
+func _install_play_colliders() -> void:
+	# The original Web playtest collides with the CUT mesh, not the old
+	# uncut heightmap. Godot trimesh shapes use exactly the rendered surfaces.
+	var terrain := world.get_node_or_null("WildTrapTerrain") as MeshInstance3D
+	if terrain != null:
+		_attach_mesh_collider(terrain)
+	for child in world.get_children():
+		if not child.name.begins_with("Prefab_") or not child is Node3D or not child.visible:
+			continue
+		for piece in child.find_children("*", "MeshInstance3D", true, false):
+			var model := piece as MeshInstance3D
+			if model != null and model.mesh != null and model.visible and model.transparency < 0.75:
+				_attach_mesh_collider(model)
+	print("WILDTRAP_PLAY_COLLIDERS ", collision_count)
+
+
+func _attach_mesh_collider(model: MeshInstance3D) -> void:
+	if model.mesh == null or model.mesh.get_surface_count() < 1:
+		return
+	var shape := model.mesh.create_trimesh_shape()
+	if shape == null:
+		return
+	var body := StaticBody3D.new()
+	body.name = "WT_PlayCollider"
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var collision := CollisionShape3D.new()
+	collision.name = "Shape"
+	collision.shape = shape
+	body.add_child(collision)
+	model.add_child(body)
+	collision_count += 1
+
+
+func _start_explorer() -> void:
+	if not is_instance_valid(world) or world.get_node_or_null("WildTrapTerrain") == null:
+		push_error("WildTrap: no hay escenario para iniciar Explorador 1 WT.")
+		return
+	player = EXPLORER.new() as CharacterBody3D
+	player.initialize(camera, world)
+	add_child(player)
+	status.text = "WILDTRAP · Explorador 1 WT   |   WASD: moverse   |   Shift: correr   |   Arrastrar ratón: cámara"
+	status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	print("WILDTRAP_PLAY_STARTED")
+
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_RIGHT:
-			dragging = event.pressed
-		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			distance = maxf(45.0, distance*0.88)
-		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			distance = minf(1600.0, distance*1.14)
-	elif event is InputEventMouseMotion and dragging:
-		yaw -= event.relative.x*0.005
-		pitch = clampf(pitch-event.relative.y*0.005,-1.48,-0.08)
-	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F:
-			if world_environment.environment != null:
-				world_environment.environment.fog_enabled = not world_environment.environment.fog_enabled
-				print("WILDTRAP_INSPECT_FOG_ENABLED=", world_environment.environment.fog_enabled)
-			return
-		var movement := Vector3.ZERO
-		match event.keycode:
-			KEY_W: movement.z -= 30.0
-			KEY_S: movement.z += 30.0
-			KEY_A: movement.x -= 30.0
-			KEY_D: movement.x += 30.0
-		if movement != Vector3.ZERO:
-			target += Basis(Vector3.UP,yaw)*movement
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F:
+		if world_environment.environment != null:
+			world_environment.environment.fog_enabled = not world_environment.environment.fog_enabled
+			print("WILDTRAP_PLAY_FOG_ENABLED=", world_environment.environment.fog_enabled)
 
-func _update_camera() -> void:
-	var horizontal: float = cos(pitch)*distance
-	camera.position = target+Vector3(sin(yaw)*horizontal,-sin(pitch)*distance,cos(yaw)*horizontal)
-	camera.look_at(target,Vector3.UP)
+
+func debug_play_summary() -> Dictionary:
+	return {"player_loaded": is_instance_valid(player),
+		"mesh_colliders": collision_count,
+		"spawn": player.initial_spawn if is_instance_valid(player) else Vector3.ZERO,
+		"player_data": player.debug_summary() if is_instance_valid(player) else {}}
