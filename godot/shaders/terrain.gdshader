@@ -42,12 +42,28 @@ uniform float cliff_intensity_desert = 1.0;
 uniform float cliff_intensity_plains = 0.85;
 uniform float cliff_intensity_swamp = 1.0;
 uniform float cliff_intensity_mountain = 1.0;
+uniform float ground_opacity_forest = 1.0;
+uniform float ground_opacity_desert = 1.0;
+uniform float ground_opacity_plains = 1.0;
+uniform float ground_opacity_swamp = 1.0;
+uniform float ground_opacity_mountain = 1.0;
+uniform float biome_contrast_forest = 1.0;
+uniform float biome_contrast_desert = 1.0;
+uniform float biome_contrast_plains = 1.0;
+uniform float biome_contrast_swamp = 1.0;
+uniform float biome_contrast_mountain = 1.0;
+uniform float biome_saturation_forest = 1.0;
+uniform float biome_saturation_desert = 1.0;
+uniform float biome_saturation_plains = 1.0;
+uniform float biome_saturation_swamp = 1.0;
+uniform float biome_saturation_mountain = 1.0;
 
 uniform sampler2D handpaint_texture : source_color, filter_linear_mipmap;
 uniform bool handpaint_enabled = true;
 uniform float handpaint_opacity : hint_range(0.0, 1.0) = 0.50;
 uniform float handpaint_contrast : hint_range(0.0, 4.0) = 0.45;
 uniform float handpaint_rotation_degrees = 180.0;
+uniform int handpaint_blend_mode = 3;
 
 uniform int selected_biome = -1;
 uniform vec4 editor_tint : source_color = vec4(0.37, 0.68, 0.55, 1.0);
@@ -72,6 +88,29 @@ vec3 overlay_rgb(vec3 bottom,vec3 top){
  return mix(multiply,screen,step(vec3(0.5),bottom));
 }
 
+vec3 blend_rgb(vec3 bottom, vec3 top, int mode){
+ if(mode==0)return top;
+ if(mode==1)return bottom*top;
+ if(mode==2)return 1.0-(1.0-bottom)*(1.0-top);
+ if(mode==3)return overlay_rgb(bottom,top);
+ if(mode==4){
+  vec3 low=bottom-(1.0-2.0*top)*bottom*(1.0-bottom);
+  vec3 high=bottom+(2.0*top-1.0)*(sqrt(max(bottom,vec3(0.0)))-bottom);
+  return mix(low,high,step(vec3(0.5),top));
+ }
+ if(mode==5)return overlay_rgb(top,bottom);
+ float base_light=dot(bottom,vec3(0.2126,0.7152,0.0722));
+ float top_light=dot(top,vec3(0.2126,0.7152,0.0722));
+ if(mode==6)return clamp(top+vec3(base_light-top_light),vec3(0.0),vec3(1.0));
+ return clamp(bottom+vec3(top_light-base_light),vec3(0.0),vec3(1.0));
+}
+
+vec3 color_adjust(vec3 rgb,float contrast,float saturation){
+ vec3 adjusted=clamp((rgb-vec3(0.5))*contrast+vec3(0.5),vec3(0.0),vec3(1.0));
+ float gray=dot(adjusted,vec3(0.2126,0.7152,0.0722));
+ return clamp(mix(vec3(gray),adjusted,saturation),vec3(0.0),vec3(1.0));
+}
+
 vec3 handpaint_underlay(vec3 base,vec2 uv,float upness){
  if(!handpaint_enabled || handpaint_opacity<=0.0)return base;
  float flatness=smoothstep(0.70,0.86,upness);
@@ -90,7 +129,7 @@ vec3 handpaint_underlay(vec3 base,vec2 uv,float upness){
  float strength=clamp(handpaint_opacity*artwork.a*edge_fade*flatness*coverage*ink,0.0,1.0);
  if(strength<0.0001)return base;
  vec3 underlay=vec3(0.5-0.5*ink);
- vec3 mixed=overlay_rgb(underlay,base);
+ vec3 mixed=blend_rgb(underlay,base,handpaint_blend_mode);
  float old_luma=dot(base,vec3(0.2126,0.7152,0.0722));
  float new_luma=dot(mixed,vec3(0.2126,0.7152,0.0722));
  vec3 biome_hue=clamp(base*(new_luma/max(old_luma,0.002)),vec3(0.0),vec3(1.0));
@@ -109,12 +148,12 @@ void fragment(){
  vec2 base_uv=wt_pos.xz/630.0;
  vec2 wall_axis=vec2(abs(wt_normal.x)>abs(wt_normal.z)?wt_pos.z:wt_pos.x,wt_pos.y)/630.0;
  vec3 accum=vec3(0.0);
- if(mf>0.001){accum+=texture(ground_forest,base_uv*repeat_forest).rgb*mf;}
- if(md>0.001){accum+=texture(ground_desert,base_uv*repeat_desert).rgb*md;}
- if(mp>0.001){accum+=texture(ground_plains,base_uv*repeat_plains).rgb*mp;}
- if(ms>0.001){accum+=texture(ground_swamp,base_uv*repeat_swamp).rgb*ms;}
- if(mm>0.001){accum+=texture(ground_mountain,base_uv*repeat_mountain).rgb*mm;}
  vec3 unassigned=vec3(0.30,0.40,0.34);
+ if(mf>0.001){accum+=mix(unassigned,color_adjust(texture(ground_forest,base_uv*repeat_forest).rgb,biome_contrast_forest,biome_saturation_forest),ground_opacity_forest)*mf;}
+ if(md>0.001){accum+=mix(unassigned,color_adjust(texture(ground_desert,base_uv*repeat_desert).rgb,biome_contrast_desert,biome_saturation_desert),ground_opacity_desert)*md;}
+ if(mp>0.001){accum+=mix(unassigned,color_adjust(texture(ground_plains,base_uv*repeat_plains).rgb,biome_contrast_plains,biome_saturation_plains),ground_opacity_plains)*mp;}
+ if(ms>0.001){accum+=mix(unassigned,color_adjust(texture(ground_swamp,base_uv*repeat_swamp).rgb,biome_contrast_swamp,biome_saturation_swamp),ground_opacity_swamp)*ms;}
+ if(mm>0.001){accum+=mix(unassigned,color_adjust(texture(ground_mountain,base_uv*repeat_mountain).rgb,biome_contrast_mountain,biome_saturation_mountain),ground_opacity_mountain)*mm;}
  vec3 ground=total>0.001?mix(unassigned,accum/max(total,0.001),clamp(total,0.0,1.0)):unassigned;
  ground=handpaint_underlay(ground,muv,upness);
 
