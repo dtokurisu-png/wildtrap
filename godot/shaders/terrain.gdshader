@@ -66,6 +66,7 @@ uniform float handpaint_rotation_degrees = 180.0;
 uniform int handpaint_blend_mode = 3; // Legacy source value retained.
 uniform int ground_blend_mode = 3;
 uniform float ground_transparency : hint_range(0.0,1.0) = 1.0;
+uniform float region_feather_world : hint_range(0.0,20.0) = 5.0;
 
 uniform int selected_biome = -1;
 uniform vec4 editor_tint : source_color = vec4(0.37, 0.68, 0.55, 1.0);
@@ -141,13 +142,24 @@ vec3 handpaint_underlay(vec3 base,vec2 uv,float upness){
  return mix(base,biome_hue,strength);
 }
 
+float feather_region(sampler2D mask_image,vec2 coords){
+ float radius=region_feather_world/630.0;
+ float center=texture(mask_image,coords).r;
+ if(radius<0.000001)return center;
+ float a=texture(mask_image,clamp(coords+vec2(radius,0.0),vec2(0.0),vec2(1.0))).r;
+ float b=texture(mask_image,clamp(coords-vec2(radius,0.0),vec2(0.0),vec2(1.0))).r;
+ float c=texture(mask_image,clamp(coords+vec2(0.0,radius),vec2(0.0),vec2(1.0))).r;
+ float d=texture(mask_image,clamp(coords-vec2(0.0,radius),vec2(0.0),vec2(1.0))).r;
+ return clamp(0.5*center+0.125*(a+b+c+d),0.0,1.0);
+}
+
 void fragment(){
  vec2 muv=vec2(wt_pos.x/630.0+0.5,0.5-wt_pos.z/630.0);
- float mf=texture(mask_forest,muv).r;
- float md=texture(mask_desert,muv).r;
- float mp=texture(mask_plains,muv).r;
- float ms=texture(mask_swamp,muv).r;
- float mm=texture(mask_mountain,muv).r;
+ float mf=feather_region(mask_forest,muv);
+ float md=feather_region(mask_desert,muv);
+ float mp=feather_region(mask_plains,muv);
+ float ms=feather_region(mask_swamp,muv);
+ float mm=feather_region(mask_mountain,muv);
  float total=mf+md+mp+ms+mm;
  float upness=abs(wt_normal.y);
  vec2 base_uv=wt_pos.xz/630.0;
@@ -164,11 +176,11 @@ void fragment(){
 
  // The web cliff renderer paints ONLY polygons whose parent has the
  // corresponding biome, on steep geometry. Names/own biomeIds are ignored.
- float cf=texture(cliff_mask_forest,muv).r;
- float cd=texture(cliff_mask_desert,muv).r;
- float cp=texture(cliff_mask_plains,muv).r;
- float cs=texture(cliff_mask_swamp,muv).r;
- float cm=texture(cliff_mask_mountain,muv).r;
+ float cf=feather_region(cliff_mask_forest,muv);
+ float cd=feather_region(cliff_mask_desert,muv);
+ float cp=feather_region(cliff_mask_plains,muv);
+ float cs=feather_region(cliff_mask_swamp,muv);
+ float cm=feather_region(cliff_mask_mountain,muv);
  float cliff_total=cf+cd+cp+cs+cm;
  float verticality=1.0-upness;
  float wall_strength=smoothstep(0.10,0.74,verticality);

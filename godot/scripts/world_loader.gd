@@ -331,6 +331,7 @@ func _apply_material() -> void:
 		var mix_data: Dictionary=source_world.get("groundMix",{})
 		material.set_shader_parameter("ground_blend_mode",int(mix_data.get("mode",art_settings.get("blendMode",3))))
 		material.set_shader_parameter("ground_transparency",clampf(float(mix_data.get("opacity",1.0)),0.0,1.0))
+		material.set_shader_parameter("region_feather_world",clampf(float(mix_data.get("feather",5.0)),0.0,20.0))
 	else:
 		material.set_shader_parameter("handpaint_enabled",false)
 		push_warning("WildTrap hand-painted terrain image missing")
@@ -388,6 +389,8 @@ func _add_detail_layers() -> void:
 			layer_material.set_shader_parameter("layer_number",float(layer))
 			layer_material.set_shader_parameter("biome_contrast",clampf(float(config.get("colorContrast",1.0)),0.0,3.0))
 			layer_material.set_shader_parameter("biome_saturation",clampf(float(config.get("colorSaturation",1.0)),0.0,3.0))
+			var layer_mix: Dictionary=source_world.get("groundMix",{})
+			layer_material.set_shader_parameter("region_feather_world",clampf(float(layer_mix.get("feather",5.0)),0.0,20.0))
 			var instance:=MeshInstance3D.new()
 			instance.name="WildTrapDetail_%s_%d" % [biome,layer]
 			instance.set_meta("wildtrap_generated",true)
@@ -488,6 +491,7 @@ func apply_editor_material_preview(next_world: Dictionary) -> void:
 	var mix_data: Dictionary=source_world.get("groundMix",{})
 	terrain_material.set_shader_parameter("ground_blend_mode",int(mix_data.get("mode",art.get("blendMode",3))))
 	terrain_material.set_shader_parameter("ground_transparency",clampf(float(mix_data.get("opacity",1.0)),0.0,1.0))
+	terrain_material.set_shader_parameter("region_feather_world",clampf(float(mix_data.get("feather",5.0)),0.0,20.0))
 	terrain_material.set_shader_parameter("handpaint_enabled",_editor_handpaint_enabled and handpaint_loaded)
 	for item in _detail_materials:
 		var biome:=str(item.get("biome",""))
@@ -502,6 +506,8 @@ func apply_editor_material_preview(next_world: Dictionary) -> void:
 		layer_mat.set_shader_parameter("variation_seed",float((config.get("noise",{}) as Dictionary).get("seed",1)))
 		layer_mat.set_shader_parameter("biome_contrast",clampf(float(config.get("colorContrast",1.0)),0.0,3.0))
 		layer_mat.set_shader_parameter("biome_saturation",clampf(float(config.get("colorSaturation",1.0)),0.0,3.0))
+		var layer_mix: Dictionary=source_world.get("groundMix",{})
+		layer_mat.set_shader_parameter("region_feather_world",clampf(float(layer_mix.get("feather",5.0)),0.0,20.0))
 		var filename:=str(slot.get("name",""))
 		var path:=str(catalog.get(filename,""))
 		if path.begins_with("res://assets/textures/details/") and ResourceLoader.exists(path):

@@ -23,6 +23,7 @@ var _art_contrast: SpinBox
 var _art_rotation: SpinBox
 var _art_blend: OptionButton
 var _ground_transparency: SpinBox
+var _ground_feather: SpinBox
 var _preview_toggles: Dictionary={}
 var _info: Label
 var _refreshing:=false
@@ -74,6 +75,7 @@ func _ready() -> void:
 	add_child(ground_section)
 	_heading(ground_section,"Suelo · mezcla")
 	_ground_transparency=_number_row("Transparencia %",0.0,100.0,1.0,ground_section)
+	_ground_feather=_number_row("Difuminado (m)",0.0,20.0,0.5,ground_section)
 	_art_blend=_selector(ground_section,BLENDS,"HandpaintBlend")
 	_button(ground_section,"Aplicar suelo",_apply_ground_mix)
 	var controls:=HBoxContainer.new()
@@ -115,7 +117,7 @@ func _ready() -> void:
 	_info.name="TextureStatus"
 	_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	add_child(_info)
-	for spin in [_scale,_opacity,_contrast,_saturation,_ground_transparency,_art_opacity,_art_contrast,_art_rotation]:
+	for spin in [_scale,_opacity,_contrast,_saturation,_ground_transparency,_ground_feather,_art_opacity,_art_contrast,_art_rotation]:
 		spin.value_changed.connect(_preview_changes)
 	_art_blend.item_selected.connect(_on_blend_changed)
 	refresh()
@@ -238,6 +240,7 @@ func refresh_fields() -> void:
 	_art_rotation.set_value_no_signal(float(painted.get("rotation",180.0)))
 	var ground_mix: Dictionary=store.data.get("groundMix",{})
 	_ground_transparency.set_value_no_signal((1.0-clampf(float(ground_mix.get("opacity",1.0)),0.0,1.0))*100.0)
+	_ground_feather.set_value_no_signal(clampf(float(ground_mix.get("feather",5.0)),0.0,20.0))
 	_art_blend.select(clampi(int(ground_mix.get("mode",painted.get("blendMode",3))),0,7))
 	_refreshing=false
 
@@ -303,7 +306,7 @@ func _handpaint_values() -> Dictionary:
 
 
 func _ground_mix_values() -> Dictionary:
-	return {"opacity":1.0-_ground_transparency.value/100.0,"mode":_art_blend.selected}
+	return {"opacity":1.0-_ground_transparency.value/100.0,"mode":_art_blend.selected,"feather":_ground_feather.value}
 
 
 func _apply_ground_mix() -> void:
