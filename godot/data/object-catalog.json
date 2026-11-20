@@ -1,0 +1,107 @@
+[
+  {
+    "id": "mountain",
+    "name": "Montaña",
+    "path": "res://assets/models/library/mountain.glb",
+    "span": 65,
+    "freeCave": false
+  },
+  {
+    "id": "rocky-cave",
+    "name": "Cueva rocosa",
+    "path": "res://assets/models/rocky_cave.glb",
+    "span": 46,
+    "freeCave": true
+  },
+  {
+    "id": "stone-cave",
+    "name": "Cueva de piedra",
+    "path": "res://assets/models/stone_cave.glb",
+    "span": 46,
+    "freeCave": true
+  },
+  {
+    "id": "stylized-cave",
+    "name": "Cueva estilizada",
+    "path": "res://assets/models/stylized_cave.glb",
+    "span": 46,
+    "freeCave": true
+  },
+  {
+    "id": "cliffside-path",
+    "name": "Camino de acantilado",
+    "path": "res://assets/models/library/cliffside-path.glb",
+    "span": 46,
+    "freeCave": false
+  },
+  {
+    "id": "floating-rock-2",
+    "name": "Roca flotante",
+    "path": "res://assets/models/library/floating-rock-2.glb",
+    "span": 35,
+    "freeCave": false
+  },
+  {
+    "id": "cave-floor-1",
+    "name": "Piso de cueva",
+    "path": "res://assets/models/library/cave-floor-1.glb",
+    "span": 46,
+    "freeCave": false
+  },
+  {
+    "id": "rock-formation-1",
+    "name": "Formación rocosa",
+    "path": "res://assets/models/library/rock-formation-1.glb",
+    "span": 35,
+    "freeCave": false
+  },
+  {
+    "id": "rock-pillar-3",
+    "name": "Pilar rocoso 3",
+    "path": "res://assets/models/library/rock-pillar-3.glb",
+    "span": 35,
+    "freeCave": false
+  },
+  {
+    "id": "rock-pillar-4",
+    "name": "Pilar rocoso 4",
+    "path": "res://assets/models/library/rock-pillar-4.glb",
+    "span": 35,
+    "freeCave": false
+  },
+  {
+    "id": "cave-roof-2",
+    "name": "Techo de cueva 2",
+    "path": "res://assets/models/library/cave-roof-2.glb",
+    "span": 46,
+    "freeCave": false
+  },
+  {
+    "id": "cave-roof-3",
+    "name": "Techo de cueva 3",
+    "path": "res://assets/models/library/cave-roof-3.glb",
+    "span": 46,
+    "freeCave": false
+  },
+  {
+    "id": "cave-roof-4",
+    "name": "Techo de cueva 4",
+    "path": "res://assets/models/library/cave-roof-4.glb",
+    "span": 46,
+    "freeCave": false
+  },
+  {
+    "id": "cave-roof-6",
+    "name": "Techo de cueva 6",
+    "path": "res://assets/models/library/cave-roof-6.glb",
+    "span": 46,
+    "freeCave": false
+  },
+  {
+    "id": "cave-roof",
+    "name": "Techo de cueva",
+    "path": "res://assets/models/library/cave-roof.glb",
+    "span": 46,
+    "freeCave": false
+  }
+]
