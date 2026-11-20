@@ -82,6 +82,8 @@ jobs:
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/object_texture_store_test.gd
       - name: Verify five native editor tabs and functional viewport palettes
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/five_tabs_editor_test.gd
+      - name: Verify 3D object dragging and split ground/painter panels
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/object_drag_material_test.gd
       - name: Verify native scene nodes
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/smoke_test.gd
       - name: Verify Explorer 1 WT gameplay, animation, camera and collisions
