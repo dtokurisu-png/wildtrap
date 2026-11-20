@@ -120,9 +120,19 @@ func _find_animations(character: Node3D) -> void:
 	# Keep imported order and never confuse the engine RESET clip.
 	idle_name=all[mini(2,all.size()-1)]
 	run_name=all[mini(4,all.size()-1)]
-	var original:=animation_player.get_animation(run_name)
-	if original!=null:
-		var adjusted:=original.duplicate(true) as Animation
+	var idle_source:=animation_player.get_animation(idle_name)
+	var run_source:=animation_player.get_animation(run_name)
+	var library:=AnimationLibrary.new()
+	# Imported GLB clips are one-shot by default. Make independent runtime
+	# copies so both Idle and Running loop without changing source assets.
+	if idle_source!=null:
+		var idle_loop:=idle_source.duplicate(true) as Animation
+		idle_loop.loop_mode=Animation.LOOP_LINEAR
+		if library.add_animation("Idle_Loop",idle_loop)==OK:
+			idle_name="WildTrap/Idle_Loop"
+	if run_source!=null:
+		var adjusted:=run_source.duplicate(true) as Animation
+		adjusted.loop_mode=Animation.LOOP_LINEAR
 		# Equivalent to playtest-animation.mjs, keeping vertical bobbing.
 		for track in range(adjusted.get_track_count()):
 			if adjusted.track_get_type(track)!=Animation.TYPE_POSITION_3D:
@@ -139,10 +149,10 @@ func _find_animations(character: Node3D) -> void:
 				var value: Variant=adjusted.track_get_key_value(track,key)
 				if value is Vector3:
 					adjusted.track_set_key_value(track,key,Vector3(first.x,value.y,first.z))
-		var library:=AnimationLibrary.new()
 		if library.add_animation("Run_InPlace",adjusted)==OK:
-			animation_player.add_animation_library("WildTrap",library)
 			run_name="WildTrap/Run_InPlace"
+	if not library.get_animation_list().is_empty():
+		animation_player.add_animation_library("WildTrap",library)
 	animation_player.play(idle_name)
 
 
