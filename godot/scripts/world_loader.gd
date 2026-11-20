@@ -446,18 +446,62 @@ func apply_editor_objects_preview(next_world: Dictionary) -> void:
 
 
 func apply_editor_material_preview(next_world: Dictionary) -> void:
-	if not Engine.is_editor_hint():
+	if not Engine.is_editor_hint() or not is_instance_valid(terrain):
 		return
+	# Editing numbers must NOT reconstruct 15 × 90k-triangle overlays on every
+	# spinbox tick. Bind texture/uniform changes on existing materials only.
 	source_world=next_world.duplicate(true)
-	for child in get_children():
-		if child.has_meta("wildtrap_generated") and child.name.begins_with("WildTrapDetail_"):
-			remove_child(child)
-			child.queue_free()
-	_detail_materials.clear()
-	detail_layer_count=0
-	_apply_material()
-	_add_detail_layers()
-	apply_editor_biome_preview(source_world,_editor_selected_biome)
+	var terrain_material:=terrain.material_override as ShaderMaterial
+	if terrain_material==null:
+		return
+	var materials: Dictionary=source_world.get("biomeMaterials",{})
+	var heights: Dictionary=source_world.get("cliffHeightSettings",{})
+	var cliff_biomes: Dictionary=heights.get("biomes",{})
+	var catalog_value: Variant=JSON.parse_string(FileAccess.get_file_as_string(DETAIL_MAP))
+	var catalog: Dictionary=catalog_value if catalog_value is Dictionary else {}
+	for biome in BIOMES:
+		var config: Dictionary=materials.get(biome,{})
+		var ground: Dictionary=(config.get("slots",{}) as Dictionary).get("ground",{})
+		terrain_material.set_shader_parameter("repeat_"+biome,clampf(float(ground.get("scale",200.0)),0.25,1000.0))
+		terrain_material.set_shader_parameter("ground_opacity_"+biome,clampf(float(ground.get("opacity",1.0)),0.0,1.0))
+		terrain_material.set_shader_parameter("biome_contrast_"+biome,clampf(float(config.get("colorContrast",1.0)),0.0,3.0))
+		terrain_material.set_shader_parameter("biome_saturation_"+biome,clampf(float(config.get("colorSaturation",1.0)),0.0,3.0))
+		var own: Dictionary=cliff_biomes.get(biome,{})
+		var repeats:=float(own.get("repeats",0.0))
+		if repeats<3.5 or repeats>315.0:
+			if biome=="plains" and float(heights.get("period",0.0))>=2.0:
+				repeats=630.0/float(heights.get("period",12.6))
+			else:
+				repeats=26.25
+		terrain_material.set_shader_parameter("cliff_repeat_"+biome,repeats)
+		terrain_material.set_shader_parameter("cliff_intensity_"+biome,
+			clampf(float(own.get("intensity",1.0)),0.0,1.0) if _editor_cliff_color_enabled else 0.0)
+	var art: Dictionary=source_world.get("handpaintMaterial",{})
+	_editor_handpaint_opacity=clampf(float(art.get("opacity",0.50)),0.0,1.0)
+	terrain_material.set_shader_parameter("handpaint_opacity",_editor_handpaint_opacity)
+	terrain_material.set_shader_parameter("handpaint_contrast",clampf(float(art.get("contrast",0.45)),0.0,4.0))
+	terrain_material.set_shader_parameter("handpaint_rotation_degrees",float(art.get("rotation",180.0)))
+	terrain_material.set_shader_parameter("handpaint_blend_mode",int(art.get("blendMode",3)))
+	terrain_material.set_shader_parameter("handpaint_enabled",_editor_handpaint_enabled and handpaint_loaded)
+	for item in _detail_materials:
+		var biome:=str(item.get("biome",""))
+		var layer:=int(item.get("layer",1))
+		var layer_mat:=item.get("material") as ShaderMaterial
+		if layer_mat==null:
+			continue
+		var config: Dictionary=materials.get(biome,{})
+		var slot: Dictionary=(config.get("slots",{}) as Dictionary).get("detail"+str(layer),{})
+		layer_mat.set_shader_parameter("repeats",clampf(float(slot.get("scale",200.0)),0.25,1000.0))
+		layer_mat.set_shader_parameter("intensity",clampf(float(slot.get("opacity",0.5)),0.0,1.0))
+		layer_mat.set_shader_parameter("variation_seed",float((config.get("noise",{}) as Dictionary).get("seed",1)))
+		layer_mat.set_shader_parameter("biome_contrast",clampf(float(config.get("colorContrast",1.0)),0.0,3.0))
+		layer_mat.set_shader_parameter("biome_saturation",clampf(float(config.get("colorSaturation",1.0)),0.0,3.0))
+		var filename:=str(slot.get("name",""))
+		var path:=str(catalog.get(filename,""))
+		if path.begins_with("res://assets/textures/details/") and ResourceLoader.exists(path):
+			var image:=load(path) as Texture2D
+			if image!=null:
+				layer_mat.set_shader_parameter("detail_texture",image)
 	set_editor_details_visible(_editor_details_enabled)
 
 
