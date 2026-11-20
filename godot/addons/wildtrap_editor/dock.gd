@@ -4,6 +4,15 @@ extends VBoxContainer
 ## undo/redo and non-persistent 3D inspection markers.
 const STORE = preload("res://addons/wildtrap_editor/world_store.gd")
 const RULES = preload("res://addons/wildtrap_editor/biome_rules.gd")
+const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
+const SPAWN_VIEW = preload("res://addons/wildtrap_editor/spawn_viewport.gd")
+const SPAWN_NAMES := {
+	"player":"Jugador","npc":"NPC","trees":"Árboles","grass":"Hierbas",
+	"plants":"Plantas","rocks":"Rocas","objects":"Objetos",
+	"specialCreature":"Criatura especial","river":"Río","swamp":"Pantano",
+	"lake":"Lago","oasis":"Oasis","dune":"Duna","mountain":"Montaña",
+	"cliff":"Acantilado"
+}
 const BIOMES := ["forest","desert","plains","swamp","mountain"]
 const LABELS := {
 	"forest":"Bosque","desert":"Desierto","plains":"Pradera",
@@ -42,6 +51,32 @@ var _prev_button: Button
 var _next_button: Button
 var _cliff_toggle: Button
 var _tab_scrolls: Dictionary = {}
+var _tabs: TabContainer
+var _spawn_mode := ""
+var _pending_spawn_area: Array = []
+var _selected_spawn_kind := "point"
+var _selected_spawn_area_id := ""
+var _spawn_point_category: OptionButton
+var _spawn_slot: OptionButton
+var _spawn_list: VBoxContainer
+var _spawn_area_list: VBoxContainer
+var _spawn_point_form: VBoxContainer
+var _spawn_area_form: VBoxContainer
+var _spawn_point_x: SpinBox
+var _spawn_point_z: SpinBox
+var _spawn_vertex_x: SpinBox
+var _spawn_vertex_z: SpinBox
+var _spawn_vertex_picker: OptionButton
+var _spawn_area_name: LineEdit
+var _spawn_area_type: OptionButton
+var _spawn_area_biome: OptionButton
+var _spawn_density: HSlider
+var _spawn_density_label: Label
+var _spawn_area_hidden: CheckButton
+var _spawn_hint: Label
+var _spawn_selected_vertex := 0
+var _updating_spawn_controls := false
+var _preview_signature := ""
 
 
 func _init() -> void:
@@ -61,6 +96,9 @@ func _ready() -> void:
 
 
 func on_scene_changed(root: Node) -> void:
+	clear_spawn_preview()
+	_spawn_mode=""
+	_pending_spawn_area.clear()
 	_clear_marker()
 	_scene_root=root
 	refresh_scene()
@@ -116,7 +154,9 @@ func _build_panel() -> void:
 	_redo_button=_button(saves,"Rehacer",_redo_edit)
 	_button(self,"Recargar archivo de Git",_reload_world)
 	var tabs := TabContainer.new()
+	_tabs=tabs
 	tabs.name="WildTrapTabs"
+	tabs.tab_changed.connect(_tab_changed)
 	tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL
 	add_child(tabs)
 
@@ -156,12 +196,123 @@ func _build_panel() -> void:
 	_distribution_label=_label(pager,"")
 	_next_button=_button(pager,"Siguiente",_next_page)
 
+	
 	var spawns_tab := _tab(tabs,"Spawns")
-	var spawn_list := VBoxContainer.new()
-	spawn_list.name="SpawnList"
-	spawns_tab.add_child(spawn_list)
+	var draw_tools := HBoxContainer.new()
+	spawns_tab.add_child(draw_tools)
+	_button(draw_tools,"Punto",_set_spawn_mode.bind("point"))
+	_button(draw_tools,"Área",_set_spawn_mode.bind("area"))
+	_button(draw_tools,"Seleccionar",_set_spawn_mode.bind("select"))
+	var draw_tools_2 := HBoxContainer.new()
+	spawns_tab.add_child(draw_tools_2)
+	_button(draw_tools_2,"Cerrar área",_close_spawn_polygon)
+	_button(draw_tools_2,"Cancelar",_cancel_spawn_tool)
+	_spawn_hint=_label(spawns_tab,"")
+	var point_params := HBoxContainer.new()
+	spawns_tab.add_child(point_params)
+	_spawn_point_category=OptionButton.new()
+	_spawn_point_category.name="SpawnCategory"
+	_spawn_point_category.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	for cat in SPAWNS.POINT_CATEGORIES:
+		_spawn_point_category.add_item(str(SPAWN_NAMES.get(cat,cat)))
+	_spawn_point_category.item_selected.connect(_on_spawn_category_selected)
+	point_params.add_child(_spawn_point_category)
+	_spawn_slot=OptionButton.new()
+	_spawn_slot.name="PlayerSlot"
+	for slot in range(1,SPAWNS.MAX_PLAYERS+1):
+		_spawn_slot.add_item("J"+str(slot))
+	point_params.add_child(_spawn_slot)
+	_label(spawns_tab,"Puntos")
+	_spawn_list=VBoxContainer.new()
+	_spawn_list.name="SpawnList"
+	spawns_tab.add_child(_spawn_list)
+	_label(spawns_tab,"Áreas")
+	_spawn_area_list=VBoxContainer.new()
+	_spawn_area_list.name="SpawnAreaList"
+	spawns_tab.add_child(_spawn_area_list)
 	_spawn_info=_label(spawns_tab,"")
-	_button(spawns_tab,"Ocultar marcador",_clear_marker)
+
+	_spawn_point_form=VBoxContainer.new()
+	_spawn_point_form.name="SpawnPointProperties"
+	spawns_tab.add_child(_spawn_point_form)
+	var pos_row := HBoxContainer.new()
+	_spawn_point_form.add_child(pos_row)
+	_spawn_point_x=_coordinate(pos_row)
+	_spawn_point_z=_coordinate(pos_row)
+	_button(_spawn_point_form,"Aplicar X/Z",_apply_point_coordinates)
+	_button(_spawn_point_form,"Mover punto en 3D",_set_spawn_mode.bind("move_point"))
+	_button(_spawn_point_form,"Eliminar punto",_delete_selected_spawn)
+
+	_spawn_area_form=VBoxContainer.new()
+	_spawn_area_form.name="SpawnAreaProperties"
+	spawns_tab.add_child(_spawn_area_form)
+	_spawn_area_name=LineEdit.new()
+	_spawn_area_name.placeholder_text="Nombre del área"
+	_spawn_area_form.add_child(_spawn_area_name)
+	_spawn_area_name.text_submitted.connect(_on_area_name_submitted)
+	_spawn_area_name.focus_exited.connect(_on_area_name_focus_exited)
+	_spawn_area_type=OptionButton.new()
+	for category in SPAWNS.AREA_CATEGORIES:
+		_spawn_area_type.add_item(str(SPAWN_NAMES.get(category,category)))
+	_spawn_area_form.add_child(_spawn_area_type)
+	_spawn_area_type.item_selected.connect(_on_area_type_selected)
+	_spawn_area_biome=OptionButton.new()
+	for biome in SPAWNS.BIOME_IDS:
+		_spawn_area_biome.add_item("Todos" if biome=="any" else str(LABELS.get(biome,biome)))
+	_spawn_area_form.add_child(_spawn_area_biome)
+	_spawn_area_biome.item_selected.connect(_on_area_biome_selected)
+	var density_row := HBoxContainer.new()
+	_spawn_area_form.add_child(density_row)
+	_spawn_density=HSlider.new()
+	_spawn_density.name="SpawnDensity"
+	_spawn_density.min_value=0
+	_spawn_density.max_value=100
+	_spawn_density.step=1
+	_spawn_density.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	density_row.add_child(_spawn_density)
+	_spawn_density_label=_label(density_row,"40%")
+	_spawn_density.value_changed.connect(_on_density_preview)
+	_spawn_density.drag_ended.connect(_on_density_committed)
+	_spawn_area_hidden=CheckButton.new()
+	_spawn_area_hidden.text="Ocultar"
+	_spawn_area_hidden.toggled.connect(_on_area_hidden_toggled)
+	_spawn_area_form.add_child(_spawn_area_hidden)
+	_spawn_vertex_picker=OptionButton.new()
+	_spawn_area_form.add_child(_spawn_vertex_picker)
+	_spawn_vertex_picker.item_selected.connect(_on_vertex_selected)
+	var vertex_row := HBoxContainer.new()
+	_spawn_area_form.add_child(vertex_row)
+	_spawn_vertex_x=_coordinate(vertex_row)
+	_spawn_vertex_z=_coordinate(vertex_row)
+	_button(_spawn_area_form,"Aplicar vértice X/Z",_apply_vertex_coordinates)
+	_button(_spawn_area_form,"Mover vértice en 3D",_set_spawn_mode.bind("move_vertex"))
+	_button(_spawn_area_form,"Eliminar área",_delete_selected_spawn)
+	_spawn_point_form.visible=false
+	_spawn_area_form.visible=false
+
+
+
+func _coordinate(parent: Node) -> SpinBox:
+	var spin := SpinBox.new()
+	spin.min_value=-315.0
+	spin.max_value=315.0
+	spin.step=0.25
+	spin.allow_greater=false
+	spin.allow_lesser=false
+	spin.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	parent.add_child(spin)
+	return spin
+
+
+func _tab_changed(index: int) -> void:
+	if index!=2:
+		_spawn_mode=""
+		_pending_spawn_area.clear()
+		clear_spawn_preview()
+	else:
+		_redraw_spawn_overlay()
+
+
 
 
 func refresh_scene() -> void:
