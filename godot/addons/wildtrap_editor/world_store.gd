@@ -153,7 +153,9 @@ func save() -> bool:
 	if not enumeration.get("ok",false) or RULES.current_index(data,enumeration.get("options",[]))<0:
 		last_error="La distribución de biomas no cumple las restricciones."
 		return false
-	var text_data := JSON.stringify(data)
+	# Preserve every float bit of the source (sculpt/mesh offsets, GLB positions).
+	# The default JSON.stringify precision would round unrelated scene values.
+	var text_data := JSON.stringify(data, "", true, true)
 	var temp_path := path+".tmp"
 	var file := FileAccess.open(temp_path,FileAccess.WRITE)
 	if file==null:

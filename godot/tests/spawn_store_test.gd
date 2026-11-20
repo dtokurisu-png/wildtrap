@@ -104,8 +104,12 @@ func _check() -> void:
 		for existing in all_nodes:
 			if int(existing.get("id",-1))==int(old.get("id",-2)):
 				found=true
-				if existing!=old:
-					_fail("Original node changed: "+str(old.get("id")))
+				if JSON.stringify(existing, "", true, true)!=JSON.stringify(old, "", true, true):
+					var differences: Array = []
+					for key in old.keys():
+						if JSON.stringify(old.get(key), "", true, true)!=JSON.stringify(existing.get(key), "", true, true):
+							differences.append(str(key)+":"+JSON.stringify(old.get(key), "", true, true)+" vs "+JSON.stringify(existing.get(key), "", true, true))
+					_fail("Original node changed: "+str(old.get("id"))+" fields="+str(differences))
 					return
 				break
 		if not found:
