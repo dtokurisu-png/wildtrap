@@ -142,3 +142,33 @@ cliff height geometry and original JSON remain unchanged.
 Biome highlighting is muted green instead of intense cyan, with just 14%
 tint instead of 42%. Labels in the panel remain brief; detailed zone biome
 names are available by hovering their buttons.
+
+
+## Native spawn editor — direct 3D tools
+
+Open main.tscn in Godot's 3D editor and open **WildTrap Editor > Spawns**.
+Buttons **Punto**, **Área**, **Seleccionar** arm the *editor viewport*:
+- **Punto**: choose Jugador/NPC/Árboles/Hierbas/Plantas/Rocas/Objetos/
+  Criatura especial; click the real terrain to place. Slots J1–J6 are
+  unique: placing an occupied player slot moves that slot instead of
+  creating a duplicate.
+- **Área**: click 3+ points on real terrain. Click the first point again,
+  or click **Cerrar área**, to create a validated polygon. Self-crossings,
+  tiny or degenerate polygons, and outside-map points are rejected.
+- **Seleccionar**: click a saved point or inside an area to edit it. The
+  side panel includes area name/type/biome/density/hidden, area vertices,
+  exact X/Z for points, move-on-terrain buttons and delete.
+- **Cancelar**: exits the viewport tool without writing pending vertices.
+  Normal Godot orbit/zoom input is not intercepted unless a spawn tool is
+  explicitly active. Other tabs disable spawn clicks.
+- **Guardar** writes all changes to Godot's canonical world.json in the
+  same locally cloned repository. Undo/Redo and external-change protection
+  are shared with biome distributions.
+
+The original characterSpawn, playerSpawn and spawnAreas JSON formats are
+preserved. Non-character object/vegetation markers use the new
+`kind:"spawnPoint",category:"..."` records, for native editing only.
+The actual procedural population of trees, objects, NPC actors or creatures
+is **not** implemented by this stage; placing a spawn defines where that
+future game system may generate them. All spawn previews are transient editor
+nodes, not game-world objects serialized to main.tscn.

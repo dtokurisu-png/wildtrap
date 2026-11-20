@@ -34,6 +34,8 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 
 func _exit_tree() -> void:
 	if wildtrap_dock != null and is_instance_valid(wildtrap_dock):
+		if wildtrap_dock.has_method("clear_spawn_preview"):
+			wildtrap_dock.clear_spawn_preview()
 		remove_control_from_docks(wildtrap_dock)
 		wildtrap_dock.queue_free()
 	wildtrap_dock = null
