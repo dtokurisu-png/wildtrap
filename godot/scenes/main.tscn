@@ -1,7 +1,7 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://c7m0qqlyjh1rw"]
 
-[ext_resource type="Script" path="res://scripts/bootstrap.gd" id="1_bootstrap"]
-[ext_resource type="Script" path="res://scripts/world_loader.gd" id="2_world"]
+[ext_resource type="Script" uid="uid://dc6xdaytpgyv1" path="res://scripts/bootstrap.gd" id="1_bootstrap"]
+[ext_resource type="Script" uid="uid://bt747hm8ttjw0" path="res://scripts/world_loader.gd" id="2_world"]
 
 [sub_resource type="Environment" id="Environment_start"]
 background_mode = 1
@@ -13,33 +13,34 @@ fog_enabled = true
 fog_light_color = Color(0.72549, 0.788235, 0.756863, 1)
 fog_density = 0.00052
 
-[node name="WildTrap" type="Node3D"]
+[node name="WildTrap" type="Node3D" unique_id=1076205979]
 script = ExtResource("1_bootstrap")
 
-[node name="World" type="Node3D" parent="."]
-script = ExtResource("2_world")
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_start")
-
-[node name="Sun" type="DirectionalLight3D" parent="."]
-rotation = Vector3(-0.95, -0.4, 0)
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=909085288]
+transform = Transform3D(0.92104214, 0.32047173, -0.22131242, -0.005889313, 0.5796458, 0.8148473, 0.38941833, -0.7492053, 0.5357656, 82.269226, 523.5654, 0)
 light_color = Color(1, 0.92, 0.82, 1)
 light_energy = 1.6
 shadow_enabled = true
 directional_shadow_max_distance = 800.0
 
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="World" type="Node3D" parent="." unique_id=1656281415]
+script = ExtResource("2_world")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1003859056]
+environment = SubResource("Environment_start")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=146934933]
 current = true
 far = 3200.0
 
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1985039177]
 
-[node name="StatusLabel" type="Label" parent="CanvasLayer"]
+[node name="StatusLabel" type="Label" parent="CanvasLayer" unique_id=882806757]
 offset_left = 18.0
 offset_top = 14.0
 offset_right = 1250.0
 offset_bottom = 86.0
-text = "WILDTRAP / GODOT  |  Inspeccion del escenario publicado (migracion parcial)\nClic derecho: girar  |  Rueda: acercar  |  WASD: mover vista  |  F: activar/desactivar niebla"
-theme_override_colors/font_color = Color(0.13, 0.20, 0.17, 1)
+theme_override_colors/font_color = Color(0.13, 0.2, 0.17, 1)
 theme_override_font_sizes/font_size = 16
+text = "WILDTRAP / GODOT  |  Inspeccion del escenario publicado (migracion parcial)
+Clic derecho: girar  |  Rueda: acercar  |  WASD: mover vista  |  F: activar/desactivar niebla"
