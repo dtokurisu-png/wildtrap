@@ -45,6 +45,9 @@ var vertex_count: int = 0
 var triangle_count: int = 0
 var terrain: MeshInstance3D
 var _editor_selected_biome := ""
+var _editor_selected_zone: Dictionary = {}
+var _editor_show_cliff_areas := false
+var _cliff_preview_texture: Texture2D
 
 
 func set_editor_biome_selection(biome: String) -> void:
@@ -53,10 +56,50 @@ func set_editor_biome_selection(biome: String) -> void:
 		terrain.material_override.set_shader_parameter("selected_biome",BIOMES.find(biome))
 
 
+func set_editor_zone_selection(zone: Dictionary) -> void:
+	_editor_selected_zone=zone.duplicate(true)
+	_update_editor_zone_mask()
+
+
+func set_editor_cliffs_visible(enabled: bool) -> void:
+	# A temporary selection overlay, never hiding source cliff geometry.
+	_editor_show_cliff_areas=enabled
+	_update_editor_cliff_mask()
+
+
+func _update_editor_zone_mask() -> void:
+	if not Engine.is_editor_hint() or not is_instance_valid(terrain):
+		return
+	var material := terrain.material_override as ShaderMaterial
+	if material==null:
+		return
+	var points: Array = _editor_selected_zone.get("points",[])
+	if points.size()<3:
+		material.set_shader_parameter("selected_zone_enabled",false)
+		return
+	var zone_image: Image = BIOME_MASKS.make_zone_mask(source_world,_editor_selected_zone)
+	material.set_shader_parameter("selected_zone_mask",ImageTexture.create_from_image(zone_image))
+	material.set_shader_parameter("selected_zone_enabled",true)
+
+
+func _update_editor_cliff_mask() -> void:
+	if not Engine.is_editor_hint() or not is_instance_valid(terrain):
+		return
+	var material := terrain.material_override as ShaderMaterial
+	if material==null:
+		return
+	if _editor_show_cliff_areas:
+		if _cliff_preview_texture==null:
+			_cliff_preview_texture=ImageTexture.create_from_image(BIOME_MASKS.make_cliff_mask(source_world))
+		material.set_shader_parameter("cliff_zones_mask",_cliff_preview_texture)
+	material.set_shader_parameter("cliff_zones_enabled",_editor_show_cliff_areas)
+
+
 func apply_editor_biome_preview(next_source: Dictionary, biome: String = "") -> void:
 	if not Engine.is_editor_hint():
 		return
 	source_world=next_source.duplicate(true)
+	_cliff_preview_texture=null
 	_editor_selected_biome=biome
 	if not is_instance_valid(terrain):
 		return
@@ -70,6 +113,8 @@ func apply_editor_biome_preview(next_source: Dictionary, biome: String = "") -> 
 		if image != null:
 			shader_mat.set_shader_parameter("mask_"+id_biome,ImageTexture.create_from_image(image))
 	set_editor_biome_selection(biome)
+	_update_editor_zone_mask()
+	_update_editor_cliff_mask()
 
 
 
@@ -190,6 +235,8 @@ func _apply_material() -> void:
 	terrain.material_override = material
 	if Engine.is_editor_hint():
 		set_editor_biome_selection(_editor_selected_biome)
+		_update_editor_zone_mask()
+		_update_editor_cliff_mask()
 
 func _height_at(x: float, z: float) -> float:
 	var n: int = int(source_world.get("resolution", 129))
