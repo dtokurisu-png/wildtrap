@@ -204,3 +204,37 @@ slowly near the ground, or Shift+middle mouse to pan the orbit target.
 This lets you inspect patches at close range without relying on the large
 orbit step distance. Full third-person player camera/collision is a separate
 step, and does not yet exist in the native project.
+
+## Native WildTrap Editor — the definitive five tabs
+
+Open `scenes/main.tscn` and the **WildTrap Editor** right dock. All five
+tabs are scrollable: **Biomas | Zonas | Spawns | Objetos | Texturas**.
+Biomas now contains only biome selection; material controls are in Texturas.
+
+**Objetos** lists the complete 15-item original prefab library (source
+models are copied from the same repo, without changing `main`).
+Choose a model in the palette, click **Colocar**, then click on the
+terrain in the Godot 3D viewport. Select a placed model from the list
+and change its X/Z, Y yaw (degrees), scale or (for the original three free
+caves) absolute Y. **Seleccionar**, **Mover**, hide/show and remove operate
+on the scene data with native undo/redo, then **Guardar** persists
+`nodes[]` into `godot/data/world.json`. Native view models are transient
+scene children and will not be duplicated inside `main.tscn`.
+Earlier browser mesh sculpt/cut operations on old prefabs have not been
+ported to Godot and are preserved as JSON only.
+
+**Texturas** selects a biome and one of five slots: Suelo base,
+Complementaria 1–3 or Acantilado. The image preview uses the verified
+original PNG, and details may be switched among the 15 recovered RGBA
+assets. Change repeats, opacity, biome contrast/saturation; press
+**Aplicar material** to add that change to the project's undoable state.
+Global Hand painting supports opacity, black/ink contrast, rotation and
+eight blend modes, with **Aplicar hand painting** for persistence. Live
+preview values in this tab affect only the current 3D editor view until
+applied. Use the three comparison switches here to show or hide Details,
+Hand painting and Cliff colors without changing the saved world data.
+
+**Guardar** writes native project world.json; follow with Commit and
+Push in GitHub Desktop. Do not modify the original browser files to edit
+the new Godot version. The native scene view still uses the stock Godot
+editor camera; it is not automatically terrain-collision constrained.
