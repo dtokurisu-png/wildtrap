@@ -29,8 +29,12 @@ uniform float repeat_swamp = 200.0;
 uniform float repeat_mountain = 200.0;
 uniform float cliff_repeat = 26.25;
 uniform int selected_biome = -1;
-uniform vec4 editor_tint : source_color = vec4(0.0, 1.0, 0.86, 1.0);
-uniform float editor_tint_strength : hint_range(0.0,1.0) = 0.42;
+uniform vec4 editor_tint : source_color = vec4(0.37, 0.68, 0.55, 1.0);
+uniform float editor_tint_strength : hint_range(0.0,1.0) = 0.14;
+uniform bool selected_zone_enabled = false;
+uniform sampler2D selected_zone_mask : filter_linear;
+uniform bool cliff_zones_enabled = false;
+uniform sampler2D cliff_zones_mask : filter_linear;
 
 varying vec3 wt_pos;
 varying vec3 wt_normal;
@@ -83,6 +87,9 @@ void fragment() {
  else if(selected_biome==2){active=mp;}
  else if(selected_biome==3){active=ms;}
  else if(selected_biome==4){active=mm;}
- ALBEDO=mix(ALBEDO,editor_tint.rgb,clamp(active,0.0,1.0)*editor_tint_strength);
+ float highlight_strength=clamp(active,0.0,1.0)*editor_tint_strength;
+ if(selected_zone_enabled){highlight_strength=max(highlight_strength,texture(selected_zone_mask,muv).r*0.19);}
+ if(cliff_zones_enabled){highlight_strength=max(highlight_strength,texture(cliff_zones_mask,muv).r*0.10);}
+ ALBEDO=mix(ALBEDO,editor_tint.rgb,clamp(highlight_strength,0.0,0.24));
  ROUGHNESS=1.0;
 }

@@ -60,6 +60,48 @@ static func make(source: Dictionary) -> Dictionary:
 	return result
 
 
+static func make_zone_mask(source: Dictionary, zone: Dictionary) -> Image:
+	var img := Image.create_empty(RESOLUTION,RESOLUTION,false,Image.FORMAT_RGBA8)
+	img.fill(Color(0,0,0,1))
+	if not bool(zone.get("hidden",false)):
+		_paint_polygon(img,zone.get("points",[]),float(source.get("size",630)))
+	return img
+
+
+static func make_cliff_mask(source: Dictionary) -> Image:
+	var img := Image.create_empty(RESOLUTION,RESOLUTION,false,Image.FORMAT_RGBA8)
+	img.fill(Color(0,0,0,1))
+	for zone in source.get("zones",[]):
+		if zone is Dictionary and bool(zone.get("isCliff",false)) and not bool(zone.get("hidden",false)):
+			_paint_polygon(img,zone.get("points",[]),float(source.get("size",630)))
+	return img
+
+
+static func _paint_polygon(img: Image, poly: Array, world_size: float) -> void:
+	if poly.size()<3 or world_size<=0.0:
+		return
+	var half := world_size/2.0
+	var min_x := INF
+	var max_x := -INF
+	var min_z := INF
+	var max_z := -INF
+	for point in poly:
+		min_x=minf(min_x,float(point.get("x",0)))
+		max_x=maxf(max_x,float(point.get("x",0)))
+		min_z=minf(min_z,float(point.get("z",0)))
+		max_z=maxf(max_z,float(point.get("z",0)))
+	var left := maxi(0,int(floor((min_x+half)/world_size*RESOLUTION))-1)
+	var right := mini(RESOLUTION-1,int(ceil((max_x+half)/world_size*RESOLUTION))+1)
+	var top := maxi(0,int(floor((half-max_z)/world_size*RESOLUTION))-1)
+	var bottom := mini(RESOLUTION-1,int(ceil((half-min_z)/world_size*RESOLUTION))+1)
+	for py in range(top,bottom+1):
+		var z := half-(float(py)+0.5)/RESOLUTION*world_size
+		for px in range(left,right+1):
+			var x := (float(px)+0.5)/RESOLUTION*world_size-half
+			if _inside(poly,x,z):
+				img.set_pixel(px,py,Color(1,1,1,1))
+
+
 static func save_pngs(images: Dictionary) -> bool:
 	for biome in BIOMES:
 		var image: Image = images.get(biome)
