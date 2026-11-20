@@ -63,6 +63,8 @@ jobs:
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/world_data_test.gd
       - name: Verify editor-native world preview without Play
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/editor_preview_test.gd
+      - name: Verify canonical JSON save, undo and redo
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/editor_store_test.gd
       - name: Verify WildTrap editor dock and scene selectors
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/editor_dock_test.gd
       - name: Verify plugin starts inside the native Godot editor
