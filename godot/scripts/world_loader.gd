@@ -328,6 +328,9 @@ func _apply_material() -> void:
 		material.set_shader_parameter("handpaint_contrast",clampf(float(art_settings.get("contrast",0.45)),0.0,4.0))
 		material.set_shader_parameter("handpaint_rotation_degrees",float(art_settings.get("rotation",180.0)))
 		material.set_shader_parameter("handpaint_blend_mode",int(art_settings.get("blendMode",3)))
+		var mix_data: Dictionary=source_world.get("groundMix",{})
+		material.set_shader_parameter("ground_blend_mode",int(mix_data.get("mode",art_settings.get("blendMode",3))))
+		material.set_shader_parameter("ground_transparency",clampf(float(mix_data.get("opacity",1.0)),0.0,1.0))
 	else:
 		material.set_shader_parameter("handpaint_enabled",false)
 		push_warning("WildTrap hand-painted terrain image missing")
@@ -482,6 +485,9 @@ func apply_editor_material_preview(next_world: Dictionary) -> void:
 	terrain_material.set_shader_parameter("handpaint_contrast",clampf(float(art.get("contrast",0.45)),0.0,4.0))
 	terrain_material.set_shader_parameter("handpaint_rotation_degrees",float(art.get("rotation",180.0)))
 	terrain_material.set_shader_parameter("handpaint_blend_mode",int(art.get("blendMode",3)))
+	var mix_data: Dictionary=source_world.get("groundMix",{})
+	terrain_material.set_shader_parameter("ground_blend_mode",int(mix_data.get("mode",art.get("blendMode",3))))
+	terrain_material.set_shader_parameter("ground_transparency",clampf(float(mix_data.get("opacity",1.0)),0.0,1.0))
 	terrain_material.set_shader_parameter("handpaint_enabled",_editor_handpaint_enabled and handpaint_loaded)
 	for item in _detail_materials:
 		var biome:=str(item.get("biome",""))

@@ -202,6 +202,23 @@ func set_material_values(biome: String,slot: String,values: Dictionary) -> bool:
 	return _accept_material(next_world,changed)
 
 
+func set_ground_mix(values: Dictionary) -> bool:
+	# Shared surface compositing is separate from the art-only properties.
+	var next_world: Dictionary=data.duplicate(true)
+	var current: Dictionary=next_world.get("groundMix",{})
+	var old_opacity:=float(current.get("opacity",1.0))
+	var old_mode:=int(current.get("mode",int((next_world.get("handpaintMaterial",{}) as Dictionary).get("blendMode",3))))
+	var new_opacity:=clampf(float(values.get("opacity",old_opacity)),0.0,1.0)
+	var new_mode:=clampi(int(values.get("mode",old_mode)),0,7)
+	if is_equal_approx(old_opacity,new_opacity) and old_mode==new_mode:
+		last_error="Sin cambios."
+		return false
+	current["opacity"]=new_opacity
+	current["mode"]=new_mode
+	next_world["groundMix"]=current
+	return _accept_material(next_world,true)
+
+
 func set_handpaint_values(values: Dictionary) -> bool:
 	var next_world: Dictionary=data.duplicate(true)
 	var current: Dictionary=next_world.get("handpaintMaterial",{})

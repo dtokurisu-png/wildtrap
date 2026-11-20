@@ -63,7 +63,9 @@ uniform bool handpaint_enabled = true;
 uniform float handpaint_opacity : hint_range(0.0, 1.0) = 0.50;
 uniform float handpaint_contrast : hint_range(0.0, 4.0) = 0.45;
 uniform float handpaint_rotation_degrees = 180.0;
-uniform int handpaint_blend_mode = 3;
+uniform int handpaint_blend_mode = 3; // Legacy source value retained.
+uniform int ground_blend_mode = 3;
+uniform float ground_transparency : hint_range(0.0,1.0) = 1.0;
 
 uniform int selected_biome = -1;
 uniform vec4 editor_tint : source_color = vec4(0.37, 0.68, 0.55, 1.0);
@@ -129,7 +131,10 @@ vec3 handpaint_underlay(vec3 base,vec2 uv,float upness){
  float strength=clamp(handpaint_opacity*artwork.a*edge_fade*flatness*coverage*ink,0.0,1.0);
  if(strength<0.0001)return base;
  vec3 underlay=vec3(0.5-0.5*ink);
- vec3 mixed=blend_rgb(underlay,base,handpaint_blend_mode);
+ // The ART stays underneath. Only the GROUND layer receives its blend
+ // mode and global transparency. Preserve the supplied image unchanged.
+ vec3 mixed=blend_rgb(underlay,base,ground_blend_mode);
+ mixed=mix(underlay,mixed,ground_transparency);
  float old_luma=dot(base,vec3(0.2126,0.7152,0.0722));
  float new_luma=dot(mixed,vec3(0.2126,0.7152,0.0722));
  vec3 biome_hue=clamp(base*(new_luma/max(old_luma,0.002)),vec3(0.0),vec3(1.0));
