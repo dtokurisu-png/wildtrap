@@ -104,7 +104,15 @@ for(let i=0;i<vc;i++){
   Number(uv[i*2]??0),Number(uv[i*2+1]??0),Number(color[i*3]??1),Number(color[i*3+1]??1),Number(color[i*3+2]??1)];
  for(const v of values){if(!Number.isFinite(v))throw Error('Nonfinite mesh element at vertex '+i);buffer.writeFloatLE(v,off);off+=4;}
 }
-for(const x of idx){buffer.writeUInt32LE(x,off);off+=4}
+// Three.js exports the upper faces with counter-clockwise winding.
+// Godot ArrayMesh defines FRONT faces clockwise. Preserve the physically
+// correct source normals (+Y on flat ground) and invert only final indices.
+// Otherwise Godot shades the terrain as a backface and the top goes black.
+for(let i=0;i<idx.length;i+=3){
+ for(const j of [idx[i],idx[i+2],idx[i+1]]){
+  buffer.writeUInt32LE(j,off);off+=4;
+ }
+}
 write('godot/data/terrain.wtmesh',buffer);
 const biomes=['forest','desert','plains','swamp','mountain'],maskRes=512;
 const zones=(world.zones||[]).filter(z=>!z.isCliff&&!z.hidden&&z.points?.length>=3);
