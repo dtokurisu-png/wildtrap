@@ -304,6 +304,60 @@ func _closest_existing(hit: Vector3, radius: float=15.0) -> int:
 	return selected
 
 
+func _hit_existing_model(camera: Camera3D,screen_position: Vector2) -> int:
+	# The cave can be clicked anywhere on its geometry, not just at its
+	# center footprint. Bounding boxes are a fast broad-phase approximation.
+	var world:=_world()
+	if world==null or store==null:
+		return -1
+	var ray_origin:=camera.project_ray_origin(screen_position)
+	var ray_dir:=camera.project_ray_normal(screen_position).normalized()
+	var closest:=INF
+	var picked:=-1
+	for record in store.data.get("nodes",[]):
+		if not (record is Dictionary) or str(record.get("kind",""))!="prefab":
+			continue
+		var prefab:=str(record.get("prefabId",""))
+		var id_num:=int(record.get("id",-1))
+		var root:=world.get_node_or_null("Prefab_%s_%d" % [prefab,id_num]) as Node3D
+		if root==null or not root.visible:
+			continue
+		var low:=Vector3(INF,INF,INF)
+		var high:=Vector3(-INF,-INF,-INF)
+		for entry in root.find_children("*","MeshInstance3D",true,false):
+			var part:=entry as MeshInstance3D
+			if part.mesh==null:
+				continue
+			var box:=part.get_aabb()
+			for i in range(2):
+				for j in range(2):
+					for k in range(2):
+						var v:=box.position+box.size*Vector3(float(i),float(j),float(k))
+						var w:=part.global_transform*v
+						low=low.min(w)
+						high=high.max(w)
+		if not is_finite(low.x):
+			continue
+		var tmin:=0.0
+		var tmax:=5000.0
+		for axis in range(3):
+			var start:=ray_origin[axis]
+			var direction:=ray_dir[axis]
+			if absf(direction)<0.00000001:
+				if start<low[axis] or start>high[axis]:
+					tmax=-1.0
+					break
+			else:
+				var t0: float=(low[axis]-start)/direction
+				var t1: float=(high[axis]-start)/direction
+				tmin=maxf(tmin,minf(t0,t1))
+				tmax=minf(tmax,maxf(t0,t1))
+		if tmax>=tmin and tmin<closest:
+			closest=tmin
+			picked=id_num
+	return picked
+
+
 func handle_3d_input(camera: Camera3D,event: InputEvent) -> bool:
 	if host==null or store==null:
 		return false
@@ -330,14 +384,16 @@ func handle_3d_input(camera: Camera3D,event: InputEvent) -> bool:
 	if event is InputEventMouseButton:
 		var click:=event as InputEventMouseButton
 		if click.button_index==MOUSE_BUTTON_LEFT and click.pressed and not click.alt_pressed and not click.shift_pressed:
-			# Click terrain near an object to reveal its contextual controls.
-			var hit: Variant=PICK.pick_terrain(camera,click.position,_world())
-			if hit is Vector3:
-				var id_num:=_closest_existing(hit)
-				if id_num>=0:
-					_selected_id=id_num
-					refresh()
-					return true
+			# Pick a GLB by its true world-space bounds, including cave roofs.
+			var id_num:=_hit_existing_model(camera,click.position)
+			if id_num<0:
+				var hit: Variant=PICK.pick_terrain(camera,click.position,_world())
+				if hit is Vector3:
+					id_num=_closest_existing(hit)
+			if id_num>=0:
+				_selected_id=id_num
+				refresh()
+				return true
 	return false
 
 
