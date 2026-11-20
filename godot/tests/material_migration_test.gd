@@ -63,7 +63,9 @@ func _check() -> void:
 		if mask==null:
 			_fail("Missing painted cliff mask for "+biome)
 			return
-		var pixels:=mask.get_image()
+		# Imported Texture2D.get_image() may be GPU-compressed on CI;
+		# inspect the canonical PNG directly, leaving shader binding intact.
+		var pixels:=Image.load_from_file("res://data/masks/cliff_"+biome+".png")
 		if pixels==null or pixels.get_width()!=512 or pixels.get_height()!=512:
 			_fail("Wrong cliff mask size "+biome)
 			return
