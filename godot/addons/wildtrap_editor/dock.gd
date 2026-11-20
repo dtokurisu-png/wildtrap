@@ -6,6 +6,8 @@ const STORE = preload("res://addons/wildtrap_editor/world_store.gd")
 const RULES = preload("res://addons/wildtrap_editor/biome_rules.gd")
 const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
 const SPAWN_VIEW = preload("res://addons/wildtrap_editor/spawn_viewport.gd")
+const OBJECT_EDITOR = preload("res://addons/wildtrap_editor/object_editor.gd")
+const TEXTURE_EDITOR = preload("res://addons/wildtrap_editor/texture_editor.gd")
 const SPAWN_NAMES := {
 	"player":"Jugador","npc":"NPC","trees":"Árboles","grass":"Hierbas",
 	"plants":"Plantas","rocks":"Rocas","objects":"Objetos",
@@ -54,6 +56,8 @@ var _tab_scrolls: Dictionary = {}
 var _material_visibility := {"details":true,"handpaint":true,"cliffs":true}
 var _handpaint_preview_opacity := 0.50
 var _tabs: TabContainer
+var _object_editor: Control
+var _texture_editor: Control
 var _spawn_mode := ""
 var _pending_spawn_area: Array = []
 var _selected_spawn_kind := "point"
@@ -173,29 +177,7 @@ func _build_panel() -> void:
 		item.name="Biome_"+biome
 		_biome_buttons[biome]=item
 	_button(biome_tab,"Quitar selección",_clear_biome)
-	for entry in [
-		{"id":"details","label":"Complementarias"},
-		{"id":"handpaint","label":"Hand painting"},
-		{"id":"cliffs","label":"Acantilados (textura)"}
-	]:
-		var check := CheckButton.new()
-		check.name="Material_"+str(entry["id"])
-		check.text=str(entry["label"])
-		check.set_pressed_no_signal(true)
-		check.toggled.connect(_set_material_visible.bind(str(entry["id"])))
-		biome_tab.add_child(check)
-	var opacity_row := HBoxContainer.new()
-	biome_tab.add_child(opacity_row)
-	_label(opacity_row,"Opacidad pintura")
-	var opacity_slider := HSlider.new()
-	opacity_slider.name="HandpaintOpacity"
-	opacity_slider.min_value=0
-	opacity_slider.max_value=100
-	opacity_slider.step=1
-	opacity_slider.value=50
-	opacity_slider.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	opacity_slider.value_changed.connect(_set_handpaint_preview_opacity)
-	opacity_row.add_child(opacity_slider)
+
 	_biome_info=_label(biome_tab,"")
 
 	var zones_tab := _tab(tabs,"Zonas")
@@ -315,6 +297,18 @@ func _build_panel() -> void:
 	_spawn_point_form.visible=false
 	_spawn_area_form.visible=false
 
+	var objects_tab := _tab(tabs,"Objetos")
+	_object_editor=OBJECT_EDITOR.new()
+	_object_editor.name="ObjectTools"
+	objects_tab.add_child(_object_editor)
+	_object_editor.call("configure",_store,self)
+
+	var textures_tab := _tab(tabs,"Texturas")
+	_texture_editor=TEXTURE_EDITOR.new()
+	_texture_editor.name="TextureTools"
+	textures_tab.add_child(_texture_editor)
+	_texture_editor.call("configure",_store,self)
+
 
 
 func _coordinate(parent: Node) -> SpinBox:
@@ -336,6 +330,8 @@ func _tab_changed(index: int) -> void:
 		clear_spawn_preview()
 	else:
 		_redraw_spawn_overlay()
+	if index!=3 and _object_editor!=null:
+		_object_editor.call("deactivate")
 
 
 
@@ -354,9 +350,44 @@ func refresh_scene() -> void:
 	_update_spawn_info()
 	_recalculate_distributions()
 	_update_save_buttons()
+	if _object_editor!=null:
+		_object_editor.call("refresh")
+	if _texture_editor!=null:
+		_texture_editor.call("refresh")
 	if _get_world()!=null:
 		_apply_preview()
 	_redraw_spawn_overlay()
+
+
+func set_texture_layer_visible(key: String,enabled: bool) -> void:
+	if not _material_visibility.has(key):
+		return
+	_material_visibility[key]=enabled
+	_update_material_preview()
+
+
+func external_editor_changed(category: String) -> void:
+	_source=_store.data
+	_update_save_buttons()
+	var world:=_get_world()
+	if category=="objects":
+		if world!=null and world.has_method("apply_editor_objects_preview"):
+			world.call("apply_editor_objects_preview",_source)
+		if _object_editor!=null:
+			_object_editor.call("refresh")
+	elif category=="materials":
+		if world!=null and world.has_method("apply_editor_material_preview"):
+			world.call("apply_editor_material_preview",_source)
+		_update_material_preview()
+		if _texture_editor!=null:
+			_texture_editor.call("refresh")
+	_status.text="Cambios sin guardar."
+
+
+func handle_object_viewport_input(camera: Camera3D,event: InputEvent) -> bool:
+	if _tabs==null or _tabs.current_tab!=3 or _object_editor==null:
+		return false
+	return bool(_object_editor.call("handle_3d_input",camera,event))
 
 
 func _set_material_visible(enabled: bool, key: String) -> void:
@@ -595,6 +626,17 @@ func _after_history_change(status_text: String) -> void:
 	_update_save_buttons()
 	_rebuild_spawn_buttons()
 	_apply_preview()
+	var world:=_get_world()
+	if world!=null:
+		if world.has_method("apply_editor_objects_preview"):
+			world.call("apply_editor_objects_preview",_source)
+		if world.has_method("apply_editor_material_preview"):
+			world.call("apply_editor_material_preview",_source)
+		_update_material_preview()
+	if _object_editor!=null:
+		_object_editor.call("refresh")
+	if _texture_editor!=null:
+		_texture_editor.call("refresh")
 	_redraw_spawn_overlay()
 	_status.text=status_text
 
@@ -616,6 +658,9 @@ func _reload_world() -> void:
 	if _store.open():
 		_pending_spawn_area.clear()
 		_spawn_mode=""
+		var world:=_get_world()
+		if world!=null:
+			world.call_deferred("_rebuild_world")
 		refresh_scene()
 		_status.text="Datos de Godot recargados."
 	else:
