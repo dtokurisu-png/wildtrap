@@ -127,7 +127,42 @@ func _thumbnail_ready(_path: String,preview: Texture2D,thumbnail: Texture2D,id_t
 	var tile:=_tiles[id_text] as Button
 	if not is_instance_valid(tile):
 		return
-	tile.icon=thumbnail if thumbnail!=null else preview
+	if thumbnail!=null or preview!=null:
+		tile.icon=thumbnail if thumbnail!=null else preview
+	else:
+		# Some Godot importers do not supply a ready preview for .glb.
+		# Render a thumbnail of an actual mesh instead of a generic symbol.
+		_make_mesh_thumbnail(tile,id_text)
+
+
+func _make_mesh_thumbnail(tile: Button,id_text: String) -> void:
+	var spec:=OBJECTS.by_id(id_text)
+	var packed:=load(str(spec.get("path",""))) as PackedScene
+	if packed==null:
+		return
+	var root:=packed.instantiate() as Node3D
+	if root==null:
+		return
+	var best: Mesh
+	var max_vertices:=0
+	for item in root.find_children("*","MeshInstance3D",true,false):
+		var mesh_instance:=item as MeshInstance3D
+		if mesh_instance.mesh==null:
+			continue
+		var count:=0
+		for surf in range(mesh_instance.mesh.get_surface_count()):
+			var arrays:=mesh_instance.mesh.surface_get_arrays(surf)
+			if arrays[Mesh.ARRAY_VERTEX] is PackedVector3Array:
+				count+=(arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+		if count>max_vertices:
+			max_vertices=count
+			best=mesh_instance.mesh
+	if best!=null:
+		var meshes: Array[Mesh]=[best]
+		var rendered: Array[Texture2D]=EditorInterface.make_mesh_previews(meshes,96)
+		if rendered.size()>0 and rendered[0]!=null:
+			tile.icon=rendered[0]
+	root.free()
 
 
 func _tile_input(event: InputEvent,id_text: String) -> void:
