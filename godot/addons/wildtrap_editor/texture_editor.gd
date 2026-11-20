@@ -22,6 +22,7 @@ var _art_opacity: SpinBox
 var _art_contrast: SpinBox
 var _art_rotation: SpinBox
 var _art_blend: OptionButton
+var _handpaint_blend: OptionButton
 var _ground_transparency: SpinBox
 var _ground_feather: SpinBox
 var _preview_toggles: Dictionary={}
@@ -112,6 +113,7 @@ func _ready() -> void:
 	_art_opacity=_number_row("Pintura %",0.0,100.0,1.0,art_section)
 	_art_contrast=_number_row("Negros %",0.0,400.0,1.0,art_section)
 	_art_rotation=_number_row("Rotación °",-360.0,360.0,1.0,art_section)
+	_handpaint_blend=_selector(art_section,BLENDS,"HandpaintPaintingBlend")
 	_button(art_section,"Aplicar pintura",_apply_handpaint)
 	_info=Label.new()
 	_info.name="TextureStatus"
@@ -120,6 +122,7 @@ func _ready() -> void:
 	for spin in [_scale,_opacity,_contrast,_saturation,_ground_transparency,_ground_feather,_art_opacity,_art_contrast,_art_rotation]:
 		spin.value_changed.connect(_preview_changes)
 	_art_blend.item_selected.connect(_on_blend_changed)
+	_handpaint_blend.item_selected.connect(_on_blend_changed)
 	refresh()
 
 
@@ -238,6 +241,7 @@ func refresh_fields() -> void:
 	_art_opacity.set_value_no_signal(float(painted.get("opacity",0.50))*100.0)
 	_art_contrast.set_value_no_signal(float(painted.get("contrast",0.45))*100.0)
 	_art_rotation.set_value_no_signal(float(painted.get("rotation",180.0)))
+	_handpaint_blend.select(clampi(int(painted.get("blendMode",3)),0,7))
 	var ground_mix: Dictionary=store.data.get("groundMix",{})
 	_ground_transparency.set_value_no_signal((1.0-clampf(float(ground_mix.get("opacity",1.0)),0.0,1.0))*100.0)
 	_ground_feather.set_value_no_signal(clampf(float(ground_mix.get("feather",5.0)),0.0,20.0))
@@ -302,7 +306,7 @@ func _assign_values(next: Dictionary) -> void:
 func _handpaint_values() -> Dictionary:
 	return {"opacity":_art_opacity.value/100.0,
 		"contrast":_art_contrast.value/100.0,
-		"rotation":_art_rotation.value}
+		"rotation":_art_rotation.value,"blendMode":_handpaint_blend.selected}
 
 
 func _ground_mix_values() -> Dictionary:
