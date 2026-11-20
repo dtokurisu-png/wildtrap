@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://yf1abft4hf2p"
-path="res://.godot/imported/rock-pillar-4_rock_pillar_3d_model_4_basecolor.jpg-b413ae002bbc8991a21d4a0b8952e499.ctex"
+path.s3tc="res://.godot/imported/rock-pillar-4_rock_pillar_3d_model_4_basecolor.jpg-b413ae002bbc8991a21d4a0b8952e499.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "a7d80220b51ea69dd46fdd3fad600974"
@@ -14,7 +15,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/library/rock-pillar-4_rock_pillar_3d_model_4_basecolor.jpg"
-dest_files=["res://.godot/imported/rock-pillar-4_rock_pillar_3d_model_4_basecolor.jpg-b413ae002bbc8991a21d4a0b8952e499.ctex"]
+dest_files=["res://.godot/imported/rock-pillar-4_rock_pillar_3d_model_4_basecolor.jpg-b413ae002bbc8991a21d4a0b8952e499.s3tc.ctex"]
 
 [params]
 

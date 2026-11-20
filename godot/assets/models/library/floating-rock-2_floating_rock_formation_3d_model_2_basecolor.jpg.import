@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dc1j0u1re1vt0"
-path="res://.godot/imported/floating-rock-2_floating_rock_formation_3d_model_2_basecolor.jpg-2103ad42d01a507c8423080c48dabb3d.ctex"
+path.s3tc="res://.godot/imported/floating-rock-2_floating_rock_formation_3d_model_2_basecolor.jpg-2103ad42d01a507c8423080c48dabb3d.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "a2ac67e7218c000dbbc3c26b675221da"
@@ -14,7 +15,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/library/floating-rock-2_floating_rock_formation_3d_model_2_basecolor.jpg"
-dest_files=["res://.godot/imported/floating-rock-2_floating_rock_formation_3d_model_2_basecolor.jpg-2103ad42d01a507c8423080c48dabb3d.ctex"]
+dest_files=["res://.godot/imported/floating-rock-2_floating_rock_formation_3d_model_2_basecolor.jpg-2103ad42d01a507c8423080c48dabb3d.s3tc.ctex"]
 
 [params]
 

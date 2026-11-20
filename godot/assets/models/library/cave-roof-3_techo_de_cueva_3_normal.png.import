@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b0efm5pk5pu7i"
-path="res://.godot/imported/cave-roof-3_techo_de_cueva_3_normal.png-130b86cb53a7cc16b911bc354f76e413.ctex"
+path.s3tc="res://.godot/imported/cave-roof-3_techo_de_cueva_3_normal.png-130b86cb53a7cc16b911bc354f76e413.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "7135a8dd0d3ea5f2058e731f2c8d7f93"
@@ -14,7 +15,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/library/cave-roof-3_techo_de_cueva_3_normal.png"
-dest_files=["res://.godot/imported/cave-roof-3_techo_de_cueva_3_normal.png-130b86cb53a7cc16b911bc354f76e413.ctex"]
+dest_files=["res://.godot/imported/cave-roof-3_techo_de_cueva_3_normal.png-130b86cb53a7cc16b911bc354f76e413.s3tc.ctex"]
 
 [params]
 

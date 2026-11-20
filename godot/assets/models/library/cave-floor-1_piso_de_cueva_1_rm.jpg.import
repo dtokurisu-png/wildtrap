@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bvx1kxhvdlnyl"
-path="res://.godot/imported/cave-floor-1_piso_de_cueva_1_rm.jpg-40f85ddd9fa5f62d2856af35ea4f66c0.ctex"
+path.s3tc="res://.godot/imported/cave-floor-1_piso_de_cueva_1_rm.jpg-40f85ddd9fa5f62d2856af35ea4f66c0.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "4032370d57e66f74135582e923467df3"
@@ -14,7 +15,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/library/cave-floor-1_piso_de_cueva_1_rm.jpg"
-dest_files=["res://.godot/imported/cave-floor-1_piso_de_cueva_1_rm.jpg-40f85ddd9fa5f62d2856af35ea4f66c0.ctex"]
+dest_files=["res://.godot/imported/cave-floor-1_piso_de_cueva_1_rm.jpg-40f85ddd9fa5f62d2856af35ea4f66c0.s3tc.ctex"]
 
 [params]
 
