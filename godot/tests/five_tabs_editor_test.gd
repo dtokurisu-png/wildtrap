@@ -21,7 +21,7 @@ func _check() -> void:
 		_fail("Expected five native editor tabs")
 		return
 	for i in range(5):
-		var label_text:=["Biomas","Zonas","Spawns","Objetos","Texturas"][i]
+		var label_text: String=["Biomas","Zonas","Spawns","Objetos","Texturas"][i]
 		if tabs.get_tab_title(i)!=label_text:
 			_fail("Wrong tab "+str(i)+": "+tabs.get_tab_title(i))
 			return
