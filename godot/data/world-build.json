@@ -1,5 +1,5 @@
 {
-  "source": "assets/terrain/wildtrap-mobile-world.json (published repository snapshot, not verified as escenario (4))",
+  "source": "godot/data/world.json (canonical native project; historical import from published snapshot)",
   "size": 630,
   "resolution": 129,
   "heightSamples": 16641,
