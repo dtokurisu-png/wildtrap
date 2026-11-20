@@ -125,3 +125,20 @@ Spawn inspection is still read-only. Object placement, painting, editing of
 the five polygon borders, geometry displacement in-editor, and native
 player controls are separate stages. Original unknown JSON keys, geometry,
 caves and sculpt metadata are not intentionally deleted.
+
+## Godot panel usability: scrollable zones and real cliff previews
+
+The native **WildTrap Editor** panel now uses one continuously scrollable
+vertical page per tab. Zonas keeps its list of 16 preexisting polygons,
+all distributions and the Previous/Next pager inside the same scroll view.
+The separate nested lists and extra status explanations were removed.
+
+**Mostrar acantilados** toggles a low-strength selection overlay on the
+actual 11 stored cliff polygon footprints (including vertical wall fragments).
+Selecting one cliff zone highlights that specific polygon rather than tinting
+its entire parent biome. This is a read-only editor overlay; the physical
+cliff height geometry and original JSON remain unchanged.
+
+Biome highlighting is muted green instead of intense cyan, with just 14%
+tint instead of 42%. Labels in the panel remain brief; detailed zone biome
+names are available by hovering their buttons.

@@ -61,7 +61,54 @@ func _check() -> void:
 	if str(summary.get("terrain_info","")).is_empty():
 		_fail("Biome dock data missing")
 		return
-	print("WILDTRAP_EDITOR_DOCK_OK zones=16 spawns=1 distributions=96 surface_tint=true")
+	# All tabs must be fully scrollable, including zone list and pager.
+	for page_name in ["Biomas","Zonas","Spawns"]:
+		var scroll := dock.find_child(page_name,true,false) as ScrollContainer
+		if scroll==null or scroll.vertical_scroll_mode!=ScrollContainer.SCROLL_MODE_SHOW_ALWAYS:
+			_fail("Missing whole-panel vertical scrolling: "+page_name)
+			return
+		if scroll.get_v_scroll_bar()==null:
+			_fail("No vertical scrollbar available: "+page_name)
+			return
+	var zone_scroll := dock.find_child("Zonas",true,false) as ScrollContainer
+	if zone_scroll.find_child("DistributionPager",true,false)==null:
+		_fail("Distribution pager is outside the scrollable zone page")
+		return
+	# Selecting a cliff highlights the real polygon in the terrain shader.
+	dock.call("_choose_zone","zone-6")
+	if not bool(mat.get_shader_parameter("selected_zone_enabled")):
+		_fail("Cliff polygon selection did not reach terrain shader")
+		return
+	var zone_mask := mat.get_shader_parameter("selected_zone_mask") as Texture2D
+	if zone_mask==null:
+		_fail("No native selected cliff zone mask")
+		return
+	# Whole-cliff toggle must generate and use 11 source polygons.
+	dock.call("_toggle_cliffs")
+	if not bool(mat.get_shader_parameter("cliff_zones_enabled")):
+		_fail("Mostrar acantilados did not enable the 3D cliff overlay")
+		return
+	var cliff_mask := mat.get_shader_parameter("cliff_zones_mask") as Texture2D
+	if cliff_mask==null:
+		_fail("Missing cliff area texture in shader")
+		return
+	var cliff_pixels := cliff_mask.get_image()
+	var any_cliff := false
+	for y in range(0,cliff_pixels.get_height(),3):
+		if any_cliff:
+			break
+		for x in range(0,cliff_pixels.get_width(),3):
+			if cliff_pixels.get_pixel(x,y).r>0.9:
+				any_cliff=true
+				break
+	if not any_cliff:
+		_fail("The cliff mask contains no selected polygons")
+		return
+	dock.call("_toggle_cliffs")
+	if bool(mat.get_shader_parameter("cliff_zones_enabled")):
+		_fail("Cliff overlay did not switch off")
+		return
+	print("WILDTRAP_EDITOR_DOCK_OK zones=16 spawns=1 distributions=96 scroll=true cliff_masks=true")
 	dock.queue_free()
 	scene.queue_free()
 	await process_frame

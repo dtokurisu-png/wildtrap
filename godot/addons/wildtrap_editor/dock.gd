@@ -108,7 +108,7 @@ func _tab(tabs: TabContainer, name_text: String) -> VBoxContainer:
 func _build_panel() -> void:
 	var header := _label(self,"WILDTRAP EDITOR")
 	header.add_theme_font_size_override("font_size",17)
-	_status=_label(self,"Datos nativos de Godot · Guardado en Git")
+	_status=_label(self,"")
 	var saves := HBoxContainer.new()
 	add_child(saves)
 	_save_button=_button(saves,"Guardar",_save_world)
@@ -139,15 +139,18 @@ func _build_panel() -> void:
 	_cliff_toggle.name="ShowCliffs"
 	_cliff_toggle.toggle_mode=true
 	_zone_list=VBoxContainer.new()
+	_zone_list.name="ZoneList"
 	_zone_list.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	zones_tab.add_child(_zone_list)
 	_zone_info=_label(zones_tab,"")
 	_zone_info.visible=false
 	_label(zones_tab,"Distribuciones posibles")
 	_distribution_list=VBoxContainer.new()
+	_distribution_list.name="DistributionList"
 	_distribution_list.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	zones_tab.add_child(_distribution_list)
 	var pager := HBoxContainer.new()
+	pager.name="DistributionPager"
 	zones_tab.add_child(pager)
 	_prev_button=_button(pager,"Anterior",_previous_page)
 	_distribution_label=_label(pager,"")
@@ -246,7 +249,7 @@ func _update_biome_buttons() -> void:
 	for biome in BIOMES:
 		var button: Button = _biome_buttons[biome]
 		button.set_pressed_no_signal(_selected_biome==biome)
-		button.text=str(LABELS[biome])+" · "+str(counts[biome])
+		button.text=str(LABELS[biome])
 	_biome_info.text=""
 
 
