@@ -1,18 +1,23 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/bootstrap.gd" id="1_bootstrap"]
+[ext_resource type="Script" path="res://scripts/world_loader.gd" id="2_world"]
 
 [sub_resource type="Environment" id="Environment_start"]
 background_mode = 1
 background_color = Color(0.72549, 0.788235, 0.756863, 1)
 ambient_light_source = 1
 ambient_light_color = Color(0.89, 0.94, 0.92, 1)
-ambient_light_energy = 0.45
+ambient_light_energy = 0.55
+fog_enabled = true
+fog_light_color = Color(0.72549, 0.788235, 0.756863, 1)
+fog_density = 0.00215
 
 [node name="WildTrap" type="Node3D"]
 script = ExtResource("1_bootstrap")
 
 [node name="World" type="Node3D" parent="."]
+script = ExtResource("2_world")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_start")
@@ -20,18 +25,21 @@ environment = SubResource("Environment_start")
 [node name="Sun" type="DirectionalLight3D" parent="."]
 rotation = Vector3(-0.95, -0.4, 0)
 light_color = Color(1, 0.92, 0.82, 1)
-light_energy = 1.0
+light_energy = 1.6
+shadow_enabled = true
+directional_shadow_max_distance = 800.0
 
 [node name="Camera3D" type="Camera3D" parent="."]
 current = true
+far = 3200.0
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
 [node name="StatusLabel" type="Label" parent="CanvasLayer"]
-offset_left = 20.0
-offset_top = 16.0
-offset_right = 850.0
-offset_bottom = 88.0
-text = "WILDTRAP / GODOT\nPaso 1: base nativa lista. El escenario original aun no se ha importado."
-theme_override_colors/font_color = Color(0.12, 0.22, 0.18, 1)
-theme_override_font_sizes/font_size = 18
+offset_left = 18.0
+offset_top = 14.0
+offset_right = 1250.0
+offset_bottom = 64.0
+text = "WILDTRAP / GODOT  |  Vista de geometria importada desde GitHub (snapshot parcial)"
+theme_override_colors/font_color = Color(0.13, 0.20, 0.17, 1)
+theme_override_font_sizes/font_size = 16

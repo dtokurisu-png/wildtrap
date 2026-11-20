@@ -13,29 +13,56 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: godot-migration-native
+  cancel-in-progress: false
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
-      - name: Checkout repository
+      - name: Checkout migration repository
         uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install geometry bake dependency
+        run: npm install --no-save --prefix godot/tools pngjs@7.0.0
+      - name: Verify source JSON equals repository publication
+        run: cmp godot/data/world.json assets/terrain/wildtrap-mobile-world.json
+      - name: Bake original cut/cliff geometry into native Godot terrain
+        run: node godot/tools/bake-world.mjs
+      - name: Record reproducible native terrain assets
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add godot/data/terrain.wtmesh godot/data/world-build.json godot/data/masks/
+          if ! git diff --cached --quiet; then
+            git commit -m "Bake reproducible native world from WildTrap source JSON"
+            git push origin HEAD:godot-migration
+          fi
       - name: Install official Godot 4.7.2
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 --retry-delay 2 \
-            --output godot-linux.zip \
+          curl --fail --location --retry 3 --retry-delay 2 --output godot-linux.zip \
             "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
           mkdir -p /tmp/wildtrap-godot
           unzip -q godot-linux.zip -d /tmp/wildtrap-godot
           chmod +x /tmp/wildtrap-godot/Godot_v4.7.2-stable_linux.x86_64
           echo "/tmp/wildtrap-godot" >> "$GITHUB_PATH"
           /tmp/wildtrap-godot/Godot_v4.7.2-stable_linux.x86_64 --headless --version
-      - name: Import native project
+      - name: Import Godot source and assets
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --import
-      - name: Check scene and resources
+      - name: Verify source and baked terrain
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/world_data_test.gd
+      - name: Verify native scene nodes
         run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/smoke_test.gd
-      - name: Boot game in headless mode
-        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --quit-after 4
+      - name: Boot native 3D world
+        run: |
+          set -o pipefail
+          Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --quit-after 4 2>&1 | tee /tmp/wildtrap-native-boot.log
+          grep 'WILDTRAP_GODOT_WORLD_IMPORTED' /tmp/wildtrap-native-boot.log
