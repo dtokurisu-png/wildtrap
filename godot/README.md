@@ -77,3 +77,21 @@ controls to inspect the terrain. You may select `Camera3D` and enable
 In-game controls (character movement), procedural painting/gizmo editing,
 spawn tools, and serialized inspector tools remain future milestones.
 The Godot native editor preview does *not* save edits back to JSON yet.
+
+## Step 2.2: WildTrap Editor dock in Godot
+
+`res://addons/wildtrap_editor/` provides a native `EditorPlugin` dock.
+It is enabled under `[editor_plugins]` in `project.godot`.
+
+Open `scenes/main.tscn`, enter **3D**, and locate **WildTrap Editor**
+in the right dock tabs (next to / below the Inspector, depending on layout).
+The **Terreno** tab reports the generated mesh and can refresh its preview
+or select `World`. The **Biomas** tab lists the source zones and displays a
+temporary 3D outline of the selected polygon. The **Spawns** tab lists
+player spawns and displays a marker in the scene. Both read exactly
+`res://data/world.json` and do not generate fictional entries.
+
+These tools inspect data and display non-persistent marker nodes (no scene
+owner). No JSON, GLB or mesh file is written by panel controls. **Editing
+and saving** biome/spawn properties is the next development phase. Never
+treat selection or a preview marker as a saved change to the source.
