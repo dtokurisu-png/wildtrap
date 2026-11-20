@@ -28,6 +28,14 @@ func _install_play_colliders() -> void:
 	for child in world.get_children():
 		if not child.name.begins_with("Prefab_") or not child is Node3D or not child.visible:
 			continue
+		var intangible:=false
+		var id_suffix:=str(child.name).get_slice("_",str(child.name).get_slice_count("_")-1)
+		for node in world.source_world.get("nodes",[]):
+			if node is Dictionary and str(node.get("kind",""))=="prefab" and str(node.get("id",""))==id_suffix:
+				intangible=bool(node.get("editorIntangible",false))
+				break
+		if intangible:
+			continue
 		for piece in child.find_children("*", "MeshInstance3D", true, false):
 			var model := piece as MeshInstance3D
 			if model != null and model.mesh != null and model.visible and model.transparency < 0.75:
@@ -39,6 +47,9 @@ func _attach_mesh_collider(model: MeshInstance3D) -> void:
 	if model.mesh == null or model.mesh.get_surface_count() < 1:
 		return
 	var shape := model.mesh.create_trimesh_shape()
+	if shape is ConcavePolygonShape3D:
+		# Cave wall interiors must collide from either side.
+		(shape as ConcavePolygonShape3D).backface_collision = true
 	if shape == null:
 		return
 	var body := StaticBody3D.new()
