@@ -52,8 +52,13 @@ func _check() -> void:
 	if not (written is Dictionary):
 		_fail("Saved JSON could not be parsed")
 		return
-	if rules.current_index(written,options["options"])!=next or (written.get("heights",[]) as Array).size()!=16641:
-		_fail("Save changed terrain or did not persist the selected biomes")
+	var persisted_idx: int = rules.current_index(written,options["options"])
+	var persisted_heights: int = (written.get("heights",[]) as Array).size()
+	if persisted_idx!=next or persisted_heights!=16641:
+		var persisted_biomes: Array = []
+		for zone in rules.regions(written):
+			persisted_biomes.append(zone.get("biomeId","?"))
+		_fail("Save mismatch: expected_index="+str(next)+" persisted_index="+str(persisted_idx)+" original_index="+str(current)+" heights="+str(persisted_heights)+" expected_biomes="+str(options["options"][next])+" actual_biomes="+str(persisted_biomes))
 		return
 	if (written.get("nodes",[]) as Array).size()!=(original.get("nodes",[]) as Array).size():
 		_fail("Save lost unrelated scene objects")
