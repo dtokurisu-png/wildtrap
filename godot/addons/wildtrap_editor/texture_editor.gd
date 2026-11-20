@@ -136,6 +136,10 @@ func _slot_id() -> String:
 
 func _on_selection(_index: int) -> void:
 	refresh_fields()
+	if store!=null and host!=null:
+		var world:=host.call("_get_world") as Node3D
+		if world!=null and world.has_method("apply_editor_material_preview"):
+			world.call("apply_editor_material_preview",store.data)
 
 
 func _on_texture_changed(_index: int) -> void:
@@ -213,6 +217,8 @@ func _preview_changes(_value: float) -> void:
 	var preview: Dictionary=store.data.duplicate(true)
 	_assign_values(preview)
 	world.call("apply_editor_material_preview",preview)
+	if _info!=null:
+		_info.text="Vista previa sin aplicar."
 
 
 func _assign_values(next: Dictionary) -> void:
