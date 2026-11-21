@@ -3,7 +3,7 @@ extends RefCounted
 ## Native equivalents of editor-spawn-areas.mjs and editor-player-spawns.mjs.
 ## Data definitions only: the game's runtime ecosystem generator is a later stage.
 
-const POINT_CATEGORIES := ["player","npc","trees","grass","plants","rocks","objects","specialCreature"]
+const POINT_CATEGORIES := ["unassigned","player","npc","trees","grass","plants","rocks","objects","specialCreature"]
 const AREA_CATEGORIES := ["trees","grass","plants","rocks","objects","npc","specialCreature","river","swamp","lake","oasis","dune","mountain","cliff"]
 const BIOME_IDS := ["any","forest","plains","desert","swamp","mountain"]
 const MAX_PLAYERS := 6
@@ -81,6 +81,38 @@ static func _find_point(world: Dictionary, id_num: int) -> Dictionary:
 		if node is Dictionary and is_spawn_node(node) and int(node.get("id",-1))==id_num:
 			return node
 	return {}
+
+
+static func change_point_category(world: Dictionary, id_num: int, category: String, player_slot: int = 1) -> Dictionary:
+	if not POINT_CATEGORIES.has(category):
+		return {"ok":false,"error":"Tipo de punto inválido."}
+	var record := _find_point(world,id_num)
+	if record.is_empty():
+		return {"ok":false,"error":"Punto no encontrado."}
+	if category=="player":
+		if player_slot<1 or player_slot>MAX_PLAYERS:
+			return {"ok":false,"error":"Jugador fuera del rango J1–J6."}
+		for existing in world.get("nodes",[]):
+			if existing is Dictionary and existing != record and str(existing.get("kind",""))=="playerSpawn" and int(existing.get("playerSlot",0))==player_slot:
+				return {"ok":false,"error":"J"+str(player_slot)+" ya tiene un punto. Selecciona otro jugador."}
+	var old_category := point_category(record)
+	var old_slot := int(record.get("playerSlot",0))
+	if old_category==category and (category!="player" or old_slot==player_slot):
+		return {"ok":true,"changed":false,"id":id_num}
+	# Preserve id, position, and unrelated metadata; remove only spawn-specific keys.
+	record.erase("playerSlot")
+	record.erase("npcId")
+	record.erase("category")
+	if category=="player":
+		record["kind"]="playerSpawn"
+		record["playerSlot"]=player_slot
+	elif category=="npc":
+		record["kind"]="characterSpawn"
+		record["npcId"]=""
+	else:
+		record["kind"]="spawnPoint"
+		record["category"]=category
+	return {"ok":true,"changed":true,"id":id_num}
 
 
 static func move_point(world: Dictionary, id_num: int, x: float, z: float) -> Dictionary:
