@@ -5,6 +5,7 @@ extends RefCounted
 const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
 const OVERLAY_NAME := "__WildTrapSpawnOverlay"
 const CURSOR_NAME := "__WildTrapSpawnCursor"
+const MARKER_BUILD := "R4-24x32"
 
 
 static func pick_mesh(ray_origin: Vector3, ray_direction: Vector3, terrain: MeshInstance3D) -> Variant:
