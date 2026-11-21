@@ -2,10 +2,13 @@
 extends EditorPlugin
 
 const DOCK_SCRIPT = preload("res://addons/wildtrap_editor/dock.gd")
+const PLAY_SPAWN = preload("res://scripts/play_spawn_preview.gd")
 
 var wildtrap_dock: Control
 
 func _enter_tree() -> void:
+	# Old Play previews must not survive a fresh editor session.
+	PLAY_SPAWN.clear_preview()
 	# Receive raycast/drag input even when the scene tree selection changes.
 	set_input_event_forwarding_always_enabled()
 	wildtrap_dock = DOCK_SCRIPT.new()
@@ -41,6 +44,15 @@ func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 		if wildtrap_dock.has_method("handle_object_viewport_input") and wildtrap_dock.handle_object_viewport_input(viewport_camera,event):
 			return AFTER_GUI_INPUT_STOP
 	return AFTER_GUI_INPUT_PASS
+
+
+# Godot calls this immediately before Play. The editor's in-memory J1,
+# including unsaved marker movement, becomes the exact runtime spawn.
+func _build() -> bool:
+	if wildtrap_dock==null or not is_instance_valid(wildtrap_dock):
+		PLAY_SPAWN.clear_preview()
+		return true
+	return bool(wildtrap_dock.call("prepare_play_spawn_preview"))
 
 
 func _exit_tree() -> void:

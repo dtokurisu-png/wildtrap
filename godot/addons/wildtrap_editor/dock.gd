@@ -6,6 +6,7 @@ const STORE = preload("res://addons/wildtrap_editor/world_store.gd")
 const RULES = preload("res://addons/wildtrap_editor/biome_rules.gd")
 const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
 const SPAWN_VIEW = preload("res://addons/wildtrap_editor/spawn_viewport.gd")
+const PLAY_SPAWN = preload("res://scripts/play_spawn_preview.gd")
 const OBJECT_EDITOR = preload("res://addons/wildtrap_editor/object_editor.gd")
 const TEXTURE_EDITOR = preload("res://addons/wildtrap_editor/texture_editor.gd")
 const SPAWN_NAMES := {
@@ -677,7 +678,7 @@ func _rebuild_spawn_buttons() -> void:
 			continue
 		var id_num := int(entry.get("id",-1))
 		var category: String = SPAWNS.point_category(entry)
-		var label_text := "J"+str(entry.get("playerSlot","?")) if category=="player" else str(SPAWN_NAMES.get(category,category))+" "+str(id_num)
+		var label_text := "J"+str(int(entry.get("playerSlot",0))) if category=="player" else str(SPAWN_NAMES.get(category,category))+" "+str(id_num)
 		var button := _button(_spawn_list,label_text,_select_spawn.bind(id_num))
 		button.toggle_mode=true
 		button.set_pressed_no_signal(_selected_spawn_kind=="point" and _current_spawn_id==id_num)
@@ -753,21 +754,24 @@ func _update_spawn_info() -> void:
 		var index: int=SPAWNS.POINT_CATEGORIES.find(cat)
 		_spawn_point_category.select(maxi(index,0))
 		_spawn_slot.visible=cat=="player"
-		# Prefer the next free J slot for a new unassigned marker.
+		# All J slots remain selectable: choosing an occupied slot moves
+		# that player's spawn role here, leaving the old marker unassigned.
 		var occupied: Dictionary={}
 		for entry in _source.get("nodes",[]):
 			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("id",-1))!=_current_spawn_id:
 				occupied[int(entry.get("playerSlot",0))]=true
 		for i in range(SPAWNS.MAX_PLAYERS):
-			_spawn_slot.set_item_disabled(i,occupied.has(i+1))
+			_spawn_slot.set_item_disabled(i,false)
+			_spawn_slot.set_item_text(i,"J"+str(i+1)+(" · trasladar aquí" if occupied.has(i+1) else ""))
 		if cat=="player":
 			_spawn_slot.select(clampi(int(point.get("playerSlot",1))-1,0,SPAWNS.MAX_PLAYERS-1))
 		else:
-			for i in range(SPAWNS.MAX_PLAYERS):
-				if not occupied.has(i+1):
-					_spawn_slot.select(i)
-					break
-		_spawn_info.text=str(SPAWN_NAMES.get(cat,"Punto"))
+			_spawn_slot.select(0)
+		if cat=="player":
+			var selected_slot:=int(point.get("playerSlot",0))
+			_spawn_info.text="J1 · aparición del personaje" if selected_slot==1 else "J"+str(selected_slot)+" · no aparece en Play"
+		else:
+			_spawn_info.text=str(SPAWN_NAMES.get(cat,"Punto"))+" · selecciona Jugador para trasladar aquí la aparición J1"
 	elif _spawn_area_form.visible:
 		_spawn_area_name.text=str(area.get("name",""))
 		var type_index := SPAWNS.AREA_CATEGORIES.find(str(area.get("type","trees")))
@@ -798,24 +802,12 @@ func _on_spawn_category_selected(index: int) -> void:
 	if _updating_spawn_controls or _selected_spawn().is_empty():
 		return
 	var cat: String=SPAWNS.POINT_CATEGORIES[index]
+	# The active Explorer is J1. Assigning a new marker as Jugador
+	# moves J1 here by default; J2–J6 can still be selected afterward.
 	if cat=="player":
-		var occupied: Dictionary={}
-		for entry in _source.get("nodes",[]):
-			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("id",-1))!=_current_spawn_id:
-				occupied[int(entry.get("playerSlot",0))]=true
-		var free_slot: int=-1
-		for slot in range(1,SPAWNS.MAX_PLAYERS+1):
-			if not occupied.has(slot):
-				free_slot=slot
-				break
-		if free_slot<0:
-			_status.text="Los seis jugadores J1–J6 ya están asignados."
-			_update_spawn_info()
-			return
-		_spawn_slot.select(free_slot-1)
+		_spawn_slot.select(0)
 	_spawn_slot.visible=cat=="player"
 	_apply_point_type(cat)
-
 
 func _on_spawn_slot_selected(_index: int) -> void:
 	if _updating_spawn_controls or _selected_spawn().is_empty():
@@ -827,8 +819,8 @@ func _apply_point_type(cat: String) -> void:
 	var result: Dictionary=_store.spawn_change_point_category(_current_spawn_id,cat,_spawn_slot.selected+1)
 	if _commit_spawn(result,"Tipo de punto actualizado."):
 		_update_spawn_info()
+		_save_player_one_spawn_for_play(_current_spawn_id)
 	elif not bool(result.get("ok",false)):
-		# Reject a duplicate J1–J6 slot without changing the existing spawn.
 		_update_spawn_info()
 
 
@@ -891,6 +883,37 @@ func _redraw_spawn_overlay() -> void:
 		_spawn_selected_vertex)
 
 
+# Runtime Play reloads res://data/world.json in a separate scene.
+# Persist J1 relocations immediately so F5 does not use a stale spawn.
+# Called by EditorPlugin._build(), not by a click or a manual save.
+# Transfer live data so F5 follows J1 even when there are pending changes.
+func prepare_play_spawn_preview() -> bool:
+	if _store.data.is_empty() and not _store.open():
+		_status.text="No se pudo preparar Play: "+_store.last_error
+		return false
+	if not PLAY_SPAWN.prepare(_store.data):
+		_status.text="No se pudo preparar Play: falta un punto J1 válido."
+		return false
+	var point: Dictionary=PLAY_SPAWN.player_one(_store.data)
+	_status.text="Play desde J1: X "+str(snappedf(float(point.get("x",0)),0.01))+" · Z "+str(snappedf(float(point.get("z",0)),0.01))
+	print("WILDTRAP_EDITOR_PLAY_J1 x=",point.get("x")," z=",point.get("z"))
+	return true
+
+
+func _save_player_one_spawn_for_play(point_id: int) -> void:
+	var point := _selected_spawn()
+	if int(point.get("id",-1))!=point_id:
+		return
+	if str(point.get("kind",""))!="playerSpawn" or int(point.get("playerSlot",0))!=1:
+		return
+	# Preview follows the editor immediately without silently saving
+	# unrelated unsaved changes in the full canonical world.json.
+	if PLAY_SPAWN.prepare(_store.data):
+		_status.text="J1 listo para Play: X "+str(snappedf(float(point.get("x",0)),0.01))+" · Z "+str(snappedf(float(point.get("z",0)),0.01))+(". Pulsa Guardar para conservar el cambio." if _store.dirty else "")
+	else:
+		_status.text="No se pudo sincronizar J1 con Play."
+
+
 func _commit_spawn(result: Dictionary, success_text: String) -> bool:
 	if not bool(result.get("ok",false)):
 		_status.text=str(result.get("error","No se pudo aplicar."))
@@ -936,10 +959,15 @@ func handle_spawn_viewport_input(camera: Camera3D, event: InputEvent) -> bool:
 		var point_id:=_spawn_drag_id
 		_spawn_drag_id=-1
 		SPAWN_VIEW.set_cursor(world,null)
-		_commit_spawn(_store.spawn_move_point(point_id,_spawn_drag_position.x,_spawn_drag_position.z),"Punto movido.")
+		var updated := _commit_spawn(_store.spawn_move_point(point_id,_spawn_drag_position.x,_spawn_drag_position.z),"Punto movido.")
 		_current_spawn_id=point_id
 		_selected_spawn_kind="point"
 		_update_spawn_info()
+		if updated:
+			_save_player_one_spawn_for_play(point_id)
+			var moved_point:=_selected_spawn()
+			if str(moved_point.get("kind",""))!="playerSpawn" or int(moved_point.get("playerSlot",0))!=1:
+				_status.text="Punto movido. El personaje aparece exclusivamente en J1."
 		return true
 	if not mouse.pressed or mouse.alt_pressed or mouse.ctrl_pressed or mouse.shift_pressed:
 		return false

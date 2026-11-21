@@ -2,6 +2,7 @@ extends CharacterBody3D
 ## Explorador 1 WT: native port of playtest.mjs movement and chase camera.
 ## Player/collisions exist ONLY while Play is running, never in edit mode.
 const MODEL := "res://assets/models/explorador_1_wt.glb"
+const PLAY_SPAWN = preload("res://scripts/play_spawn_preview.gd")
 const CAMERA_DISTANCE := 2.55
 const CAMERA_HEIGHT := 1.15
 const CAMERA_ELEVATION := 1.90
@@ -157,13 +158,14 @@ func _find_animations(character: Node3D) -> void:
 
 
 func _spawn_at_player_one() -> void:
-	var found: Dictionary={}
-	if world!=null and world.has_method("get"):
-		var source: Dictionary=world.get("source_world")
-		for entry in source.get("nodes",[]):
-			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("playerSlot",0))==1:
-				found=entry
-				break
+	# Play uses the marker position exported by EditorPlugin._build() at F5.
+	# It falls back to canonical world.json for normal standalone launches.
+	var latest: Variant=JSON.parse_string(FileAccess.get_file_as_string("res://data/world.json"))
+	var source: Dictionary=latest if latest is Dictionary else {}
+	var found: Dictionary=PLAY_SPAWN.resolve(source)
+	if found.is_empty():
+		push_error("WildTrap: no hay un punto asignado a Jugador 1 (J1).")
+		return
 	var px:=float(found.get("x",0))
 	var pz:=float(found.get("z",0))
 	var surface:=0.0
@@ -172,6 +174,7 @@ func _spawn_at_player_one() -> void:
 	var ground:=_find_floor(px,pz,surface)
 	position=Vector3(px,ground,pz)
 	initial_spawn=position
+	print("WILDTRAP_PLAY_J1 source=",found.get("source","world.json")," x=",px," z=",pz)
 
 
 func _find_floor(x: float,z: float,expected: float) -> float:
