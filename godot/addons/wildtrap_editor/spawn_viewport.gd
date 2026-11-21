@@ -67,6 +67,9 @@ static func _marker_texture() -> Texture2D:
 				img.set_pixel(x,y,Color(0.015,0.07,0.025,1.0))
 			if (float(x)-39.5)*(float(x)-39.5)+(float(y)-68.0)*(float(y)-68.0)<=45.0:
 				img.set_pixel(x,y,Color(0.015,0.07,0.025,1.0))
+	# Downsize the ACTUAL texture, not only Sprite3D.pixel_size.
+	# Fixed-size billboards in the editor must remain compact at all zooms.
+	img.resize(24,32,Image.INTERPOLATE_LANCZOS)
 	return ImageTexture.create_from_image(img)
 
 
@@ -78,8 +81,9 @@ static func _make_sprite(texture: Texture2D, sprite_name: String) -> Sprite3D:
 	icon.fixed_size=true
 	icon.no_depth_test=true
 	icon.shaded=false
-	# Small fixed-screen marker; keep generous invisible picking radius.
-	icon.pixel_size=0.00065
+	# Keep screen size stable while using a 24x32 source image.
+	# Independent 42px hit area remains in closest_screen_point().
+	icon.pixel_size=0.004
 	icon.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	icon.set_meta("wildtrap_editor_marker",true)
 	return icon
