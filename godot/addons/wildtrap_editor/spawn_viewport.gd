@@ -5,7 +5,10 @@ extends RefCounted
 const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
 const OVERLAY_NAME := "__WildTrapSpawnOverlay"
 const CURSOR_NAME := "__WildTrapSpawnCursor"
-const MARKER_BUILD := "R4-24x32"
+const MARKER_BUILD := "R6-adjustable"
+const MARKER_BASE_PIXEL_SIZE := 0.004
+const DEFAULT_MARKER_SCALE := 0.35
+static var _marker_scale: float = DEFAULT_MARKER_SCALE
 
 
 static func pick_mesh(ray_origin: Vector3, ray_direction: Vector3, terrain: MeshInstance3D) -> Variant:
@@ -84,10 +87,26 @@ static func _make_sprite(texture: Texture2D, sprite_name: String) -> Sprite3D:
 	icon.shaded=false
 	# Keep screen size stable while using a 24x32 source image.
 	# Independent 42px hit area remains in closest_screen_point().
-	icon.pixel_size=0.004
+	icon.pixel_size=MARKER_BASE_PIXEL_SIZE*_marker_scale
 	icon.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	icon.set_meta("wildtrap_editor_marker",true)
 	return icon
+
+
+# Resize already drawn markers immediately, including the active cursor.
+# New sprites use the same setting when the overlay is rebuilt.
+static func set_marker_scale(world: Node3D, factor: float) -> void:
+	_marker_scale=clampf(factor,0.05,2.0)
+	if not is_instance_valid(world):
+		return
+	var cursor:=world.get_node_or_null(CURSOR_NAME) as Sprite3D
+	if cursor!=null:
+		cursor.pixel_size=MARKER_BASE_PIXEL_SIZE*_marker_scale
+	var overlay:=world.get_node_or_null(OVERLAY_NAME)
+	if overlay!=null:
+		for child in overlay.get_children():
+			if child is Sprite3D:
+				(child as Sprite3D).pixel_size=MARKER_BASE_PIXEL_SIZE*_marker_scale
 
 
 static func clear_cursor(world: Node3D) -> void:
