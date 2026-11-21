@@ -21,7 +21,7 @@ const LABELS := {
 	"forest":"Bosque","desert":"Desierto","plains":"Pradera",
 	"swamp":"Pantano","mountain":"Montaña"
 }
-const EDITOR_BUILD := "R6"
+const EDITOR_BUILD := "R7"
 const PAGE_SIZE := 12
 const MARKER_COLOR := Color(0.40,0.70,0.56,1.0)
 
@@ -116,6 +116,8 @@ func on_scene_changed(root: Node) -> void:
 	_pending_spawn_area.clear()
 	_clear_marker()
 	_scene_root=root
+	if _tabs!=null and _tabs.current_tab==2:
+		_spawn_mode="select"
 	refresh_scene()
 
 
@@ -745,6 +747,7 @@ func _select_spawn(id_num: int) -> void:
 
 
 func _select_spawn_area(id_text: String) -> void:
+	_clear_marker()
 	_selected_spawn_area_id=id_text
 	_selected_spawn_kind="area"
 	_pending_spawn_area.clear()
@@ -869,8 +872,9 @@ func _set_spawn_mode(mode: String) -> void:
 	if mode!="point":
 		SPAWN_VIEW.clear_cursor(_get_world())
 	if mode=="area":
+		_clear_marker()
 		_pending_spawn_area.clear()
-		_status.text="Marca al menos 3 vértices en el terreno y pulsa el primero para cerrar."
+		_status.text="Haz clic en el terreno para dibujar. Pulsa el primer vértice para cerrar."
 	elif mode=="point":
 		_status.text="Clic en el terreno para colocar."
 	elif mode=="select":
@@ -1016,18 +1020,31 @@ func handle_spawn_viewport_input(camera: Camera3D, event: InputEvent) -> bool:
 		_spawn_drag_position=Vector3(float(marker.get("x",0)),_terrain_y(float(marker.get("x",0)),float(marker.get("z",0))),float(marker.get("z",0)))
 		_spawn_dragging=true
 		return true
-	var hit: Variant=SPAWN_VIEW.pick_terrain(camera,mouse.position,world)
-	if not (hit is Vector3):
-		_status.text="No se encontró terreno bajo el cursor."
-		return false
-	var near_first:=false
+	# Close from the first visible marker before ray-picking: the marker
+	# may sit above the surface and a click on its top is still valid.
 	if _spawn_mode=="area" and _pending_spawn_area.size()>=3:
 		var first: Dictionary=_pending_spawn_area[0]
 		var px:=float(first.get("x",0))
 		var pz:=float(first.get("z",0))
-		var pixel: Vector2=camera.unproject_position(Vector3(px,_terrain_y(px,pz)+2,pz))
-		near_first=pixel.distance_to(mouse.position)<17.0
-	return spawn_world_click(hit,near_first)
+		var anchor:=Vector3(px,_terrain_y(px,pz)+3.0,pz)
+		if not camera.is_position_behind(anchor) and camera.unproject_position(anchor).distance_to(mouse.position)<=22.0:
+			_close_spawn_polygon()
+			return true
+	var hit: Variant=SPAWN_VIEW.pick_terrain(camera,mouse.position,world)
+	if _spawn_mode=="select":
+		if hit is Vector3:
+			var area: Dictionary=SPAWN_VIEW.containing_area(_source,hit.x,hit.z)
+			if not area.is_empty():
+				_select_spawn_area(str(area.get("id","")))
+				return true
+		var border_area: Dictionary=SPAWN_VIEW.closest_area_border(_source,camera,mouse.position,world)
+		if not border_area.is_empty():
+			_select_spawn_area(str(border_area.get("id","")))
+			return true
+	if not (hit is Vector3):
+		_status.text="No se encontró terreno bajo el cursor."
+		return false
+	return spawn_world_click(hit)
 
 
 func spawn_world_click(hit: Vector3, near_first: bool = false) -> bool:
@@ -1052,9 +1069,12 @@ func spawn_world_click(hit: Vector3, near_first: bool = false) -> bool:
 			_update_spawn_info()
 		return true
 	if _spawn_mode=="area":
-		if near_first:
-			_close_spawn_polygon()
-			return true
+		# Ground clicks near the first vertex can also finish the polygon.
+		if _pending_spawn_area.size()>=3:
+			var first: Dictionary=_pending_spawn_area[0]
+			if near_first or Vector2(x-float(first.get("x",0)),z-float(first.get("z",0))).length()<=1.2:
+				_close_spawn_polygon()
+				return true
 		if not _pending_spawn_area.is_empty():
 			var last: Dictionary = _pending_spawn_area.back()
 			if Vector2(float(last.get("x",0))-x,float(last.get("z",0))-z).length()<0.3:
@@ -1063,17 +1083,17 @@ func spawn_world_click(hit: Vector3, near_first: bool = false) -> bool:
 			_status.text="Máximo 128 vértices."
 			return true
 		_pending_spawn_area.append({"x":x,"z":z})
-		_status.text=str(_pending_spawn_area.size())+" puntos"
+		_status.text=str(_pending_spawn_area.size())+" vértices · "+("pulsa el primero para cerrar" if _pending_spawn_area.size()>=3 else "continúa dibujando")
 		_redraw_spawn_overlay()
 		return true
 	if _spawn_mode=="select":
-		var found: Dictionary = SPAWN_VIEW.closest_point(_source,x,z)
-		if not found.is_empty():
-			_select_spawn(int(found.get("id",-1)))
+		var area: Dictionary=SPAWN_VIEW.containing_area(_source,x,z)
+		if not area.is_empty():
+			_select_spawn_area(str(area.get("id","")))
 		else:
-			var area: Dictionary = SPAWN_VIEW.containing_area(_source,x,z)
-			if not area.is_empty():
-				_select_spawn_area(str(area.get("id","")))
+			var found: Dictionary=SPAWN_VIEW.closest_point(_source,x,z)
+			if not found.is_empty():
+				_select_spawn(int(found.get("id",-1)))
 		return true
 	if _spawn_mode=="move_point":
 		if _commit_spawn(_store.spawn_move_point(_current_spawn_id,x,z),"Punto movido."):
@@ -1091,13 +1111,8 @@ func _close_spawn_polygon() -> void:
 		return
 	var result: Dictionary = _store.spawn_create_area(_pending_spawn_area)
 	if _commit_spawn(result,"Área creada."):
-		_selected_spawn_area_id=str(result.get("id",""))
-		_selected_spawn_kind="area"
-		_pending_spawn_area.clear()
-		_spawn_selected_vertex=0
-		_spawn_mode="select"
-		_rebuild_spawn_buttons()
-		_redraw_spawn_overlay()
+		_select_spawn_area(str(result.get("id","")))
+		_status.text="Área creada y seleccionada. Haz clic en su interior o borde para editarla."
 
 
 func _delete_selected_point() -> void:
