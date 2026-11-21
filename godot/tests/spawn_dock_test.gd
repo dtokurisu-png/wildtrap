@@ -50,7 +50,7 @@ func _check() -> void:
 		_fail("Consecutive point clicks failed to create separate markers")
 		return
 	dock.call("_select_spawn",marker_id)
-	var result: Dictionary=dock._store.spawn_change_point_category(marker_id,"trees")
+	var result: Dictionary=(dock.get("_store") as RefCounted).call("spawn_change_point_category",marker_id,"trees")
 	if not bool(result.get("ok",false)):
 		_fail("Could not assign category to selected marker")
 		return
