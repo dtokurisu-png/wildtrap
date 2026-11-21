@@ -205,16 +205,19 @@ func _build_panel() -> void:
 
 	
 	var spawns_tab := _tab(tabs,"Spawns")
+	# Select an action directly; no redundant Punto/Área/Seleccionar/
+	# Cerrar área buttons. Click the first vertex again to close an area.
 	var draw_tools := HBoxContainer.new()
 	spawns_tab.add_child(draw_tools)
-	_button(draw_tools,"Punto",_set_spawn_mode.bind("point"))
-	_button(draw_tools,"Área",_set_spawn_mode.bind("area"))
-	_button(draw_tools,"Seleccionar",_set_spawn_mode.bind("select"))
-	var draw_tools_2 := HBoxContainer.new()
-	spawns_tab.add_child(draw_tools_2)
-	_button(draw_tools_2,"Cerrar área",_close_spawn_polygon)
-	_button(draw_tools_2,"Cancelar",_cancel_spawn_tool)
-	_spawn_hint=_label(spawns_tab,"")
+	var action := OptionButton.new()
+	action.name="SpawnAction"
+	action.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	for title_text in ["Seleccionar existente","Crear punto","Crear área"]:
+		action.add_item(title_text)
+	action.item_selected.connect(_on_spawn_action_selected)
+	draw_tools.add_child(action)
+	_button(draw_tools,"Cancelar",_cancel_spawn_tool)
+	_spawn_hint=_label(spawns_tab,"Crea un área marcando sus vértices y tocando de nuevo el primero para cerrarla.")
 	var point_params := HBoxContainer.new()
 	spawns_tab.add_child(point_params)
 	_spawn_point_category=OptionButton.new()
@@ -329,6 +332,8 @@ func _tab_changed(index: int) -> void:
 		_pending_spawn_area.clear()
 		clear_spawn_preview()
 	else:
+		if _spawn_mode.is_empty():
+			_spawn_mode="select"
 		_redraw_spawn_overlay()
 	if index!=3 and _object_editor!=null:
 		_object_editor.call("deactivate")
@@ -781,6 +786,13 @@ func _on_spawn_category_selected(_index: int) -> void:
 	_spawn_slot.visible=cat=="player"
 
 
+func _on_spawn_action_selected(index: int) -> void:
+	match index:
+		1: _set_spawn_mode("point")
+		2: _set_spawn_mode("area")
+		_: _set_spawn_mode("select")
+
+
 func _set_spawn_mode(mode: String) -> void:
 	if _get_world()==null:
 		_status.text="Abre el escenario 3D primero."
@@ -794,7 +806,7 @@ func _set_spawn_mode(mode: String) -> void:
 	_spawn_mode=mode
 	if mode=="area":
 		_pending_spawn_area.clear()
-		_status.text="Marca vértices y cierra el área."
+		_status.text="Marca al menos 3 vértices en el terreno y pulsa el primero para cerrar."
 	elif mode=="point":
 		_status.text="Clic en el terreno para colocar."
 	elif mode=="select":
@@ -805,8 +817,11 @@ func _set_spawn_mode(mode: String) -> void:
 
 
 func _cancel_spawn_tool() -> void:
-	_spawn_mode=""
+	_spawn_mode="select"
 	_pending_spawn_area.clear()
+	var action := find_child("SpawnAction",true,false) as OptionButton
+	if action!=null:
+		action.select(0)
 	_status.text=""
 	_redraw_spawn_overlay()
 
@@ -933,6 +948,9 @@ func _close_spawn_polygon() -> void:
 		_pending_spawn_area.clear()
 		_spawn_selected_vertex=0
 		_spawn_mode="select"
+		var action := find_child("SpawnAction",true,false) as OptionButton
+		if action!=null:
+			action.select(0)
 		_rebuild_spawn_buttons()
 		_redraw_spawn_overlay()
 
