@@ -3,9 +3,12 @@ extends RefCounted
 ## Viewport-only picking and editor marker rendering.
 ## No physics collider, no changes to WildTrap geometry or saved scene owners.
 const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
+const AREA_SHADER = preload("res://addons/wildtrap_editor/spawn_area_overlay.gdshader")
 const OVERLAY_NAME := "__WildTrapSpawnOverlay"
 const CURSOR_NAME := "__WildTrapSpawnCursor"
 const MARKER_BUILD := "R6-adjustable"
+const AREA_BORDER_WIDTH := 1.25
+const DRAFT_VERTEX_RADIUS := 12.0
 const MARKER_BASE_PIXEL_SIZE := 0.004
 const DEFAULT_MARKER_SCALE := 0.35
 static var _marker_scale: float = DEFAULT_MARKER_SCALE
@@ -47,13 +50,6 @@ static func _height(world: Node3D, x: float, z: float) -> float:
 	if world.has_method("_height_at"):
 		return float(world.call("_height_at",x,z))
 	return 0.0
-
-
-static func _segment(mesh: ImmediateMesh, a: Vector3,b: Vector3,color: Color) -> void:
-	mesh.surface_set_color(color)
-	mesh.surface_add_vertex(a)
-	mesh.surface_set_color(color)
-	mesh.surface_add_vertex(b)
 
 
 # Billboard indicators stay the same screen size at any zoom.
@@ -105,7 +101,7 @@ static func set_marker_scale(world: Node3D, factor: float) -> void:
 	var overlay:=world.get_node_or_null(OVERLAY_NAME)
 	if overlay!=null:
 		for child in overlay.get_children():
-			if child is Sprite3D:
+			if child is Sprite3D and child.name.begins_with("SpawnMarker_"):
 				(child as Sprite3D).pixel_size=MARKER_BASE_PIXEL_SIZE*_marker_scale
 
 
@@ -133,17 +129,16 @@ static func set_cursor(world: Node3D, position: Variant) -> void:
 	cursor.visible=true
 
 
-static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_kind: String, selected_id: Variant, selected_vertex: int) -> void:
+static func refresh(world: Node3D, source: Dictionary, pending: PackedVector3Array, selected_kind: String, selected_id: Variant) -> void:
 	if world==null or not is_instance_valid(world):
 		return
 	var old := world.get_node_or_null(OVERLAY_NAME)
 	if old!=null:
 		world.remove_child(old)
 		old.queue_free()
-	var overlay := MeshInstance3D.new()
+	var overlay := Node3D.new()
 	overlay.name=OVERLAY_NAME
 	overlay.set_meta("wildtrap_editor_marker",true)
-	overlay.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	world.add_child(overlay)
 	var texture := _marker_texture()
 	for node in source.get("nodes",[]):
@@ -156,52 +151,79 @@ static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_
 		if selected_kind=="point" and int(node.get("id",-1))==int(selected_id):
 			icon.modulate=Color(0.78,1.0,0.77,1.0)
 		overlay.add_child(icon)
-	var has_lines:=pending.size()>1
-	for area in source.get("spawnAreas",[]):
-		if area is Dictionary and not bool(area.get("hidden",false)) and (area.get("points",[]) as Array).size()>=3:
-			has_lines=true
-			break
-	for item in pending:
-		if item is Dictionary:
-			var px:=float(item.get("x",0))
-			var pz:=float(item.get("z",0))
-			var pending_icon:=_make_sprite(texture,"PendingVertex")
-			pending_icon.position=Vector3(px,_height(world,px,pz)+3.0,pz)
-			overlay.add_child(pending_icon)
-	if not has_lines:
+	var terrain := world.get_node_or_null("WildTrapTerrain") as MeshInstance3D
+	if terrain==null or terrain.mesh==null:
 		return
-	var mesh:=ImmediateMesh.new()
-	var material:=StandardMaterial3D.new()
-	material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.no_depth_test=true
-	material.vertex_color_use_as_albedo=true
-	mesh.surface_begin(Mesh.PRIMITIVE_LINES,material)
 	for area in source.get("spawnAreas",[]):
 		if not (area is Dictionary) or bool(area.get("hidden",false)):
 			continue
-		var points: Array=area.get("points",[])
+		var points := _area_points(area.get("points",[]))
 		if points.size()<3:
 			continue
 		var selected:=selected_kind=="area" and str(area.get("id",""))==str(selected_id)
-		var tint:=Color(1,0.84,0.56,1) if selected else Color(0.54,0.95,0.63,1)
-		for i in range(points.size()):
-			var a: Dictionary=points[i]
-			var b: Dictionary=points[(i+1)%points.size()]
-			var ax:=float(a.get("x",0))
-			var az:=float(a.get("z",0))
-			var bx:=float(b.get("x",0))
-			var bz:=float(b.get("z",0))
-			_segment(mesh,Vector3(ax,_height(world,ax,az)+2,az),Vector3(bx,_height(world,bx,bz)+2,bz),tint)
-	for i in range(1,pending.size()):
-		var prev: Dictionary=pending[i-1]
-		var item: Dictionary=pending[i]
-		var ax:=float(prev.get("x",0))
-		var az:=float(prev.get("z",0))
-		var bx:=float(item.get("x",0))
-		var bz:=float(item.get("z",0))
-		_segment(mesh,Vector3(ax,_height(world,ax,az)+2,az),Vector3(bx,_height(world,bx,bz)+2,bz),Color(1,0.83,0.51,1))
-	mesh.surface_end()
-	overlay.mesh=mesh
+		_add_area_surface(overlay, terrain, points, true, selected)
+	if pending.is_empty():
+		return
+	var draft := PackedVector2Array()
+	var vertex_texture := _draft_vertex_texture()
+	for i in pending.size():
+		var point := pending[i]
+		draft.append(Vector2(point.x, point.z))
+		var vertex := _make_sprite(vertex_texture, "AreaVertex")
+		vertex.pixel_size = 0.0038 if i==0 else 0.0025
+		vertex.modulate = Color(1.0, 0.8, 0.4) if i==0 else Color(1.0, 0.45, 0.08)
+		overlay.add_child(vertex, true)
+		vertex.global_position = point
+	if draft.size()>1:
+		_add_area_surface(overlay, terrain, draft, false, false)
+
+
+static func _area_points(records: Array) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for point in records:
+		points.append(Vector2(float(point["x"]), float(point["z"])))
+	return points
+
+
+static func _draft_vertex_texture() -> Texture2D:
+	var image := Image.create_empty(20, 20, false, Image.FORMAT_RGBA8)
+	for y in image.get_height():
+		for x in image.get_width():
+			var distance := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(10, 10))
+			if distance < 9.5:
+				image.set_pixel(x, y, Color(0.28, 0.08, 0.01) if distance > 7.0 else Color.WHITE)
+	return ImageTexture.create_from_image(image)
+
+
+static func _add_area_surface(overlay: Node3D, terrain: MeshInstance3D, points: PackedVector2Array, closed: bool, selected: bool) -> void:
+	var bounds := Rect2(points[0], Vector2.ZERO)
+	for point in points:
+		bounds = bounds.expand(point)
+	bounds = bounds.grow(AREA_BORDER_WIDTH)
+	var material := ShaderMaterial.new()
+	material.shader = AREA_SHADER
+	material.render_priority = 102 if not closed else (101 if selected else 100)
+	material.set_shader_parameter("point_count", points.size())
+	var shader_points := points.duplicate()
+	shader_points.resize(128)
+	material.set_shader_parameter("points", shader_points)
+	material.set_shader_parameter("bounds", Vector4(bounds.position.x, bounds.position.y, bounds.end.x, bounds.end.y))
+	material.set_shader_parameter("border_width", AREA_BORDER_WIDTH)
+	material.set_shader_parameter("closed", closed)
+	material.set_shader_parameter("fill_color", Color(1.0, 0.38, 0.05, 0.36 if selected else 0.27))
+	material.set_shader_parameter("border_color", Color(1.0, 0.63 if selected else 0.44, 0.08, 1.0))
+	var surface := MeshInstance3D.new()
+	surface.name = "AreaSurface" if closed else "AreaDraft"
+	surface.mesh = terrain.mesh
+	surface.material_override = material
+	surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	overlay.add_child(surface, true)
+	surface.global_transform = terrain.global_transform
+
+
+static func marker_screen_radius(camera: Camera3D) -> float:
+	var viewport_height := camera.get_viewport().get_visible_rect().size.y
+	return clampf(viewport_height * 16.0 * MARKER_BASE_PIXEL_SIZE * _marker_scale, 8.0, 42.0)
 
 
 static func closest_screen_point(source: Dictionary, camera: Camera3D, screen: Vector2, world: Node3D, radius_pixels: float = 42.0) -> Dictionary:
@@ -240,6 +262,19 @@ static func containing_area(source: Dictionary, x: float, z: float) -> Dictionar
 	var areas: Array = source.get("spawnAreas",[])
 	for i in range(areas.size()-1,-1,-1):
 		var area: Dictionary = areas[i]
-		if not bool(area.get("hidden",false)) and SPAWNS.contains(area.get("points",[]),x,z):
+		if bool(area.get("hidden", false)):
+			continue
+		var records: Array = area.get("points", [])
+		if records.size()<3:
+			continue
+		if SPAWNS.contains(records, x, z):
 			return area
+		var points := _area_points(records)
+		var position := Vector2(x, z)
+		var previous := points[-1]
+		for point in points:
+			var nearest := Geometry2D.get_closest_point_to_segment(position, previous, point)
+			if position.distance_squared_to(nearest) <= AREA_BORDER_WIDTH * AREA_BORDER_WIDTH:
+				return area
+			previous = point
 	return {}

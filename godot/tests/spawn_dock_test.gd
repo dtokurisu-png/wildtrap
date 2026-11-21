@@ -60,7 +60,7 @@ func _check() -> void:
 		_fail("Spawn marker must preserve its apparent size across camera distance")
 		return
 	var version_header:=dock.find_child("WildTrapBuildVersion",true,false) as Label
-	if version_header==null or version_header.text!="WILDTRAP EDITOR · VERSIÓN R6":
+	if version_header==null or version_header.text!="WILDTRAP EDITOR · VERSIÓN R7":
 		_fail("Current build version must appear in the main editor header")
 		return
 	var marker_slider:=dock.find_child("SpawnMarkerSize",true,false) as HSlider
@@ -140,13 +140,42 @@ func _check() -> void:
 	if str((dock.call("_selected_spawn") as Dictionary).get("category",""))!="trees":
 		_fail("Categorization of selected point not persisted in editor state")
 		return
-	dock.call("_set_spawn_mode","area")
-	for p in [
-		Vector3(80,0,80),Vector3(105,0,80),
-		Vector3(105,0,105),Vector3(80,0,105)
-	]:
-		dock.call("spawn_world_click",p)
-	dock.call("_close_spawn_polygon")
+	var area_button: Button
+	var cancel_button: Button
+	for control in spawns.find_children("*","Button",true,false):
+		if control.text=="Área":
+			area_button=control
+		elif control.text=="Cancelar":
+			cancel_button=control
+	if area_button==null or cancel_button==null:
+		_fail("Area or Cancel tool button missing")
+		return
+	# Aim down so world coordinates on the visible terrain map directly to the view.
+	test_camera.projection=Camera3D.PROJECTION_ORTHOGONAL
+	test_camera.size=85.0
+	test_camera.global_position=Vector3(92,250,92)
+	test_camera.rotation_degrees=Vector3(-90,0,0)
+	var area_vertices := [Vector2(80,80),Vector2(105,80),Vector2(105,105),Vector2(80,105)]
+	var store := dock.get("_store") as RefCounted
+	var area_count: int=store.data.get("spawnAreas",[]).size()
+	area_button.pressed.emit()
+	for i in 2:
+		click.position=test_camera.unproject_position(Vector3(area_vertices[i].x,0,area_vertices[i].y))
+		if not dock.call("handle_spawn_viewport_input",test_camera,click):
+			_fail("Area tool did not consume the vertex click")
+			return
+	var draft := world.get_node_or_null("__WildTrapSpawnOverlay/AreaDraft") as MeshInstance3D
+	if draft==null or draft.mesh!=terrain.mesh:
+		_fail("Draft segment does not follow the native terrain")
+		return
+	cancel_button.pressed.emit()
+	if world.has_node("__WildTrapSpawnOverlay/AreaDraft") or store.data.get("spawnAreas",[]).size()!=area_count:
+		_fail("Cancel did not remove the unfinished area")
+		return
+	area_button.pressed.emit()
+	for point in area_vertices+[area_vertices[0]]:
+		click.position=test_camera.unproject_position(Vector3(point.x,0,point.y))
+		dock.call("handle_spawn_viewport_input",test_camera,click)
 	var area: Dictionary = dock.call("_selected_spawn_area")
 	if area.is_empty() or (area.get("points",[]) as Array).size()!=4:
 		_fail("Area drawing did not close polygon")
@@ -155,6 +184,18 @@ func _check() -> void:
 	if visual==null or visual.owner!=null:
 		_fail("Editor overlay missing or wrongly serialized")
 		return
+	var filled := visual.get_node_or_null("AreaSurface") as MeshInstance3D
+	if filled==null or filled.owner!=null or filled.mesh!=terrain.mesh:
+		_fail("Closed area does not overlay the native terrain")
+		return
+	for target in [Vector2(92,92),Vector2(105.8,92)]:
+		dock.call("_select_spawn",marker_id)
+		click.position=test_camera.unproject_position(Vector3(target.x,0,target.y))
+		dock.call("handle_spawn_viewport_input",test_camera,click)
+		var properties := dock.find_child("SpawnAreaProperties",true,false) as Control
+		if not properties.visible or (dock.call("_selected_spawn_area") as Dictionary).get("id")!=area.get("id"):
+			_fail("Area click did not select the interior or outer edge")
+			return
 	dock.call("_set_spawn_mode","move_vertex")
 	dock.call("spawn_world_click",Vector3(83,0,80))
 	var updated: Dictionary = dock.call("_selected_spawn_area")
@@ -162,7 +203,7 @@ func _check() -> void:
 		_fail("Viewport vertex reposition failed")
 		return
 	# Dock tests must never save data into res://.
-	print("WILDTRAP_SPAWN_DOCK_OK ray=true point=true closed_area=true move_vertex=true transient=true")
+	print("WILDTRAP_SPAWN_DOCK_OK ray=true point=true closed_area=true cancel=true area_pick=true move_vertex=true transient=true")
 	dock.call("clear_spawn_preview")
 	dock.queue_free()
 	scene.queue_free()

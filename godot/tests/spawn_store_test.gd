@@ -139,6 +139,9 @@ func _check() -> void:
 	if not reopened.open():
 		_fail("Cannot reopen moved J1 fixture")
 		return
+	if reopened.data.get("spawnAreas",[])!=areas:
+		_fail("Reopening the world lost the saved polygon or its properties")
+		return
 	var loaded_j1: Dictionary={}
 	for item in reopened.data.get("nodes",[]):
 		if item is Dictionary and str(item.get("kind",""))=="playerSpawn" and int(item.get("playerSlot",0))==1:
