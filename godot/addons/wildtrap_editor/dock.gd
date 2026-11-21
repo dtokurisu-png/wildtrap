@@ -754,21 +754,24 @@ func _update_spawn_info() -> void:
 		var index: int=SPAWNS.POINT_CATEGORIES.find(cat)
 		_spawn_point_category.select(maxi(index,0))
 		_spawn_slot.visible=cat=="player"
-		# Prefer the next free J slot for a new unassigned marker.
+		# All J slots remain selectable: choosing an occupied slot moves
+		# that player's spawn role here, leaving the old marker unassigned.
 		var occupied: Dictionary={}
 		for entry in _source.get("nodes",[]):
 			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("id",-1))!=_current_spawn_id:
 				occupied[int(entry.get("playerSlot",0))]=true
 		for i in range(SPAWNS.MAX_PLAYERS):
-			_spawn_slot.set_item_disabled(i,occupied.has(i+1))
+			_spawn_slot.set_item_disabled(i,false)
+			_spawn_slot.set_item_text(i,"J"+str(i+1)+(" · trasladar aquí" if occupied.has(i+1) else ""))
 		if cat=="player":
 			_spawn_slot.select(clampi(int(point.get("playerSlot",1))-1,0,SPAWNS.MAX_PLAYERS-1))
 		else:
-			for i in range(SPAWNS.MAX_PLAYERS):
-				if not occupied.has(i+1):
-					_spawn_slot.select(i)
-					break
-		_spawn_info.text="Jugador "+str(int(point.get("playerSlot",0)))+" · spawn de Play" if cat=="player" else str(SPAWN_NAMES.get(cat,"Punto"))+" · no controla la aparición de J1"
+			_spawn_slot.select(0)
+		if cat=="player":
+			var selected_slot:=int(point.get("playerSlot",0))
+			_spawn_info.text="J1 · aparición del personaje" if selected_slot==1 else "J"+str(selected_slot)+" · no aparece en Play"
+		else:
+			_spawn_info.text=str(SPAWN_NAMES.get(cat,"Punto"))+" · selecciona Jugador para trasladar aquí la aparición J1"
 	elif _spawn_area_form.visible:
 		_spawn_area_name.text=str(area.get("name",""))
 		var type_index := SPAWNS.AREA_CATEGORIES.find(str(area.get("type","trees")))
@@ -799,24 +802,12 @@ func _on_spawn_category_selected(index: int) -> void:
 	if _updating_spawn_controls or _selected_spawn().is_empty():
 		return
 	var cat: String=SPAWNS.POINT_CATEGORIES[index]
+	# The active Explorer is J1. Assigning a new marker as Jugador
+	# moves J1 here by default; J2–J6 can still be selected afterward.
 	if cat=="player":
-		var occupied: Dictionary={}
-		for entry in _source.get("nodes",[]):
-			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("id",-1))!=_current_spawn_id:
-				occupied[int(entry.get("playerSlot",0))]=true
-		var free_slot: int=-1
-		for slot in range(1,SPAWNS.MAX_PLAYERS+1):
-			if not occupied.has(slot):
-				free_slot=slot
-				break
-		if free_slot<0:
-			_status.text="Los seis jugadores J1–J6 ya están asignados."
-			_update_spawn_info()
-			return
-		_spawn_slot.select(free_slot-1)
+		_spawn_slot.select(0)
 	_spawn_slot.visible=cat=="player"
 	_apply_point_type(cat)
-
 
 func _on_spawn_slot_selected(_index: int) -> void:
 	if _updating_spawn_controls or _selected_spawn().is_empty():
@@ -830,7 +821,6 @@ func _apply_point_type(cat: String) -> void:
 		_update_spawn_info()
 		_save_player_one_spawn_for_play(_current_spawn_id)
 	elif not bool(result.get("ok",false)):
-		# Reject a duplicate J1–J6 slot without changing the existing spawn.
 		_update_spawn_info()
 
 
@@ -916,16 +906,12 @@ func _save_player_one_spawn_for_play(point_id: int) -> void:
 		return
 	if str(point.get("kind",""))!="playerSpawn" or int(point.get("playerSlot",0))!=1:
 		return
-	if not _store.dirty:
-		return
-	if _store.save():
-		_update_save_buttons()
-		if _editor_interface!=null:
-			_editor_interface.get_resource_filesystem().scan()
-		_status.text="J1 guardado. Play iniciará en esta posición."
-		print("WILDTRAP_J1_SPAWN_SAVED x=",point.get("x")," z=",point.get("z"))
+	# Preview follows the editor immediately without silently saving
+	# unrelated unsaved changes in the full canonical world.json.
+	if PLAY_SPAWN.prepare(_store.data):
+		_status.text="J1 listo para Play: X "+str(snappedf(float(point.get("x",0)),0.01))+" · Z "+str(snappedf(float(point.get("z",0)),0.01))+(". Pulsa Guardar para conservar el cambio." if _store.dirty else "")
 	else:
-		_status.text="J1 movido solo en el editor. No se pudo guardar: "+_store.last_error
+		_status.text="No se pudo sincronizar J1 con Play."
 
 
 func _commit_spawn(result: Dictionary, success_text: String) -> bool:
