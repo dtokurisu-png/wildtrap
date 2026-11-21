@@ -129,7 +129,131 @@ static func set_cursor(world: Node3D, position: Variant) -> void:
 	cursor.visible=true
 
 
+<<<<<<< HEAD
 static func refresh(world: Node3D, source: Dictionary, pending: PackedVector3Array, selected_kind: String, selected_id: Variant) -> void:
+=======
+# Closed areas are editor-only translucent meshes on the actual terrain.
+# Clip each terrain triangle in X/Z to the polygon and interpolate its
+# original height. This also works for concave areas and cut terrain.
+static func _polygon(points: Array) -> PackedVector2Array:
+	var poly:=PackedVector2Array()
+	for point in points:
+		poly.append(Vector2(float(point.get("x",0)),float(point.get("z",0))))
+	return poly
+
+
+static func _surface_material(tint: Color, priority: int) -> StandardMaterial3D:
+	var material:=StandardMaterial3D.new()
+	material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode=BaseMaterial3D.CULL_DISABLED
+	material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color=tint
+	material.no_depth_test=true
+	material.render_priority=priority
+	return material
+
+
+static func _add_area_fill(overlay: Node3D, world: Node3D, poly: PackedVector2Array, selected: bool, id_text: String) -> void:
+	if poly.size()<3:
+		return
+	var terrain:=world.get_node_or_null("WildTrapTerrain") as MeshInstance3D
+	if terrain==null or terrain.mesh==null or terrain.mesh.get_surface_count()==0:
+		return
+	var arrays:=terrain.mesh.surface_get_arrays(0)
+	var verts: PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]
+	var indices: PackedInt32Array=arrays[Mesh.ARRAY_INDEX]
+	var bounds:=Rect2(poly[0],Vector2.ZERO)
+	for p in poly:
+		bounds=bounds.expand(p)
+	var positions:=PackedVector3Array()
+	var transform_to_world:=terrain.global_transform
+	for i in range(0,indices.size()-2,3):
+		var a: Vector3=transform_to_world*verts[indices[i]]
+		var b: Vector3=transform_to_world*verts[indices[i+1]]
+		var c: Vector3=transform_to_world*verts[indices[i+2]]
+		var p0:=Vector2(a.x,a.z)
+		var p1:=Vector2(b.x,b.z)
+		var p2:=Vector2(c.x,c.z)
+		var tri_bounds:=Rect2(p0,Vector2.ZERO).expand(p1).expand(p2)
+		if not bounds.intersects(tri_bounds,true):
+			continue
+		var e1:=p1-p0
+		var e2:=p2-p0
+		var determinant:=e1.cross(e2)
+		if absf(determinant)<0.00001:
+			continue
+		var triangle:=PackedVector2Array([p0,p1,p2])
+		for clipped in Geometry2D.intersect_polygons(triangle,poly):
+			if clipped.size()<3:
+				continue
+			var faces:=Geometry2D.triangulate_polygon(clipped)
+			for index in faces:
+				var p: Vector2=clipped[index]
+				var relative:=p-p0
+				var u:=relative.cross(e2)/determinant
+				var v:=e1.cross(relative)/determinant
+				var y:=a.y+(b.y-a.y)*u+(c.y-a.y)*v
+				positions.append(overlay.to_local(Vector3(p.x,y+0.12,p.y)))
+	if positions.is_empty():
+		return
+	var mesh:=ImmediateMesh.new()
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_surface_material(Color(1.0,0.40,0.025,0.34 if selected else 0.22),10))
+	for vertex in positions:
+		mesh.surface_add_vertex(vertex)
+	mesh.surface_end()
+	var fill:=MeshInstance3D.new()
+	fill.name="AreaFill_"+id_text
+	fill.mesh=mesh
+	fill.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fill.set_meta("wildtrap_editor_marker",true)
+	overlay.add_child(fill)
+
+
+static func _ribbon_vertex(world: Node3D, p: Vector2) -> Vector3:
+	return Vector3(p.x,_height(world,p.x,p.y)+0.45,p.y)
+
+
+# A real ribbon mesh, not one-pixel PRIMITIVE_LINES. Subdivide long
+# edges so the orange contour follows changes in terrain elevation.
+static func _add_area_border(overlay: Node3D, world: Node3D, poly: PackedVector2Array, closed: bool, selected: bool, id_text: String) -> void:
+	if poly.size()<2:
+		return
+	var mesh:=ImmediateMesh.new()
+	var vertices:=PackedVector3Array()
+	var edge_count:=poly.size() if closed else poly.size()-1
+	var width:=2.4 if selected else 1.8
+	for i in range(edge_count):
+		var a:=poly[i]
+		var b:=poly[(i+1)%poly.size()]
+		var delta:=b-a
+		if delta.length()<0.001:
+			continue
+		var across:=Vector2(-delta.y,delta.x).normalized()*width*0.5
+		var steps:=maxi(1,ceili(delta.length()/3.0))
+		for j in range(steps):
+			var start:=a.lerp(b,float(j)/float(steps))
+			var finish:=a.lerp(b,float(j+1)/float(steps))
+			var v0:=overlay.to_local(_ribbon_vertex(world,start-across))
+			var v1:=overlay.to_local(_ribbon_vertex(world,start+across))
+			var v2:=overlay.to_local(_ribbon_vertex(world,finish+across))
+			var v3:=overlay.to_local(_ribbon_vertex(world,finish-across))
+			vertices.append_array(PackedVector3Array([v0,v1,v2,v0,v2,v3]))
+	if vertices.is_empty():
+		return
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES,_surface_material(Color(1.0,0.45 if selected else 0.32,0.015,1.0),11))
+	for vertex in vertices:
+		mesh.surface_add_vertex(vertex)
+	mesh.surface_end()
+	var border:=MeshInstance3D.new()
+	border.name="AreaBorder_"+id_text
+	border.mesh=mesh
+	border.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	border.set_meta("wildtrap_editor_marker",true)
+	overlay.add_child(border)
+
+
+static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_kind: String, selected_id: Variant, selected_vertex: int) -> void:
+>>>>>>> c48bc408aa399c9df081fd6c37d7777f8b7a0851
 	if world==null or not is_instance_valid(world):
 		return
 	var old := world.get_node_or_null(OVERLAY_NAME)
@@ -151,9 +275,12 @@ static func refresh(world: Node3D, source: Dictionary, pending: PackedVector3Arr
 		if selected_kind=="point" and int(node.get("id",-1))==int(selected_id):
 			icon.modulate=Color(0.78,1.0,0.77,1.0)
 		overlay.add_child(icon)
+<<<<<<< HEAD
 	var terrain := world.get_node_or_null("WildTrapTerrain") as MeshInstance3D
 	if terrain==null or terrain.mesh==null:
 		return
+=======
+>>>>>>> c48bc408aa399c9df081fd6c37d7777f8b7a0851
 	for area in source.get("spawnAreas",[]):
 		if not (area is Dictionary) or bool(area.get("hidden",false)):
 			continue
@@ -161,6 +288,7 @@ static func refresh(world: Node3D, source: Dictionary, pending: PackedVector3Arr
 		if points.size()<3:
 			continue
 		var selected:=selected_kind=="area" and str(area.get("id",""))==str(selected_id)
+<<<<<<< HEAD
 		_add_area_surface(overlay, terrain, points, true, selected)
 	if pending.is_empty():
 		return
@@ -224,6 +352,22 @@ static func _add_area_surface(overlay: Node3D, terrain: MeshInstance3D, points: 
 static func marker_screen_radius(camera: Camera3D) -> float:
 	var viewport_height := camera.get_viewport().get_visible_rect().size.y
 	return clampf(viewport_height * 16.0 * MARKER_BASE_PIXEL_SIZE * _marker_scale, 8.0, 42.0)
+=======
+		var poly:=_polygon(points)
+		var id_text:=str(area.get("id",""))
+		_add_area_fill(overlay,world,poly,selected,id_text)
+		_add_area_border(overlay,world,poly,true,selected,id_text)
+	for item in pending:
+		if item is Dictionary:
+			var px:=float(item.get("x",0))
+			var pz:=float(item.get("z",0))
+			var pending_icon:=_make_sprite(texture,"PendingVertex")
+			pending_icon.position=Vector3(px,_height(world,px,pz)+3.0,pz)
+			# Orange vertices distinguish area drawing from green point spawns.
+			pending_icon.modulate=Color(1.0,0.62,0.12,1.0)
+			overlay.add_child(pending_icon)
+	_add_area_border(overlay,world,_polygon(pending),false,true,"Pending")
+>>>>>>> c48bc408aa399c9df081fd6c37d7777f8b7a0851
 
 
 static func closest_screen_point(source: Dictionary, camera: Camera3D, screen: Vector2, world: Node3D, radius_pixels: float = 42.0) -> Dictionary:
@@ -260,7 +404,9 @@ static func closest_point(source: Dictionary, x: float, z: float, threshold: flo
 
 static func containing_area(source: Dictionary, x: float, z: float) -> Dictionary:
 	var areas: Array = source.get("spawnAreas",[])
+	var hit:=Vector2(x,z)
 	for i in range(areas.size()-1,-1,-1):
+<<<<<<< HEAD
 		var area: Dictionary = areas[i]
 		if bool(area.get("hidden", false)):
 			continue
@@ -277,4 +423,42 @@ static func containing_area(source: Dictionary, x: float, z: float) -> Dictionar
 			if position.distance_squared_to(nearest) <= AREA_BORDER_WIDTH * AREA_BORDER_WIDTH:
 				return area
 			previous = point
+=======
+		var area: Dictionary=areas[i]
+		if bool(area.get("hidden",false)):
+			continue
+		var points: Array=area.get("points",[])
+		if SPAWNS.contains(points,x,z):
+			return area
+		# Include the visible orange ribbon (and a little click tolerance).
+		var poly:=_polygon(points)
+		for j in range(poly.size()):
+			var closest:=Geometry2D.get_closest_point_to_segment(hit,poly[j],poly[(j+1)%poly.size()])
+			if closest.distance_to(hit)<=2.0:
+				return area
+>>>>>>> c48bc408aa399c9df081fd6c37d7777f8b7a0851
 	return {}
+
+
+# Screen-space perimeter fallback for steep terrain and distant views.
+static func closest_area_border(source: Dictionary, camera: Camera3D, screen: Vector2, world: Node3D) -> Dictionary:
+	var areas: Array=source.get("spawnAreas",[])
+	var nearest: Dictionary={}
+	var best:=8.0
+	for i in range(areas.size()-1,-1,-1):
+		var area: Dictionary=areas[i]
+		if bool(area.get("hidden",false)):
+			continue
+		var poly:=_polygon(area.get("points",[]))
+		for j in range(poly.size()):
+			var a:=_ribbon_vertex(world,poly[j])
+			var b:=_ribbon_vertex(world,poly[(j+1)%poly.size()])
+			if camera.is_position_behind(a) or camera.is_position_behind(b):
+				continue
+			var pa:=camera.unproject_position(a)
+			var pb:=camera.unproject_position(b)
+			var distance:=Geometry2D.get_closest_point_to_segment(screen,pa,pb).distance_to(screen)
+			if distance<best:
+				best=distance
+				nearest=area
+	return nearest
