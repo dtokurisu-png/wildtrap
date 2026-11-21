@@ -19,6 +19,10 @@ script = ExtResource("1_bootstrap")
 [node name="Sun" type="DirectionalLight3D" parent="." unique_id=909085288]
 transform = Transform3D(0.92104214, 0.32047173, -0.22131242, -0.005889313, 0.5796458, 0.8148473, 0.38941833, -0.7492053, 0.5357656, 82.269226, 523.5654, 0)
 shadow_enabled = true
+shadow_bias = 0.0
+shadow_transmittance_bias = -0.63
+shadow_opacity = 0.62
+shadow_blur = 0.0
 directional_shadow_max_distance = 800.0
 
 [node name="World" type="Node3D" parent="." unique_id=1656281415]
@@ -28,8 +32,7 @@ script = ExtResource("2_world")
 environment = SubResource("Environment_start")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=146934933]
-position = Vector3(0, 240, 382)
-rotation = Vector3(-0.43, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 0.90896577, 0.4168708, 0, -0.4168708, 0.90896577, 0, 240, 382)
 current = true
 far = 3200.0
 
