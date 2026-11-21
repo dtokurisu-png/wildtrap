@@ -142,15 +142,34 @@ vec3 handpaint_underlay(vec3 base,vec2 uv,float upness){
  return mix(base,biome_hue,strength);
 }
 
+// Extend painted biome footprints OUTWARD before fading their edges.
+// The old weighted average reduced coverage around thin or imperfect
+// polygons, leaving visible unpainted bands between adjacent regions.
+// Max-filtered rings preserve full coverage inside the source polygon,
+// then project progressively weaker coverage just past its boundary.
 float feather_region(sampler2D mask_image,vec2 coords){
  float radius=region_feather_world/630.0;
  float center=texture(mask_image,coords).r;
  if(radius<0.000001)return center;
- float a=texture(mask_image,clamp(coords+vec2(radius,0.0),vec2(0.0),vec2(1.0))).r;
- float b=texture(mask_image,clamp(coords-vec2(radius,0.0),vec2(0.0),vec2(1.0))).r;
- float c=texture(mask_image,clamp(coords+vec2(0.0,radius),vec2(0.0),vec2(1.0))).r;
- float d=texture(mask_image,clamp(coords-vec2(0.0,radius),vec2(0.0),vec2(1.0))).r;
- return clamp(0.5*center+0.125*(a+b+c+d),0.0,1.0);
+ vec2 step_near=vec2(radius*0.35,0.0);
+ vec2 step_far=vec2(radius,0.0);
+ vec2 diagonal=vec2(radius*0.50);
+ float near_ring=max(
+  max(texture(mask_image,clamp(coords+step_near,vec2(0.0),vec2(1.0))).r,
+      texture(mask_image,clamp(coords-step_near,vec2(0.0),vec2(1.0))).r),
+  max(texture(mask_image,clamp(coords+step_near.yx,vec2(0.0),vec2(1.0))).r,
+      texture(mask_image,clamp(coords-step_near.yx,vec2(0.0),vec2(1.0))).r));
+ float mid_ring=max(
+  max(texture(mask_image,clamp(coords+diagonal,vec2(0.0),vec2(1.0))).r,
+      texture(mask_image,clamp(coords-diagonal,vec2(0.0),vec2(1.0))).r),
+  max(texture(mask_image,clamp(coords+vec2(diagonal.x,-diagonal.y),vec2(0.0),vec2(1.0))).r,
+      texture(mask_image,clamp(coords+vec2(-diagonal.x,diagonal.y),vec2(0.0),vec2(1.0))).r));
+ float far_ring=max(
+  max(texture(mask_image,clamp(coords+step_far,vec2(0.0),vec2(1.0))).r,
+      texture(mask_image,clamp(coords-step_far,vec2(0.0),vec2(1.0))).r),
+  max(texture(mask_image,clamp(coords+step_far.yx,vec2(0.0),vec2(1.0))).r,
+      texture(mask_image,clamp(coords-step_far.yx,vec2(0.0),vec2(1.0))).r));
+ return clamp(max(center,max(near_ring*0.72,max(mid_ring*0.46,far_ring*0.22))),0.0,1.0);
 }
 
 void fragment(){
@@ -171,7 +190,8 @@ void fragment(){
  if(mp>0.001){accum+=mix(unassigned,color_adjust(texture(ground_plains,base_uv*repeat_plains).rgb,biome_contrast_plains,biome_saturation_plains),ground_opacity_plains)*mp;}
  if(ms>0.001){accum+=mix(unassigned,color_adjust(texture(ground_swamp,base_uv*repeat_swamp).rgb,biome_contrast_swamp,biome_saturation_swamp),ground_opacity_swamp)*ms;}
  if(mm>0.001){accum+=mix(unassigned,color_adjust(texture(ground_mountain,base_uv*repeat_mountain).rgb,biome_contrast_mountain,biome_saturation_mountain),ground_opacity_mountain)*mm;}
- vec3 ground=total>0.001?mix(unassigned,accum/max(total,0.001),clamp(total,0.0,1.0)):unassigned;
+ // Normalize overlapping neighboring biomes so extension doesn't expose bare base color.
+ vec3 ground=total>0.001?mix(unassigned,accum/max(total,0.001),smoothstep(0.0,0.24,total)):unassigned;
  ground=handpaint_underlay(ground,muv,upness);
 
  // The web cliff renderer paints ONLY polygons whose parent has the
