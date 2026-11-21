@@ -75,6 +75,11 @@ func spawn_place_point(category: String, x: float, z: float, player_slot: int = 
 	return _accept_spawn(next_world,SPAWNS.place_point(next_world,category,x,z,player_slot))
 
 
+func spawn_change_point_category(id_num: int, category: String, player_slot: int = 1) -> Dictionary:
+	var next_world: Dictionary = data.duplicate(true)
+	return _accept_spawn(next_world,SPAWNS.change_point_category(next_world,id_num,category,player_slot))
+
+
 func spawn_move_point(id_num: int, x: float, z: float) -> Dictionary:
 	var next_world: Dictionary = data.duplicate(true)
 	return _accept_spawn(next_world,SPAWNS.move_point(next_world,id_num,x,z))
