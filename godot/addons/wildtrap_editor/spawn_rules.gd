@@ -89,16 +89,20 @@ static func change_point_category(world: Dictionary, id_num: int, category: Stri
 	var record := _find_point(world,id_num)
 	if record.is_empty():
 		return {"ok":false,"error":"Punto no encontrado."}
-	if category=="player":
-		if player_slot<1 or player_slot>MAX_PLAYERS:
-			return {"ok":false,"error":"Jugador fuera del rango J1–J6."}
-		for existing in world.get("nodes",[]):
-			if existing is Dictionary and existing != record and str(existing.get("kind",""))=="playerSpawn" and int(existing.get("playerSlot",0))==player_slot:
-				return {"ok":false,"error":"J"+str(player_slot)+" ya tiene un punto. Selecciona otro jugador."}
+	if category=="player" and (player_slot<1 or player_slot>MAX_PLAYERS):
+		return {"ok":false,"error":"Jugador fuera del rango J1–J6."}
 	var old_category := point_category(record)
 	var old_slot := int(record.get("playerSlot",0))
 	if old_category==category and (category!="player" or old_slot==player_slot):
 		return {"ok":true,"changed":false,"id":id_num}
+	# Reassign a player slot atomically. Preserve the old marker and its
+	# coordinates; only its player role changes to unassigned.
+	if category=="player":
+		for existing in world.get("nodes",[]):
+			if existing is Dictionary and int(existing.get("id",-1))!=id_num and str(existing.get("kind",""))=="playerSpawn" and int(existing.get("playerSlot",0))==player_slot:
+				existing.erase("playerSlot")
+				existing["kind"]="spawnPoint"
+				existing["category"]="unassigned"
 	# Preserve id, position, and unrelated metadata; remove only spawn-specific keys.
 	record.erase("playerSlot")
 	record.erase("npcId")
