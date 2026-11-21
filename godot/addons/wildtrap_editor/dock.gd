@@ -13,7 +13,7 @@ const SPAWN_NAMES := {
 	"plants":"Plantas","rocks":"Rocas","objects":"Objetos",
 	"specialCreature":"Criatura especial","river":"Río","swamp":"Pantano",
 	"lake":"Lago","oasis":"Oasis","dune":"Duna","mountain":"Montaña",
-	"cliff":"Acantilado"
+	"cliff":"Acantilado","unassigned":"Sin asignar"
 }
 const BIOMES := ["forest","desert","plains","swamp","mountain"]
 const LABELS := {
@@ -218,20 +218,7 @@ func _build_panel() -> void:
 	draw_tools.add_child(action)
 	_button(draw_tools,"Cancelar",_cancel_spawn_tool)
 	_spawn_hint=_label(spawns_tab,"Crea un área marcando sus vértices y tocando de nuevo el primero para cerrarla.")
-	var point_params := HBoxContainer.new()
-	spawns_tab.add_child(point_params)
-	_spawn_point_category=OptionButton.new()
-	_spawn_point_category.name="SpawnCategory"
-	_spawn_point_category.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	for cat in SPAWNS.POINT_CATEGORIES:
-		_spawn_point_category.add_item(str(SPAWN_NAMES.get(cat,cat)))
-	_spawn_point_category.item_selected.connect(_on_spawn_category_selected)
-	point_params.add_child(_spawn_point_category)
-	_spawn_slot=OptionButton.new()
-	_spawn_slot.name="PlayerSlot"
-	for slot in range(1,SPAWNS.MAX_PLAYERS+1):
-		_spawn_slot.add_item("J"+str(slot))
-	point_params.add_child(_spawn_slot)
+
 	_label(spawns_tab,"Puntos")
 	_spawn_list=VBoxContainer.new()
 	_spawn_list.name="SpawnList"
@@ -245,6 +232,21 @@ func _build_panel() -> void:
 	_spawn_point_form=VBoxContainer.new()
 	_spawn_point_form.name="SpawnPointProperties"
 	spawns_tab.add_child(_spawn_point_form)
+	var point_params := HBoxContainer.new()
+	_spawn_point_form.add_child(point_params)
+	_spawn_point_category=OptionButton.new()
+	_spawn_point_category.name="SpawnCategory"
+	_spawn_point_category.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	for cat in SPAWNS.POINT_CATEGORIES:
+		_spawn_point_category.add_item(str(SPAWN_NAMES.get(cat,cat)))
+	_spawn_point_category.item_selected.connect(_on_spawn_category_selected)
+	point_params.add_child(_spawn_point_category)
+	_spawn_slot=OptionButton.new()
+	_spawn_slot.name="PlayerSlot"
+	for slot in range(1,SPAWNS.MAX_PLAYERS+1):
+		_spawn_slot.add_item("J"+str(slot))
+	_spawn_slot.item_selected.connect(_on_spawn_slot_selected)
+	point_params.add_child(_spawn_slot)
 	var pos_row := HBoxContainer.new()
 	_spawn_point_form.add_child(pos_row)
 	_spawn_point_x=_coordinate(pos_row)
@@ -710,6 +712,7 @@ func _select_spawn(id_num: int) -> void:
 	_selected_spawn_area_id=""
 	_pending_spawn_area.clear()
 	_spawn_mode="select"
+	SPAWN_VIEW.clear_cursor(_get_world())
 	_rebuild_spawn_buttons()
 	_update_spawn_info()
 	_redraw_spawn_overlay()
@@ -721,6 +724,7 @@ func _select_spawn_area(id_text: String) -> void:
 	_selected_spawn_kind="area"
 	_pending_spawn_area.clear()
 	_spawn_mode="select"
+	SPAWN_VIEW.clear_cursor(_get_world())
 	_spawn_selected_vertex=0
 	_rebuild_spawn_buttons()
 	_update_spawn_info()
@@ -752,7 +756,13 @@ func _update_spawn_info() -> void:
 	if _spawn_point_form.visible:
 		_spawn_point_x.set_value_no_signal(float(point.get("x",0)))
 		_spawn_point_z.set_value_no_signal(float(point.get("z",0)))
-		_spawn_info.text=str(SPAWN_NAMES.get(SPAWNS.point_category(point),"Punto"))
+		var cat: String=SPAWNS.point_category(point)
+		var index: int=SPAWNS.POINT_CATEGORIES.find(cat)
+		_spawn_point_category.select(maxi(index,0))
+		_spawn_slot.visible=cat=="player"
+		if cat=="player":
+			_spawn_slot.select(clampi(int(point.get("playerSlot",1))-1,0,SPAWNS.MAX_PLAYERS-1))
+		_spawn_info.text=str(SPAWN_NAMES.get(cat,"Punto"))
 	elif _spawn_area_form.visible:
 		_spawn_area_name.text=str(area.get("name",""))
 		var type_index := SPAWNS.AREA_CATEGORIES.find(str(area.get("type","trees")))
@@ -779,11 +789,27 @@ func _update_spawn_info() -> void:
 	_updating_spawn_controls=false
 
 
-func _on_spawn_category_selected(_index: int) -> void:
-	if _spawn_point_category==null:
+func _on_spawn_category_selected(index: int) -> void:
+	if _updating_spawn_controls or _selected_spawn().is_empty():
 		return
-	var cat: String = SPAWNS.POINT_CATEGORIES[_spawn_point_category.selected]
+	var cat: String=SPAWNS.POINT_CATEGORIES[index]
 	_spawn_slot.visible=cat=="player"
+	_apply_point_type(cat)
+
+
+func _on_spawn_slot_selected(_index: int) -> void:
+	if _updating_spawn_controls or _selected_spawn().is_empty():
+		return
+	_apply_point_type("player")
+
+
+func _apply_point_type(cat: String) -> void:
+	var result: Dictionary=_store.spawn_change_point_category(_current_spawn_id,cat,_spawn_slot.selected+1)
+	if _commit_spawn(result,"Tipo de punto actualizado."):
+		_update_spawn_info()
+	elif not bool(result.get("ok",false)):
+		# Reject a duplicate J1–J6 slot without changing the existing spawn.
+		_update_spawn_info()
 
 
 func _on_spawn_action_selected(index: int) -> void:
@@ -804,6 +830,8 @@ func _set_spawn_mode(mode: String) -> void:
 		_status.text="Selecciona un área."
 		return
 	_spawn_mode=mode
+	if mode!="point":
+		SPAWN_VIEW.clear_cursor(_get_world())
 	if mode=="area":
 		_pending_spawn_area.clear()
 		_status.text="Marca al menos 3 vértices en el terreno y pulsa el primero para cerrar."
@@ -819,6 +847,7 @@ func _set_spawn_mode(mode: String) -> void:
 func _cancel_spawn_tool() -> void:
 	_spawn_mode="select"
 	_pending_spawn_area.clear()
+	SPAWN_VIEW.clear_cursor(_get_world())
 	var action := find_child("SpawnAction",true,false) as OptionButton
 	if action!=null:
 		action.select(0)
@@ -833,6 +862,7 @@ func clear_spawn_preview() -> void:
 		if overlay!=null:
 			world.remove_child(overlay)
 			overlay.queue_free()
+		SPAWN_VIEW.clear_cursor(world)
 
 
 func _redraw_spawn_overlay() -> void:
@@ -865,6 +895,14 @@ func _commit_spawn(result: Dictionary, success_text: String) -> bool:
 func handle_spawn_viewport_input(camera: Camera3D, event: InputEvent) -> bool:
 	if _tabs==null or _tabs.current_tab!=2 or _spawn_mode.is_empty():
 		return false
+	if event is InputEventMouseMotion and _spawn_mode=="point":
+		var motion:=event as InputEventMouseMotion
+		if motion.alt_pressed or motion.ctrl_pressed or motion.shift_pressed:
+			SPAWN_VIEW.set_cursor(_get_world(),null)
+			return false
+		var surface: Variant=SPAWN_VIEW.pick_terrain(camera,motion.position,_get_world())
+		SPAWN_VIEW.set_cursor(_get_world(),surface)
+		return false
 	if not (event is InputEventMouseButton):
 		return false
 	var mouse := event as InputEventMouseButton
@@ -894,14 +932,22 @@ func spawn_world_click(hit: Vector3, near_first: bool = false) -> bool:
 	var x := clampf(hit.x,-315.0,315.0)
 	var z := clampf(hit.z,-315.0,315.0)
 	if _spawn_mode=="point":
-		var cat: String = SPAWNS.POINT_CATEGORIES[_spawn_point_category.selected]
-		var slot: int = _spawn_slot.selected+1
-		var result: Dictionary = _store.spawn_place_point(cat,x,z,slot)
-		if _commit_spawn(result,"Punto colocado."):
+		# A click on an existing marker selects it instead of placing a duplicate.
+		var existing: Dictionary=SPAWN_VIEW.closest_point(_source,x,z,1.6)
+		if not existing.is_empty():
+			_select_spawn(int(existing.get("id",-1)))
+			var action := find_child("SpawnAction",true,false) as OptionButton
+			if action!=null:
+				action.select(0)
+			SPAWN_VIEW.clear_cursor(_get_world())
+			return true
+		var result: Dictionary=_store.spawn_place_point("unassigned",x,z)
+		if _commit_spawn(result,"Punto colocado. Haz clic en él para asignarle un tipo."):
 			_current_spawn_id=int(result.get("id",-1))
 			_selected_spawn_kind="point"
 			_selected_spawn_area_id=""
 			_rebuild_spawn_buttons()
+			_update_spawn_info()
 		return true
 	if _spawn_mode=="area":
 		if near_first:
