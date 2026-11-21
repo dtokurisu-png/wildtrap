@@ -49,8 +49,15 @@ func _check() -> void:
 	mouse_move.position=screen
 	dock.call("_set_spawn_mode","point")
 	dock.call("handle_spawn_viewport_input",test_camera,mouse_move)
-	if world.get_node_or_null("__WildTrapSpawnCursor")==null:
+	var cursor:=world.get_node_or_null("__WildTrapSpawnCursor") as Sprite3D
+	if cursor==null:
 		_fail("Punto button did not display its green marker on mouse movement")
+		return
+	if cursor.texture==null or cursor.texture.get_width()!=24 or cursor.texture.get_height()!=32:
+		_fail("Spawn marker isn't the compact 24x32 R4 revision")
+		return
+	if not cursor.fixed_size:
+		_fail("Spawn marker must preserve its apparent size across camera distance")
 		return
 	var original_count: int=(dock.get("_store") as RefCounted).get("data").get("nodes",[]).size()
 	var click:=InputEventMouseButton.new()
