@@ -78,7 +78,8 @@ static func _make_sprite(texture: Texture2D, sprite_name: String) -> Sprite3D:
 	icon.fixed_size=true
 	icon.no_depth_test=true
 	icon.shaded=false
-	icon.pixel_size=0.0045
+	# ~40% of the previous size: stays legible at any zoom without covering terrain.
+	icon.pixel_size=0.0018
 	icon.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	icon.set_meta("wildtrap_editor_marker",true)
 	return icon
