@@ -59,6 +59,29 @@ func _check() -> void:
 	if not cursor.fixed_size:
 		_fail("Spawn marker must preserve its apparent size across camera distance")
 		return
+	var version_header:=dock.find_child("WildTrapBuildVersion",true,false) as Label
+	if version_header==null or version_header.text!="WILDTRAP EDITOR · VERSIÓN R6":
+		_fail("Current build version must appear in the main editor header")
+		return
+	var marker_slider:=dock.find_child("SpawnMarkerSize",true,false) as HSlider
+	if marker_slider==null:
+		_fail("Spawn marker size slider is missing")
+		return
+	marker_slider.value=20.0
+	var small_size: float=cursor.pixel_size
+	marker_slider.value=80.0
+	if not is_equal_approx(cursor.pixel_size,small_size*4.0):
+		_fail("Marker slider did not resize the live green cursor")
+		return
+	var overlay_node:=world.get_node_or_null("__WildTrapSpawnOverlay")
+	if overlay_node==null:
+		_fail("Spawn overlay is missing")
+		return
+	for child in overlay_node.get_children():
+		if child is Sprite3D and not is_equal_approx((child as Sprite3D).pixel_size,cursor.pixel_size):
+			_fail("Marker slider did not update an existing marker")
+			return
+	marker_slider.value=35.0
 	var original_count: int=(dock.get("_store") as RefCounted).get("data").get("nodes",[]).size()
 	var click:=InputEventMouseButton.new()
 	click.button_index=MOUSE_BUTTON_LEFT
