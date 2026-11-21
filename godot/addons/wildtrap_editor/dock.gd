@@ -753,8 +753,20 @@ func _update_spawn_info() -> void:
 		var index: int=SPAWNS.POINT_CATEGORIES.find(cat)
 		_spawn_point_category.select(maxi(index,0))
 		_spawn_slot.visible=cat=="player"
+		# Prefer the next free J slot for a new unassigned marker.
+		var occupied: Dictionary={}
+		for entry in _source.get("nodes",[]):
+			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("id",-1))!=_current_spawn_id:
+				occupied[int(entry.get("playerSlot",0))]=true
+		for i in range(SPAWNS.MAX_PLAYERS):
+			_spawn_slot.set_item_disabled(i,occupied.has(i+1))
 		if cat=="player":
 			_spawn_slot.select(clampi(int(point.get("playerSlot",1))-1,0,SPAWNS.MAX_PLAYERS-1))
+		else:
+			for i in range(SPAWNS.MAX_PLAYERS):
+				if not occupied.has(i+1):
+					_spawn_slot.select(i)
+					break
 		_spawn_info.text=str(SPAWN_NAMES.get(cat,"Punto"))
 	elif _spawn_area_form.visible:
 		_spawn_area_name.text=str(area.get("name",""))
@@ -786,6 +798,21 @@ func _on_spawn_category_selected(index: int) -> void:
 	if _updating_spawn_controls or _selected_spawn().is_empty():
 		return
 	var cat: String=SPAWNS.POINT_CATEGORIES[index]
+	if cat=="player":
+		var occupied: Dictionary={}
+		for entry in _source.get("nodes",[]):
+			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("id",-1))!=_current_spawn_id:
+				occupied[int(entry.get("playerSlot",0))]=true
+		var free_slot: int=-1
+		for slot in range(1,SPAWNS.MAX_PLAYERS+1):
+			if not occupied.has(slot):
+				free_slot=slot
+				break
+		if free_slot<0:
+			_status.text="Los seis jugadores J1–J6 ya están asignados."
+			_update_spawn_info()
+			return
+		_spawn_slot.select(free_slot-1)
 	_spawn_slot.visible=cat=="player"
 	_apply_point_type(cat)
 
