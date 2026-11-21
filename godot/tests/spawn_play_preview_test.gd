@@ -51,7 +51,7 @@ func _check() -> void:
 	if str(chosen.get("source",""))!="editor-preview":
 		_fail("Player spawn source should be editor-preview")
 		return
-	var scene: Node3D=(load("res://scenes/main.tscn") as PackedScene).instantiate()
+	var scene := (load("res://scenes/main.tscn") as PackedScene).instantiate() as Node3D
 	root.add_child(scene)
 	for i in range(10):
 		await process_frame
@@ -59,7 +59,7 @@ func _check() -> void:
 	if player==null:
 		_fail("Play did not instantiate the character")
 		return
-	var spawn: Vector3=player.initial_spawn
+	var spawn: Vector3=player.get("initial_spawn")
 	if absf(spawn.x-x)>0.05 or absf(spawn.z-z)>0.05:
 		_fail("Character spawned at old J1 after editor handoff: "+str(spawn))
 		return
