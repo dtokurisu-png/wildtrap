@@ -94,15 +94,15 @@ func _check() -> void:
 	if chosen.is_empty() or str(chosen.get("kind",""))!="spawnPoint" or str(chosen.get("category",""))!="unassigned":
 		_fail("Native viewport click did not place an unassigned marker")
 		return
-	var marker_id := int(chosen.get("id",-1))
+	var second_marker_id := int(chosen.get("id",-1))
 	# Repeated clicks create distinct placeholders; classification happens later.
 	dock.call("spawn_world_click",Vector3(-65,80,28))
 	var second: Dictionary=dock.call("_selected_spawn")
-	if second.is_empty() or int(second.get("id",-1))==marker_id:
+	if second.is_empty() or int(second.get("id",-1))==second_marker_id:
 		_fail("Consecutive point clicks failed to create separate markers")
 		return
-	dock.call("_select_spawn",marker_id)
-	var result: Dictionary=(dock.get("_store") as RefCounted).call("spawn_change_point_category",marker_id,"trees")
+	dock.call("_select_spawn",second_marker_id)
+	var result: Dictionary=(dock.get("_store") as RefCounted).call("spawn_change_point_category",second_marker_id,"trees")
 	if not bool(result.get("ok",false)):
 		_fail("Could not assign category to selected marker")
 		return
