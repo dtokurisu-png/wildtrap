@@ -677,7 +677,7 @@ func _rebuild_spawn_buttons() -> void:
 			continue
 		var id_num := int(entry.get("id",-1))
 		var category: String = SPAWNS.point_category(entry)
-		var label_text := "J"+str(entry.get("playerSlot","?")) if category=="player" else str(SPAWN_NAMES.get(category,category))+" "+str(id_num)
+		var label_text := "J"+str(int(entry.get("playerSlot",0))) if category=="player" else str(SPAWN_NAMES.get(category,category))+" "+str(id_num)
 		var button := _button(_spawn_list,label_text,_select_spawn.bind(id_num))
 		button.toggle_mode=true
 		button.set_pressed_no_signal(_selected_spawn_kind=="point" and _current_spawn_id==id_num)
@@ -767,7 +767,7 @@ func _update_spawn_info() -> void:
 				if not occupied.has(i+1):
 					_spawn_slot.select(i)
 					break
-		_spawn_info.text=str(SPAWN_NAMES.get(cat,"Punto"))
+		_spawn_info.text="Jugador "+str(int(point.get("playerSlot",0)))+" · spawn de Play" if cat=="player" else str(SPAWN_NAMES.get(cat,"Punto"))+" · no controla la aparición de J1"
 	elif _spawn_area_form.visible:
 		_spawn_area_name.text=str(area.get("name",""))
 		var type_index := SPAWNS.AREA_CATEGORIES.find(str(area.get("type","trees")))
@@ -963,6 +963,9 @@ func handle_spawn_viewport_input(camera: Camera3D, event: InputEvent) -> bool:
 		_update_spawn_info()
 		if updated:
 			_save_player_one_spawn_for_play(point_id)
+			var moved_point:=_selected_spawn()
+			if str(moved_point.get("kind",""))!="playerSpawn" or int(moved_point.get("playerSlot",0))!=1:
+				_status.text="Punto movido. El personaje aparece exclusivamente en J1."
 		return true
 	if not mouse.pressed or mouse.alt_pressed or mouse.ctrl_pressed or mouse.shift_pressed:
 		return false
