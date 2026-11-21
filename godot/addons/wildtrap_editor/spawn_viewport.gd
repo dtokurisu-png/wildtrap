@@ -4,6 +4,7 @@ extends RefCounted
 ## No physics collider, no changes to WildTrap geometry or saved scene owners.
 const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
 const OVERLAY_NAME := "__WildTrapSpawnOverlay"
+const CURSOR_NAME := "__WildTrapSpawnCursor"
 
 
 static func pick_mesh(ray_origin: Vector3, ray_direction: Vector3, terrain: MeshInstance3D) -> Variant:
@@ -52,9 +53,48 @@ static func _segment(mesh: ImmediateMesh, a: Vector3,b: Vector3,color: Color) ->
 
 
 static func _point_mark(mesh: ImmediateMesh, point: Vector3,color: Color) -> void:
-	_segment(mesh,point+Vector3(-2,0,0),point+Vector3(2,0,0),color)
-	_segment(mesh,point+Vector3(0,0,-2),point+Vector3(0,0,2),color)
-	_segment(mesh,point,point+Vector3(0,5,0),color)
+	# Green exclamation mark, standing above the terrain (Y is up).
+	# An elevated stroke and distinct small dot are visible at any zoom.
+	_segment(mesh,point+Vector3(0,1.4,0),point+Vector3(0,5.0,0),color)
+	_segment(mesh,point+Vector3(-0.20,0.35,0),point+Vector3(0.20,0.35,0),color)
+	_segment(mesh,point+Vector3(0,0.15,-0.20),point+Vector3(0,0.15,0.20),color)
+
+
+static func clear_cursor(world: Node3D) -> void:
+	if world==null:
+		return
+	var cursor := world.get_node_or_null(CURSOR_NAME)
+	if cursor!=null:
+		world.remove_child(cursor)
+		cursor.queue_free()
+
+
+static func set_cursor(world: Node3D, position: Variant) -> void:
+	if world==null:
+		return
+	var cursor := world.get_node_or_null(CURSOR_NAME) as MeshInstance3D
+	if not (position is Vector3):
+		if cursor!=null:
+			cursor.visible=false
+		return
+	if cursor==null:
+		var material := StandardMaterial3D.new()
+		material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.no_depth_test=true
+		material.vertex_color_use_as_albedo=true
+		material.albedo_color=Color(1,1,1,1)
+		var mesh := ImmediateMesh.new()
+		mesh.surface_begin(Mesh.PRIMITIVE_LINES,material)
+		_point_mark(mesh,Vector3.ZERO,Color(0.15,1.0,0.35,0.85))
+		mesh.surface_end()
+		cursor=MeshInstance3D.new()
+		cursor.name=CURSOR_NAME
+		cursor.mesh=mesh
+		cursor.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		cursor.set_meta("wildtrap_editor_marker",true)
+		world.add_child(cursor)
+	cursor.global_position=(position as Vector3)+Vector3.UP*0.4
+	cursor.visible=true
 
 
 static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_kind: String, selected_id: Variant, selected_vertex: int) -> void:
@@ -92,11 +132,9 @@ static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_
 		var z := float(node.get("z",0))
 		var p := Vector3(x,_height(world,x,z)+2.5,z)
 		var cat: String = SPAWNS.point_category(node)
-		var tint := Color(0.50,0.72,0.89,1.0) if cat=="player" else Color(0.75,0.70,0.92,1.0)
-		if not ["player","npc"].has(cat):
-			tint=Color(0.64,0.77,0.59,1.0)
+		var tint := Color(0.15,0.95,0.30,1.0)
 		if selected_kind=="point" and int(node.get("id",-1))==int(selected_id):
-			tint=Color(1.0,0.87,0.53,1.0)
+			tint=Color(0.50,1.0,0.60,1.0)
 		_point_mark(mesh,p,tint)
 	for area in source.get("spawnAreas",[]):
 		if not (area is Dictionary) or bool(area.get("hidden",false)):
