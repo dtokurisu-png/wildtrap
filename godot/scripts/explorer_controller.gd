@@ -157,15 +157,21 @@ func _find_animations(character: Node3D) -> void:
 
 
 func _spawn_at_player_one() -> void:
+	# Always read the same file the Spawn editor saves. A World resource can
+	# be cached in the editor and must never override the latest J1 on Play.
+	var latest: Variant=JSON.parse_string(FileAccess.get_file_as_string("res://data/world.json"))
+	var source: Dictionary=latest if latest is Dictionary else {}
 	var found: Dictionary={}
-	if world!=null and world.has_method("get"):
-		var source: Dictionary=world.get("source_world")
-		for entry in source.get("nodes",[]):
-			if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("playerSlot",0))==1:
-				found=entry
-				break
+	for entry in source.get("nodes",[]):
+		if entry is Dictionary and str(entry.get("kind",""))=="playerSpawn" and int(entry.get("playerSlot",0))==1:
+			found=entry
+			break
+	if found.is_empty():
+		push_error("WildTrap: no hay un punto asignado a Jugador 1 (J1) en world.json")
+		return
 	var px:=float(found.get("x",0))
 	var pz:=float(found.get("z",0))
+	print("WILDTRAP_PLAY_J1_FROM_DISK x=",px," z=",pz)
 	var surface:=0.0
 	if world!=null and world.has_method("_height_at"):
 		surface=float(world.call("_height_at",px,pz))
