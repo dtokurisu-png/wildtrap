@@ -177,6 +177,27 @@ static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_
 	# No owner: never permanently store the editor markers in main.tscn.
 
 
+# Screen-space hit-test matches what the player actually clicks, including
+# elevated terrain and steep surfaces. Avoid using ground X/Z proximity alone.
+static func closest_screen_point(source: Dictionary, camera: Camera3D, screen: Vector2, world: Node3D, radius_pixels: float = 20.0) -> Dictionary:
+	var nearest: Dictionary={}
+	var best:=radius_pixels*radius_pixels
+	for node in source.get("nodes",[]):
+		if not (node is Dictionary) or not SPAWNS.is_spawn_node(node):
+			continue
+		var x:=float(node.get("x",0))
+		var z:=float(node.get("z",0))
+		var position:=Vector3(x,_height(world,x,z)+4.0,z)
+		if camera.is_position_behind(position):
+			continue
+		var projection:=camera.unproject_position(position)
+		var distance:=projection.distance_squared_to(screen)
+		if distance<best:
+			best=distance
+			nearest=node
+	return nearest
+
+
 static func closest_point(source: Dictionary, x: float, z: float, threshold: float = 5.0) -> Dictionary:
 	var candidate: Dictionary = {}
 	var best := threshold*threshold
