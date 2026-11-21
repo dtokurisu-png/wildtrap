@@ -25,6 +25,13 @@ func _on_scene_changed(root: Node) -> void:
 		wildtrap_dock.on_scene_changed(root)
 
 
+# Godot only forwards editor viewport events to plugins that handle the
+# selected scene object. The WT tools operate on the World node, but must
+# keep receiving input when another scene node is selected.
+func _handles(object: Object) -> bool:
+	return object is Node3D
+
+
 func _forward_3d_gui_input(viewport_camera: Camera3D, event: InputEvent) -> int:
 	if wildtrap_dock != null and is_instance_valid(wildtrap_dock):
 		if wildtrap_dock.has_method("handle_spawn_viewport_input") and wildtrap_dock.handle_spawn_viewport_input(viewport_camera,event):
