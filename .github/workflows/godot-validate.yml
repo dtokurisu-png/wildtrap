@@ -1,0 +1,97 @@
+name: Validate WildTrap Godot base
+
+on:
+  push:
+    branches: [godot-migration]
+    paths:
+      - "godot/**"
+      - ".github/workflows/godot-validate.yml"
+  pull_request:
+    paths:
+      - "godot/**"
+      - ".github/workflows/godot-validate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: godot-migration-native-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout migration repository
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install geometry bake dependency
+        run: npm install --no-save --prefix godot/tools pngjs@7.0.0
+      - name: Validate independent canonical Godot map
+        run: node godot/tests/native_world_source.test.mjs
+      - name: Bake original cut/cliff geometry into native Godot terrain
+        run: node godot/tools/bake-world.mjs
+      - name: Check Godot-clockwise terrain faces and normals
+        run: node godot/tests/terrain_winding.test.mjs
+      - name: Record reproducible native terrain assets
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add godot/data/terrain.wtmesh godot/data/world-build.json godot/data/masks/
+          if ! git diff --cached --quiet; then
+            git commit -m "Bake reproducible native world from WildTrap source JSON"
+            git push origin HEAD:godot-migration
+          fi
+      - name: Install official Godot 4.7.2
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 --output godot-linux.zip \
+            "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          mkdir -p /tmp/wildtrap-godot
+          unzip -q godot-linux.zip -d /tmp/wildtrap-godot
+          chmod +x /tmp/wildtrap-godot/Godot_v4.7.2-stable_linux.x86_64
+          echo "/tmp/wildtrap-godot" >> "$GITHUB_PATH"
+          /tmp/wildtrap-godot/Godot_v4.7.2-stable_linux.x86_64 --headless --version
+      - name: Import Godot source and assets
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --import
+      - name: Verify source and baked terrain
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/world_data_test.gd
+      - name: Verify editor-native world preview without Play
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/editor_preview_test.gd
+      - name: Verify canonical JSON save, undo and redo
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/editor_store_test.gd
+      - name: Verify native spawn persistence and validation
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/spawn_store_test.gd
+      - name: Verify interactive 3D spawn dock and terrain ray picking
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/spawn_dock_test.gd
+      - name: Verify WildTrap editor dock and scene selectors
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/editor_dock_test.gd
+      - name: Verify plugin starts inside the native Godot editor
+        run: |
+          set -o pipefail
+          Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --quit-after 5 2>&1 | tee /tmp/wildtrap-dock.log
+          grep 'WILDTRAP_EDITOR_PLUGIN_READY' /tmp/wildtrap-dock.log
+      - name: Verify cliff colors, hand-painted artwork and original complementary textures
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/material_migration_test.gd
+      - name: Verify persisted object and texture edits in an isolated JSON copy
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/object_texture_store_test.gd
+      - name: Verify five native editor tabs and functional viewport palettes
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/five_tabs_editor_test.gd
+      - name: Verify 3D object dragging and split ground/painter panels
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --editor --script res://tests/object_drag_material_test.gd
+      - name: Verify native scene nodes
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/smoke_test.gd
+      - name: Verify unsaved J1 editor marker becomes the real Play spawn
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/spawn_play_preview_test.gd
+      - name: Verify Explorer 1 WT gameplay, animation, camera and collisions
+        run: Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --script res://tests/explorer_play_test.gd
+      - name: Boot native 3D world
+        run: |
+          set -o pipefail
+          Godot_v4.7.2-stable_linux.x86_64 --headless --path godot --quit-after 4 2>&1 | tee /tmp/wildtrap-native-boot.log
+          grep 'WILDTRAP_GODOT_WORLD_IMPORTED' /tmp/wildtrap-native-boot.log

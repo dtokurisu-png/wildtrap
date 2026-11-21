@@ -1,0 +1,58 @@
+{
+  "source": "godot/data/world.json (canonical native project; historical import from published snapshot)",
+  "size": 630,
+  "resolution": 129,
+  "heightSamples": 16641,
+  "offsets": 868,
+  "zones": 16,
+  "cliffs": 11,
+  "cuts": 6,
+  "vertices": 45257,
+  "triangles": 89274,
+  "cutStats": {
+    "originalTriangles": 32768,
+    "finalTriangles": 33575,
+    "newVertices": 547,
+    "clippedTriangles": 52,
+    "addedFaces": 859,
+    "limitedTriangles": 0,
+    "limitedFragments": 0,
+    "incomplete": false
+  },
+  "heightmapStats": [
+    {
+      "zone": "zone-8",
+      "originalVertices": 17188,
+      "vertices": 28965,
+      "triangles": 57120,
+      "subdivided": 7163,
+      "moved": 9697
+    },
+    {
+      "zone": "zone-9",
+      "originalVertices": 28965,
+      "vertices": 31141,
+      "triangles": 61472,
+      "subdivided": 1264,
+      "moved": 1595
+    },
+    {
+      "zone": "zone-10",
+      "originalVertices": 31141,
+      "vertices": 34239,
+      "triangles": 67661,
+      "subdivided": 1825,
+      "moved": 2347
+    },
+    {
+      "zone": "zone-11",
+      "originalVertices": 34239,
+      "vertices": 45257,
+      "triangles": 89274,
+      "subdivided": 6986,
+      "moved": 10338
+    }
+  ],
+  "disabledHeightmaps": 0,
+  "missing": "Full exported wildtrap-escenario (4).json not available; sculpt operations of GLB models and source-specific texture layering remain to migrate."
+}
