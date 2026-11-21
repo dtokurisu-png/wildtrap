@@ -36,6 +36,58 @@ func _check() -> void:
 	if not (hit is Vector3):
 		_fail("Native mesh ray picking returned no terrain")
 		return
+	# Exercise the same mouse-event entrypoint used by the editor viewport,
+	# rather than only calling spawn_world_click() directly.
+	var test_camera:=Camera3D.new()
+	scene.add_child(test_camera)
+	test_camera.global_position=hit+Vector3(0,60,80)
+	test_camera.look_at(hit,Vector3.UP)
+	test_camera.current=true
+	await process_frame
+	var screen: Vector2=test_camera.unproject_position(hit)
+	var mouse_move:=InputEventMouseMotion.new()
+	mouse_move.position=screen
+	dock.call("_set_spawn_mode","point")
+	dock.call("handle_spawn_viewport_input",test_camera,mouse_move)
+	if world.get_node_or_null("__WildTrapSpawnCursor")==null:
+		_fail("Punto button did not display its green marker on mouse movement")
+		return
+	var original_count: int=(dock.get("_store") as RefCounted).get("data").get("nodes",[]).size()
+	var click:=InputEventMouseButton.new()
+	click.button_index=MOUSE_BUTTON_LEFT
+	click.pressed=true
+	click.position=screen
+	if not bool(dock.call("handle_spawn_viewport_input",test_camera,click)):
+		_fail("Editor viewport left-click was not handled by Punto")
+		return
+	var current_count: int=(dock.get("_store") as RefCounted).get("data").get("nodes",[]).size()
+	if current_count!=original_count+1:
+		_fail("Mouse event did not persist an unassigned marker in editor state")
+		return
+	# Click and drag that same marker, releasing at another terrain hit.
+	var marker: Dictionary=dock.call("_selected_spawn")
+	var marker_id:=int(marker.get("id",-1))
+	var mark_world:=Vector3(float(marker.get("x",0)),float(hit.y)+4.0,float(marker.get("z",0)))
+	var mark_screen: Vector2=test_camera.unproject_position(mark_world)
+	click.position=mark_screen
+	if not bool(dock.call("handle_spawn_viewport_input",test_camera,click)):
+		_fail("Clicking a marker did not activate selection/drag")
+		return
+	var offset: Vector3=hit+Vector3(7,0,0)
+	var drag:=InputEventMouseMotion.new()
+	drag.position=test_camera.unproject_position(offset)
+	dock.call("handle_spawn_viewport_input",test_camera,drag)
+	var release:=InputEventMouseButton.new()
+	release.button_index=MOUSE_BUTTON_LEFT
+	release.pressed=false
+	release.position=drag.position
+	if not bool(dock.call("handle_spawn_viewport_input",test_camera,release)):
+		_fail("Marker release was not handled")
+		return
+	var moved: Dictionary=dock.call("_selected_spawn")
+	if int(moved.get("id",-1))!=marker_id or absf(float(moved.get("x",0))-float(marker.get("x",0)))<1.0:
+		_fail("Click-drag did not move the selected spawn marker")
+		return
 	dock.call("_set_spawn_mode","point")
 	dock.call("spawn_world_click",Vector3(-80,80,25))
 	var chosen: Dictionary = dock.call("_selected_spawn")
