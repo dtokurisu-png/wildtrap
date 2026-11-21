@@ -32,7 +32,7 @@ func _check() -> void:
 		_fail("Cannot access native terrain")
 		return
 	# A real downward ray must hit the native triangle mesh, not a flat plane.
-	var hit: Variant = picking.pick_mesh(Vector3(-50,250,55),Vector3.DOWN,terrain)
+	var hit: Variant = picking.pick_mesh(Vector3(170,250,170),Vector3.DOWN,terrain)
 	if not (hit is Vector3):
 		_fail("Native mesh ray picking returned no terrain")
 		return
