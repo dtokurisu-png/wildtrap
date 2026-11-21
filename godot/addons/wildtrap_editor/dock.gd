@@ -827,6 +827,7 @@ func _apply_point_type(cat: String) -> void:
 	var result: Dictionary=_store.spawn_change_point_category(_current_spawn_id,cat,_spawn_slot.selected+1)
 	if _commit_spawn(result,"Tipo de punto actualizado."):
 		_update_spawn_info()
+		_save_player_one_spawn_for_play(_current_spawn_id)
 	elif not bool(result.get("ok",false)):
 		# Reject a duplicate J1–J6 slot without changing the existing spawn.
 		_update_spawn_info()
@@ -891,6 +892,26 @@ func _redraw_spawn_overlay() -> void:
 		_spawn_selected_vertex)
 
 
+# Runtime Play reloads res://data/world.json in a separate scene.
+# Persist J1 relocations immediately so F5 does not use a stale spawn.
+func _save_player_one_spawn_for_play(point_id: int) -> void:
+	var point := _selected_spawn()
+	if int(point.get("id",-1))!=point_id:
+		return
+	if str(point.get("kind",""))!="playerSpawn" or int(point.get("playerSlot",0))!=1:
+		return
+	if not _store.dirty:
+		return
+	if _store.save():
+		_update_save_buttons()
+		if _editor_interface!=null:
+			_editor_interface.get_resource_filesystem().scan()
+		_status.text="J1 guardado. Play iniciará en esta posición."
+		print("WILDTRAP_J1_SPAWN_SAVED x=",point.get("x")," z=",point.get("z"))
+	else:
+		_status.text="J1 movido solo en el editor. No se pudo guardar: "+_store.last_error
+
+
 func _commit_spawn(result: Dictionary, success_text: String) -> bool:
 	if not bool(result.get("ok",false)):
 		_status.text=str(result.get("error","No se pudo aplicar."))
@@ -936,10 +957,12 @@ func handle_spawn_viewport_input(camera: Camera3D, event: InputEvent) -> bool:
 		var point_id:=_spawn_drag_id
 		_spawn_drag_id=-1
 		SPAWN_VIEW.set_cursor(world,null)
-		_commit_spawn(_store.spawn_move_point(point_id,_spawn_drag_position.x,_spawn_drag_position.z),"Punto movido.")
+		var updated := _commit_spawn(_store.spawn_move_point(point_id,_spawn_drag_position.x,_spawn_drag_position.z),"Punto movido.")
 		_current_spawn_id=point_id
 		_selected_spawn_kind="point"
 		_update_spawn_info()
+		if updated:
+			_save_player_one_spawn_for_play(point_id)
 		return true
 	if not mouse.pressed or mouse.alt_pressed or mouse.ctrl_pressed or mouse.shift_pressed:
 		return false
