@@ -99,6 +99,7 @@ func set_editor_interface(value: EditorInterface) -> void:
 
 
 func _ready() -> void:
+	print("WILDTRAP_SPAWN_MARKER_R4 texture=24x32")
 	_build_panel()
 	if not _store.open():
 		_status.text=_store.last_error
@@ -217,7 +218,7 @@ func _build_panel() -> void:
 	_button(draw_tools,"Área",_set_spawn_mode.bind("area"))
 	_button(draw_tools,"Cancelar",_cancel_spawn_tool)
 	_button(draw_tools,"Eliminar punto",_delete_selected_point)
-	_spawn_hint=_label(spawns_tab,"Crea un área marcando sus vértices y tocando de nuevo el primero para cerrarla.")
+	_spawn_hint=_label(spawns_tab,"Marcadores compactos · R4 (24×32)")
 
 	_label(spawns_tab,"Puntos")
 	_spawn_list=VBoxContainer.new()
