@@ -21,7 +21,7 @@ const LABELS := {
 	"forest":"Bosque","desert":"Desierto","plains":"Pradera",
 	"swamp":"Pantano","mountain":"Montaña"
 }
-const EDITOR_BUILD := "WT-GD-R5"
+const EDITOR_BUILD := "R6"
 const PAGE_SIZE := 12
 const MARKER_COLOR := Color(0.40,0.70,0.56,1.0)
 
@@ -85,6 +85,8 @@ var _spawn_density: HSlider
 var _spawn_density_label: Label
 var _spawn_area_hidden: CheckButton
 var _spawn_hint: Label
+var _spawn_size_label: Label
+const SPAWN_SIZE_SETTING := "wildtrap/spawn_marker_scale"
 var _spawn_selected_vertex := 0
 var _updating_spawn_controls := false
 var _preview_signature := ""
@@ -157,12 +159,10 @@ func _tab(tabs: TabContainer, name_text: String) -> VBoxContainer:
 	return body
 
 func _build_panel() -> void:
-	var header := _label(self,"WILDTRAP EDITOR")
+	var header := _label(self,"WILDTRAP EDITOR · VERSIÓN "+EDITOR_BUILD)
+	header.name="WildTrapBuildVersion"
 	header.add_theme_font_size_override("font_size",17)
-	var version_label := _label(self,"Versión: "+EDITOR_BUILD+"  |  Spawns: "+SPAWN_VIEW.MARKER_BUILD)
-	version_label.name="WildTrapBuildVersion"
-	version_label.add_theme_font_size_override("font_size",13)
-	version_label.tooltip_text="Proyecto: "+ProjectSettings.globalize_path("res://")
+	header.tooltip_text="Proyecto: "+ProjectSettings.globalize_path("res://")
 	_status=_label(self,"")
 	var saves := HBoxContainer.new()
 	add_child(saves)
@@ -224,7 +224,29 @@ func _build_panel() -> void:
 	_button(draw_tools,"Área",_set_spawn_mode.bind("area"))
 	_button(draw_tools,"Cancelar",_cancel_spawn_tool)
 	_button(draw_tools,"Eliminar punto",_delete_selected_point)
-	_spawn_hint=_label(spawns_tab,"Marcadores compactos · R4 (24×32)")
+	var size_row := HBoxContainer.new()
+	spawns_tab.add_child(size_row)
+	_label(size_row,"Tamaño del indicador")
+	_spawn_size_label=Label.new()
+	size_row.add_child(_spawn_size_label)
+	var marker_size := HSlider.new()
+	marker_size.name="SpawnMarkerSize"
+	marker_size.min_value=5.0
+	marker_size.max_value=200.0
+	marker_size.step=1.0
+	marker_size.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	marker_size.tooltip_text="Tamaño visual del signo verde. No cambia la posición del spawn."
+	spawns_tab.add_child(marker_size)
+	var initial_scale: float=SPAWN_VIEW.DEFAULT_MARKER_SCALE
+	if _editor_interface!=null:
+		var settings:=_editor_interface.get_editor_settings()
+		if settings.has_setting(SPAWN_SIZE_SETTING):
+			initial_scale=clampf(float(settings.get_setting(SPAWN_SIZE_SETTING)),0.05,2.0)
+	marker_size.set_value_no_signal(initial_scale*100.0)
+	_spawn_size_label.text=str(roundi(marker_size.value))+"%"
+	SPAWN_VIEW.set_marker_scale(_get_world(),initial_scale)
+	marker_size.value_changed.connect(_on_spawn_marker_size_changed)
+	_spawn_hint=_label(spawns_tab,"Crea un área marcando vértices y pulsa el primero para cerrarla.")
 
 	_label(spawns_tab,"Puntos")
 	_spawn_list=VBoxContainer.new()
@@ -876,6 +898,13 @@ func clear_spawn_preview() -> void:
 			world.remove_child(overlay)
 			overlay.queue_free()
 		SPAWN_VIEW.clear_cursor(world)
+
+
+func _on_spawn_marker_size_changed(value: float) -> void:
+	_spawn_size_label.text=str(roundi(value))+"%"
+	SPAWN_VIEW.set_marker_scale(_get_world(),value/100.0)
+	if _editor_interface!=null:
+		_editor_interface.get_editor_settings().set_setting(SPAWN_SIZE_SETTING,value/100.0)
 
 
 func _redraw_spawn_overlay() -> void:
