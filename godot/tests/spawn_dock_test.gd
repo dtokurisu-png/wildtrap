@@ -60,7 +60,7 @@ func _check() -> void:
 		_fail("Spawn marker must preserve its apparent size across camera distance")
 		return
 	var version_header:=dock.find_child("WildTrapBuildVersion",true,false) as Label
-	if version_header==null or version_header.text!="WILDTRAP EDITOR · VERSIÓN R6":
+	if version_header==null or version_header.text!="WILDTRAP EDITOR · VERSIÓN R7":
 		_fail("Current build version must appear in the main editor header")
 		return
 	var marker_slider:=dock.find_child("SpawnMarkerSize",true,false) as HSlider
@@ -140,20 +140,59 @@ func _check() -> void:
 	if str((dock.call("_selected_spawn") as Dictionary).get("category",""))!="trees":
 		_fail("Categorization of selected point not persisted in editor state")
 		return
+	# Exercise native mouse events for drawing, closing and selecting an area,
+	# rather than calling the polygon close method directly.
+	test_camera.projection=Camera3D.PROJECTION_ORTHOGONAL
+	test_camera.size=45.0
+	test_camera.global_position=Vector3(92.5,250.0,92.5)
+	test_camera.look_at(Vector3(92.5,0.0,92.5),Vector3.FORWARD)
+	await process_frame
 	dock.call("_set_spawn_mode","area")
-	for p in [
-		Vector3(80,0,80),Vector3(105,0,80),
-		Vector3(105,0,105),Vector3(80,0,105)
-	]:
-		dock.call("spawn_world_click",p)
-	dock.call("_close_spawn_polygon")
-	var area: Dictionary = dock.call("_selected_spawn_area")
+	for p in [Vector3(80,0,80),Vector3(105,0,80),Vector3(105,0,105),Vector3(80,0,105)]:
+		click.position=test_camera.unproject_position(p)
+		if not bool(dock.call("handle_spawn_viewport_input",test_camera,click)):
+			_fail("Area button did not accept a viewport vertex")
+			return
+	click.position=test_camera.unproject_position(Vector3(80,0,80))
+	if not bool(dock.call("handle_spawn_viewport_input",test_camera,click)):
+		_fail("Area did not close by clicking its first vertex")
+		return
+	var area: Dictionary=dock.call("_selected_spawn_area")
 	if area.is_empty() or (area.get("points",[]) as Array).size()!=4:
 		_fail("Area drawing did not close polygon")
 		return
-	var visual := world.get_node_or_null("__WildTrapSpawnOverlay")
+	var visual:=world.get_node_or_null("__WildTrapSpawnOverlay")
 	if visual==null or visual.owner!=null:
 		_fail("Editor overlay missing or wrongly serialized")
+		return
+	var aid:=str(area.get("id",""))
+	var fill:=visual.get_node_or_null("AreaFill_"+aid) as MeshInstance3D
+	var border:=visual.get_node_or_null("AreaBorder_"+aid) as MeshInstance3D
+	if fill==null or fill.mesh==null or fill.mesh.get_surface_count()!=1:
+		_fail("Closed area missing translucent terrain fill")
+		return
+	if border==null or border.mesh==null or border.mesh.get_surface_count()!=1:
+		_fail("Closed area missing thick orange perimeter")
+		return
+	var fill_mat:=fill.mesh.surface_get_material(0) as StandardMaterial3D
+	var border_mat:=border.mesh.surface_get_material(0) as StandardMaterial3D
+	if fill_mat==null or fill_mat.albedo_color.a<=0.0 or fill_mat.albedo_color.a>=1.0:
+		_fail("Area fill must be semitransparent")
+		return
+	if border_mat==null or border_mat.albedo_color.r<0.95 or border_mat.albedo_color.g<0.20 or border_mat.albedo_color.g>0.65:
+		_fail("Area border must be orange")
+		return
+	dock.call("_select_spawn",second_marker_id)
+	click.position=test_camera.unproject_position(Vector3(92.5,0,92.5))
+	dock.call("handle_spawn_viewport_input",test_camera,click)
+	if str((dock.call("_selected_spawn_area") as Dictionary).get("id",""))!=aid:
+		_fail("Click inside the area did not select it")
+		return
+	dock.call("_select_spawn",second_marker_id)
+	click.position=test_camera.unproject_position(Vector3(80,0,92.5))
+	dock.call("handle_spawn_viewport_input",test_camera,click)
+	if str((dock.call("_selected_spawn_area") as Dictionary).get("id",""))!=aid:
+		_fail("Click on the perimeter did not select the area")
 		return
 	dock.call("_set_spawn_mode","move_vertex")
 	dock.call("spawn_world_click",Vector3(83,0,80))
@@ -162,7 +201,7 @@ func _check() -> void:
 		_fail("Viewport vertex reposition failed")
 		return
 	# Dock tests must never save data into res://.
-	print("WILDTRAP_SPAWN_DOCK_OK ray=true point=true closed_area=true move_vertex=true transient=true")
+	print("WILDTRAP_SPAWN_DOCK_OK ray=true point=true closed_area=true orange_border=true area_fill=true area_click=true move_vertex=true transient=true")
 	dock.call("clear_spawn_preview")
 	dock.queue_free()
 	scene.queue_free()
