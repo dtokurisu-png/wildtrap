@@ -59,6 +59,9 @@ var _tabs: TabContainer
 var _object_editor: Control
 var _texture_editor: Control
 var _spawn_mode := ""
+var _spawn_drag_id := -1
+var _spawn_drag_position := Vector3.ZERO
+var _spawn_dragging := false
 var _pending_spawn_area: Array = []
 var _selected_spawn_kind := "point"
 var _selected_spawn_area_id := ""
@@ -212,6 +215,7 @@ func _build_panel() -> void:
 	_button(draw_tools,"Punto",_set_spawn_mode.bind("point"))
 	_button(draw_tools,"Área",_set_spawn_mode.bind("area"))
 	_button(draw_tools,"Cancelar",_cancel_spawn_tool)
+	_button(draw_tools,"Eliminar punto",_delete_selected_point)
 	_spawn_hint=_label(spawns_tab,"Crea un área marcando sus vértices y tocando de nuevo el primero para cerrarla.")
 
 	_label(spawns_tab,"Puntos")
@@ -242,13 +246,7 @@ func _build_panel() -> void:
 		_spawn_slot.add_item("J"+str(slot))
 	_spawn_slot.item_selected.connect(_on_spawn_slot_selected)
 	point_params.add_child(_spawn_slot)
-	var pos_row := HBoxContainer.new()
-	_spawn_point_form.add_child(pos_row)
-	_spawn_point_x=_coordinate(pos_row)
-	_spawn_point_z=_coordinate(pos_row)
-	_button(_spawn_point_form,"Aplicar X/Z",_apply_point_coordinates)
-	_button(_spawn_point_form,"Mover punto en 3D",_set_spawn_mode.bind("move_point"))
-	_button(_spawn_point_form,"Eliminar punto",_delete_selected_spawn)
+
 
 	_spawn_area_form=VBoxContainer.new()
 	_spawn_area_form.name="SpawnAreaProperties"
@@ -325,6 +323,8 @@ func _coordinate(parent: Node) -> SpinBox:
 
 func _tab_changed(index: int) -> void:
 	if index!=2:
+		_spawn_dragging=false
+		_spawn_drag_id=-1
 		_spawn_mode=""
 		_pending_spawn_area.clear()
 		clear_spawn_preview()
@@ -749,8 +749,6 @@ func _update_spawn_info() -> void:
 	_spawn_area_form.visible=_selected_spawn_kind=="area" and not area.is_empty()
 	_updating_spawn_controls=true
 	if _spawn_point_form.visible:
-		_spawn_point_x.set_value_no_signal(float(point.get("x",0)))
-		_spawn_point_z.set_value_no_signal(float(point.get("z",0)))
 		var cat: String=SPAWNS.point_category(point)
 		var index: int=SPAWNS.POINT_CATEGORIES.find(cat)
 		_spawn_point_category.select(maxi(index,0))
@@ -818,6 +816,8 @@ func _set_spawn_mode(mode: String) -> void:
 		_status.text="Selecciona un área."
 		return
 	_spawn_mode=mode
+	_spawn_dragging=false
+	_spawn_drag_id=-1
 	if mode!="point":
 		SPAWN_VIEW.clear_cursor(_get_world())
 	if mode=="area":
@@ -833,6 +833,8 @@ func _set_spawn_mode(mode: String) -> void:
 
 
 func _cancel_spawn_tool() -> void:
+	_spawn_dragging=false
+	_spawn_drag_id=-1
 	_spawn_mode="select"
 	_pending_spawn_area.clear()
 	SPAWN_VIEW.clear_cursor(_get_world())
@@ -880,32 +882,59 @@ func _commit_spawn(result: Dictionary, success_text: String) -> bool:
 func handle_spawn_viewport_input(camera: Camera3D, event: InputEvent) -> bool:
 	if _tabs==null or _tabs.current_tab!=2 or _spawn_mode.is_empty():
 		return false
-	if event is InputEventMouseMotion and _spawn_mode=="point":
-		var motion:=event as InputEventMouseMotion
-		if motion.alt_pressed or motion.ctrl_pressed or motion.shift_pressed:
-			SPAWN_VIEW.set_cursor(_get_world(),null)
-			return false
-		var surface: Variant=SPAWN_VIEW.pick_terrain(camera,motion.position,_get_world())
-		SPAWN_VIEW.set_cursor(_get_world(),surface)
-		return false
-	if not (event is InputEventMouseButton):
-		return false
-	var mouse := event as InputEventMouseButton
-	if mouse.button_index!=MOUSE_BUTTON_LEFT or not mouse.pressed or mouse.alt_pressed or mouse.ctrl_pressed or mouse.shift_pressed:
-		return false
 	var world := _get_world()
 	if world==null:
 		return false
-	var hit: Variant = SPAWN_VIEW.pick_terrain(camera,mouse.position,world)
+	if event is InputEventMouseMotion:
+		var motion:=event as InputEventMouseMotion
+		if _spawn_dragging:
+			var surface: Variant=SPAWN_VIEW.pick_terrain(camera,motion.position,world)
+			if surface is Vector3:
+				_spawn_drag_position=surface
+				SPAWN_VIEW.set_cursor(world,surface)
+			return true
+		if _spawn_mode=="point":
+			if motion.alt_pressed or motion.ctrl_pressed or motion.shift_pressed:
+				SPAWN_VIEW.set_cursor(world,null)
+				return false
+			SPAWN_VIEW.set_cursor(world,SPAWN_VIEW.pick_terrain(camera,motion.position,world))
+		return false
+	if not (event is InputEventMouseButton):
+		return false
+	var mouse:=event as InputEventMouseButton
+	if mouse.button_index!=MOUSE_BUTTON_LEFT:
+		return false
+	if not mouse.pressed and _spawn_dragging:
+		_spawn_dragging=false
+		var point_id:=_spawn_drag_id
+		_spawn_drag_id=-1
+		SPAWN_VIEW.set_cursor(world,null)
+		_commit_spawn(_store.spawn_move_point(point_id,_spawn_drag_position.x,_spawn_drag_position.z),"Punto movido.")
+		_current_spawn_id=point_id
+		_selected_spawn_kind="point"
+		_update_spawn_info()
+		return true
+	if not mouse.pressed or mouse.alt_pressed or mouse.ctrl_pressed or mouse.shift_pressed:
+		return false
+	# Selection and movement are direct: no explicit move tool is needed.
+	var marker: Dictionary=SPAWN_VIEW.closest_screen_point(_source,camera,mouse.position,world)
+	if not marker.is_empty() and (_spawn_mode=="point" or _spawn_mode=="select"):
+		var point_id:=int(marker.get("id",-1))
+		_select_spawn(point_id)
+		_spawn_drag_id=point_id
+		_spawn_drag_position=Vector3(float(marker.get("x",0)),_terrain_y(float(marker.get("x",0)),float(marker.get("z",0))),float(marker.get("z",0)))
+		_spawn_dragging=true
+		return true
+	var hit: Variant=SPAWN_VIEW.pick_terrain(camera,mouse.position,world)
 	if not (hit is Vector3):
 		_status.text="No se encontró terreno bajo el cursor."
 		return false
-	var near_first := false
+	var near_first:=false
 	if _spawn_mode=="area" and _pending_spawn_area.size()>=3:
-		var first: Dictionary = _pending_spawn_area[0]
-		var px := float(first.get("x",0))
-		var pz := float(first.get("z",0))
-		var pixel: Vector2 = camera.unproject_position(Vector3(px,_terrain_y(px,pz)+2,pz))
+		var first: Dictionary=_pending_spawn_area[0]
+		var px:=float(first.get("x",0))
+		var pz:=float(first.get("z",0))
+		var pixel: Vector2=camera.unproject_position(Vector3(px,_terrain_y(px,pz)+2,pz))
 		near_first=pixel.distance_to(mouse.position)<17.0
 	return spawn_world_click(hit,near_first)
 
@@ -980,8 +1009,11 @@ func _close_spawn_polygon() -> void:
 		_redraw_spawn_overlay()
 
 
-func _apply_point_coordinates() -> void:
-	_commit_spawn(_store.spawn_move_point(_current_spawn_id,_spawn_point_x.value,_spawn_point_z.value),"Punto movido.")
+func _delete_selected_point() -> void:
+	if _selected_spawn_kind!="point" or _selected_spawn().is_empty():
+		_status.text="Selecciona un punto para eliminarlo."
+		return
+	_delete_selected_spawn()
 
 
 func _apply_vertex_coordinates() -> void:
