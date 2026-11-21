@@ -6,6 +6,7 @@ const STORE = preload("res://addons/wildtrap_editor/world_store.gd")
 const RULES = preload("res://addons/wildtrap_editor/biome_rules.gd")
 const SPAWNS = preload("res://addons/wildtrap_editor/spawn_rules.gd")
 const SPAWN_VIEW = preload("res://addons/wildtrap_editor/spawn_viewport.gd")
+const PLAY_SPAWN = preload("res://scripts/play_spawn_preview.gd")
 const OBJECT_EDITOR = preload("res://addons/wildtrap_editor/object_editor.gd")
 const TEXTURE_EDITOR = preload("res://addons/wildtrap_editor/texture_editor.gd")
 const SPAWN_NAMES := {
@@ -894,6 +895,21 @@ func _redraw_spawn_overlay() -> void:
 
 # Runtime Play reloads res://data/world.json in a separate scene.
 # Persist J1 relocations immediately so F5 does not use a stale spawn.
+# Called by EditorPlugin._build(), not by a click or a manual save.
+# Transfer live data so F5 follows J1 even when there are pending changes.
+func prepare_play_spawn_preview() -> bool:
+	if _store.data.is_empty() and not _store.open():
+		_status.text="No se pudo preparar Play: "+_store.last_error
+		return false
+	if not PLAY_SPAWN.prepare(_store.data):
+		_status.text="No se pudo preparar Play: falta un punto J1 válido."
+		return false
+	var point: Dictionary=PLAY_SPAWN.player_one(_store.data)
+	_status.text="Play desde J1: X "+str(snappedf(float(point.get("x",0)),0.01))+" · Z "+str(snappedf(float(point.get("z",0)),0.01))
+	print("WILDTRAP_EDITOR_PLAY_J1 x=",point.get("x")," z=",point.get("z"))
+	return true
+
+
 func _save_player_one_spawn_for_play(point_id: int) -> void:
 	var point := _selected_spawn()
 	if int(point.get("id",-1))!=point_id:
