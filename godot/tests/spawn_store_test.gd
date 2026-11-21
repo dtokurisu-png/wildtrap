@@ -118,8 +118,37 @@ func _check() -> void:
 	if not ops.validate_world(persisted) or FileAccess.get_file_as_string("res://data/world.json")!=original:
 		_fail("Save lost data or modified the repository fixture")
 		return
+	# Regression: the playable J1 spawn must survive a store save and reload.
+	var j1_id := -1
+	for item in store.data.get("nodes",[]):
+		if item is Dictionary and str(item.get("kind",""))=="playerSpawn" and int(item.get("playerSlot",0))==1:
+			j1_id=int(item.get("id",-1))
+			break
+	if j1_id<0:
+		_fail("J1 missing from original world")
+		return
+	if not bool(store.spawn_move_point(j1_id,31.5,42.25).get("ok",false)):
+		_fail("Cannot move playable J1 spawn")
+		return
+	if not store.save():
+		_fail("Cannot persist moved J1 spawn: "+store.last_error)
+		return
+	var reopened: RefCounted=store_script.new()
+	reopened.source_path=temp
+	reopened.save_masks=false
+	if not reopened.open():
+		_fail("Cannot reopen moved J1 fixture")
+		return
+	var loaded_j1: Dictionary={}
+	for item in reopened.data.get("nodes",[]):
+		if item is Dictionary and str(item.get("kind",""))=="playerSpawn" and int(item.get("playerSlot",0))==1:
+			loaded_j1=item
+			break
+	if absf(float(loaded_j1.get("x",0))-31.5)>0.01 or absf(float(loaded_j1.get("z",0))-42.25)>0.01:
+		_fail("Play would load the previous J1 coordinates after a save")
+		return
 	DirAccess.remove_absolute(abs_path)
-	print("WILDTRAP_SPAWN_STORE_OK players=6 npc=true vegetation=true polygon=true undo=true redo=true saved=true")
+	print("WILDTRAP_SPAWN_STORE_OK players=6 npc=true vegetation=true polygon=true undo=true redo=true saved=true j1_reload=true")
 	quit(0)
 
 
