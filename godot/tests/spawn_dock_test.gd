@@ -39,8 +39,24 @@ func _check() -> void:
 	dock.call("_set_spawn_mode","point")
 	dock.call("spawn_world_click",Vector3(-80,80,25))
 	var chosen: Dictionary = dock.call("_selected_spawn")
-	if chosen.is_empty() or str(chosen.get("kind",""))!="playerSpawn":
-		_fail("Native viewport click did not create/move player spawn")
+	if chosen.is_empty() or str(chosen.get("kind",""))!="spawnPoint" or str(chosen.get("category",""))!="unassigned":
+		_fail("Native viewport click did not place an unassigned marker")
+		return
+	var marker_id := int(chosen.get("id",-1))
+	# Repeated clicks create distinct placeholders; classification happens later.
+	dock.call("spawn_world_click",Vector3(-65,80,28))
+	var second: Dictionary=dock.call("_selected_spawn")
+	if second.is_empty() or int(second.get("id",-1))==marker_id:
+		_fail("Consecutive point clicks failed to create separate markers")
+		return
+	dock.call("_select_spawn",marker_id)
+	var result: Dictionary=dock._store.spawn_change_point_category(marker_id,"trees")
+	if not bool(result.get("ok",false)):
+		_fail("Could not assign category to selected marker")
+		return
+	dock.call("refresh_scene")
+	if str((dock.call("_selected_spawn") as Dictionary).get("category",""))!="trees":
+		_fail("Categorization of selected point not persisted in editor state")
 		return
 	dock.call("_set_spawn_mode","area")
 	for p in [
