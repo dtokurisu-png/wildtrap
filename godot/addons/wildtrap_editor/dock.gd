@@ -205,17 +205,12 @@ func _build_panel() -> void:
 
 	
 	var spawns_tab := _tab(tabs,"Spawns")
-	# Select an action directly; no redundant Punto/Área/Seleccionar/
-	# Cerrar área buttons. Click the first vertex again to close an area.
+	# Direct tools: place green markers continuously, draw areas, or cancel.
+	# Clicking an existing green marker opens its editable properties.
 	var draw_tools := HBoxContainer.new()
 	spawns_tab.add_child(draw_tools)
-	var action := OptionButton.new()
-	action.name="SpawnAction"
-	action.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	for title_text in ["Seleccionar existente","Crear punto","Crear área"]:
-		action.add_item(title_text)
-	action.item_selected.connect(_on_spawn_action_selected)
-	draw_tools.add_child(action)
+	_button(draw_tools,"Punto",_set_spawn_mode.bind("point"))
+	_button(draw_tools,"Área",_set_spawn_mode.bind("area"))
 	_button(draw_tools,"Cancelar",_cancel_spawn_tool)
 	_spawn_hint=_label(spawns_tab,"Crea un área marcando sus vértices y tocando de nuevo el primero para cerrarla.")
 
@@ -812,13 +807,6 @@ func _apply_point_type(cat: String) -> void:
 		_update_spawn_info()
 
 
-func _on_spawn_action_selected(index: int) -> void:
-	match index:
-		1: _set_spawn_mode("point")
-		2: _set_spawn_mode("area")
-		_: _set_spawn_mode("select")
-
-
 func _set_spawn_mode(mode: String) -> void:
 	if _get_world()==null:
 		_status.text="Abre el escenario 3D primero."
@@ -848,9 +836,6 @@ func _cancel_spawn_tool() -> void:
 	_spawn_mode="select"
 	_pending_spawn_area.clear()
 	SPAWN_VIEW.clear_cursor(_get_world())
-	var action := find_child("SpawnAction",true,false) as OptionButton
-	if action!=null:
-		action.select(0)
 	_status.text=""
 	_redraw_spawn_overlay()
 
@@ -936,9 +921,6 @@ func spawn_world_click(hit: Vector3, near_first: bool = false) -> bool:
 		var existing: Dictionary=SPAWN_VIEW.closest_point(_source,x,z,1.6)
 		if not existing.is_empty():
 			_select_spawn(int(existing.get("id",-1)))
-			var action := find_child("SpawnAction",true,false) as OptionButton
-			if action!=null:
-				action.select(0)
 			SPAWN_VIEW.clear_cursor(_get_world())
 			return true
 		var result: Dictionary=_store.spawn_place_point("unassigned",x,z)
@@ -994,9 +976,6 @@ func _close_spawn_polygon() -> void:
 		_pending_spawn_area.clear()
 		_spawn_selected_vertex=0
 		_spawn_mode="select"
-		var action := find_child("SpawnAction",true,false) as OptionButton
-		if action!=null:
-			action.select(0)
 		_rebuild_spawn_buttons()
 		_redraw_spawn_overlay()
 
