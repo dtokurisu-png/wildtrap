@@ -64,14 +64,26 @@ static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_
 	if old!=null:
 		world.remove_child(old)
 		old.queue_free()
+	# No surface may be started unless at least one visible marker exists.
+	var has_geometry := not pending.is_empty()
+	if not has_geometry:
+		for node in source.get("nodes",[]):
+			if node is Dictionary and SPAWNS.is_spawn_node(node):
+				has_geometry=true
+				break
+	if not has_geometry:
+		for area in source.get("spawnAreas",[]):
+			if area is Dictionary and not bool(area.get("hidden",false)) and (area.get("points",[]) as Array).size()>=3:
+				has_geometry=true
+				break
+	if not has_geometry:
+		return
 	var mesh := ImmediateMesh.new()
 	var material := StandardMaterial3D.new()
 	material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.no_depth_test=true
 	material.vertex_color_use_as_albedo=true
 	material.albedo_color=Color(1,1,1,1)
-	var had_vertices := false
-	# The following loops set this when any marker can be emitted.
 	mesh.surface_begin(Mesh.PRIMITIVE_LINES,material)
 	for node in source.get("nodes",[]):
 		if not (node is Dictionary) or not SPAWNS.is_spawn_node(node):
@@ -86,7 +98,6 @@ static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_
 		if selected_kind=="point" and int(node.get("id",-1))==int(selected_id):
 			tint=Color(1.0,0.87,0.53,1.0)
 		_point_mark(mesh,p,tint)
-		had_vertices=true
 	for area in source.get("spawnAreas",[]):
 		if not (area is Dictionary) or bool(area.get("hidden",false)):
 			continue
@@ -102,7 +113,6 @@ static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_
 			var az := float(a.get("z",0))
 			var bx := float(b.get("x",0))
 			var bz := float(b.get("z",0))
-			had_vertices=true
 			_segment(mesh,Vector3(ax,_height(world,ax,az)+2,az),
 				Vector3(bx,_height(world,bx,bz)+2,bz),tint)
 			if selected:
@@ -114,17 +124,11 @@ static func refresh(world: Node3D, source: Dictionary, pending: Array, selected_
 		var x := float(p.get("x",0))
 		var z := float(p.get("z",0))
 		_point_mark(mesh,Vector3(x,_height(world,x,z)+2,z),pending_tint)
-		had_vertices=true
 		if i>0:
 			var prev: Dictionary = pending[i-1]
 			var px := float(prev.get("x",0))
 			var pz := float(prev.get("z",0))
 			_segment(mesh,Vector3(px,_height(world,px,pz)+2,pz),Vector3(x,_height(world,x,z)+2,z),pending_tint)
-	# ImmediateMesh rejects ending an empty surface. An empty marker set is
-	# valid (e.g. before any spawn is placed or after Cancelar).
-	if not had_vertices:
-		# Nothing to display. Avoid surface_end() on an empty surface.
-		return
 	mesh.surface_end()
 	var overlay := MeshInstance3D.new()
 	overlay.name=OVERLAY_NAME
