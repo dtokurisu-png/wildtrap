@@ -21,6 +21,7 @@ const LABELS := {
 	"forest":"Bosque","desert":"Desierto","plains":"Pradera",
 	"swamp":"Pantano","mountain":"Montaña"
 }
+const EDITOR_BUILD := "WT-GD-R5"
 const PAGE_SIZE := 12
 const MARKER_COLOR := Color(0.40,0.70,0.56,1.0)
 
@@ -99,7 +100,8 @@ func set_editor_interface(value: EditorInterface) -> void:
 
 
 func _ready() -> void:
-	print("WILDTRAP_SPAWN_MARKER_R4 texture=24x32")
+	print("WILDTRAP_BUILD=",EDITOR_BUILD," | SPAWN_RENDERER=",SPAWN_VIEW.MARKER_BUILD)
+	print("WILDTRAP_PROJECT_PATH=",ProjectSettings.globalize_path("res://"))
 	_build_panel()
 	if not _store.open():
 		_status.text=_store.last_error
@@ -157,6 +159,10 @@ func _tab(tabs: TabContainer, name_text: String) -> VBoxContainer:
 func _build_panel() -> void:
 	var header := _label(self,"WILDTRAP EDITOR")
 	header.add_theme_font_size_override("font_size",17)
+	var version_label := _label(self,"Versión: "+EDITOR_BUILD+"  |  Spawns: "+SPAWN_VIEW.MARKER_BUILD)
+	version_label.name="WildTrapBuildVersion"
+	version_label.add_theme_font_size_override("font_size",13)
+	version_label.tooltip_text="Proyecto: "+ProjectSettings.globalize_path("res://")
 	_status=_label(self,"")
 	var saves := HBoxContainer.new()
 	add_child(saves)
