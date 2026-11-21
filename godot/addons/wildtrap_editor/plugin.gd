@@ -6,6 +6,8 @@ const DOCK_SCRIPT = preload("res://addons/wildtrap_editor/dock.gd")
 var wildtrap_dock: Control
 
 func _enter_tree() -> void:
+	# Receive raycast/drag input even when the scene tree selection changes.
+	set_input_event_forwarding_always_enabled()
 	wildtrap_dock = DOCK_SCRIPT.new()
 	wildtrap_dock.name = "WildTrap Editor"
 	wildtrap_dock.set_editor_interface(get_editor_interface())
